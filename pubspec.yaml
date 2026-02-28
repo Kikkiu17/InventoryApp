@@ -1,0 +1,28 @@
+name: inventory_app
+description: App per la gestione dell'inventario dei componenti nei cassetti
+
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shared_preferences: ^2.2.2
+  file_picker: ^6.1.1
+  path_provider: ^2.1.2
+  share_plus: ^7.2.1
+  uuid: ^4.3.3
+  flutter_slidable: ^3.0.1
+  provider: ^6.1.2
+  http: ^1.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
