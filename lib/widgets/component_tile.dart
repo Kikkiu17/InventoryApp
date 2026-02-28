@@ -26,7 +26,11 @@ class ComponentTile extends StatelessWidget {
     final cs    = theme.colorScheme;
     
     final hasCabinets = settings.numCabinets > 1;
-    final drawerText = hasCabinets ? '${component.cabinet}-${component.drawer}' : component.drawer;
+    final isUnassigned = component.drawer.isEmpty;
+    
+    final drawerText = isUnassigned 
+        ? 'Non\nass.' 
+        : (hasCabinets ? '${component.cabinet}-${component.drawer}' : component.drawer);
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -44,23 +48,30 @@ class ComponentTile extends StatelessWidget {
                 children: [
                   // Badge cassetto
                   Container(
-                    width: hasCabinets ? 54 : 48,
+                    width: hasCabinets || isUnassigned ? 54 : 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: cs.secondaryContainer,
+                      color: isUnassigned ? cs.errorContainer : cs.secondaryContainer,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(hasCabinets ? Icons.kitchen_outlined : Icons.inbox_outlined,
-                            size: 14, color: cs.onSecondaryContainer),
+                        Icon(
+                          isUnassigned 
+                              ? Icons.location_off_outlined 
+                              : (hasCabinets ? Icons.kitchen_outlined : Icons.inbox_outlined),
+                          size: 14, 
+                          color: isUnassigned ? cs.onErrorContainer : cs.onSecondaryContainer
+                        ),
                         const SizedBox(height: 2),
                         Text(drawerText,
+                            textAlign: TextAlign.center,
                             style: TextStyle(
-                                fontSize: 13,
+                                fontSize: isUnassigned ? 11 : 13,
+                                height: 1.1,
                                 fontWeight: FontWeight.bold,
-                                color: cs.onSecondaryContainer)),
+                                color: isUnassigned ? cs.onErrorContainer : cs.onSecondaryContainer)),
                       ],
                     ),
                   ),
