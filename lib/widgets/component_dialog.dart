@@ -23,10 +23,10 @@ class _ComponentDialogState extends State<ComponentDialog> {
   late TextEditingController _nameCtrl;
   late TextEditingController _descCtrl;
   late TextEditingController _qtyCtrl;
+  late TextEditingController _colCtrl;
+  late TextEditingController _rowCtrl;
 
   int _selectedCabinet = 1;
-  String? _selectedCol;
-  String? _selectedRow;
   
   List<String> _selectedTags = [];
   List<String> _treePath = [];
@@ -42,15 +42,20 @@ class _ComponentDialogState extends State<ComponentDialog> {
     _nameCtrl = TextEditingController(text: e?.name ?? '');
     _descCtrl = TextEditingController(text: e?.description ?? '');
     _qtyCtrl  = TextEditingController(text: (e?.quantity ?? 0).toString());
+    _colCtrl  = TextEditingController();
+    _rowCtrl  = TextEditingController();
 
     _selectedCabinet = e?.cabinet ?? 1;
 
-    if (e != null && e.drawer.length >= 2) {
-      _selectedCol = e.drawer.substring(0, 1);
-      _selectedRow = e.drawer.substring(1);
-    } else {
-      _selectedCol = widget.settings.columnLabels.firstOrNull;
-      _selectedRow = widget.settings.rowLabels.firstOrNull;
+    final d = e?.drawer ?? '';
+    if (d.isNotEmpty) {
+      final match = RegExp(r'^([A-Za-z]+)(\d+)$').firstMatch(d);
+      if (match != null) {
+        _colCtrl.text = match.group(1) ?? '';
+        _rowCtrl.text = match.group(2) ?? '';
+      } else {
+        _colCtrl.text = d;
+      }
     }
 
     _selectedTags = List.from(e?.tags ?? []);
@@ -81,6 +86,8 @@ class _ComponentDialogState extends State<ComponentDialog> {
     _nameCtrl.dispose();
     _descCtrl.dispose();
     _qtyCtrl.dispose();
+    _colCtrl.dispose();
+    _rowCtrl.dispose();
     for (final c in _specialTagCtrls.values) {
       c.dispose();
     }
@@ -110,8 +117,6 @@ class _ComponentDialogState extends State<ComponentDialog> {
   @override
   Widget build(BuildContext context) {
     final isEdit  = widget.existing != null && !widget.isDuplicate;
-    final cols    = widget.settings.columnLabels;
-    final rows    = widget.settings.rowLabels;
     final cs      = Theme.of(context).colorScheme;
 
     Map<String, dynamic> currentTreeLevel = widget.settings.tagTree;
@@ -194,7 +199,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                 Expanded(
                   child: TextFormField(
                     controller: _qtyCtrl,
-                    textInputAction: TextInputAction.done,
+                    textInputAction: TextInputAction.next,
                     decoration: InputDecoration(
                       labelText: 'Quantità', border: const OutlineInputBorder(), filled: true,
                       fillColor: Colors.green.withOpacity(_opacityGreen), 
@@ -227,26 +232,38 @@ class _ComponentDialogState extends State<ComponentDialog> {
               const SizedBox(height: 12),
               Row(children: [
                 Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _selectedCol,
+                  child: TextFormField(
+                    controller: _colCtrl,
+                    textInputAction: TextInputAction.next,
+                    textCapitalization: TextCapitalization.characters,
                     decoration: InputDecoration(
-                      labelText: 'Colonna', border: const OutlineInputBorder(), filled: true,
+                      labelText: 'Colonna', hintText: 'Es: A', border: const OutlineInputBorder(), filled: true,
                       fillColor: Colors.green.withOpacity(_opacityGreen),
                     ),
-                    items: cols.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                    onChanged: (v) => setState(() => _selectedCol = v),
+                    validator: (v) {
+                      if ((v?.isEmpty ?? true) && _rowCtrl.text.trim().isNotEmpty) return 'Manca colonna';
+                      if ((v?.isNotEmpty ?? false) && _rowCtrl.text.trim().isEmpty) return 'Manca riga';
+                      return null;
+                    },
+                    onFieldSubmitted: (_) => _submit(),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _selectedRow,
+                  child: TextFormField(
+                    controller: _rowCtrl,
+                    textInputAction: TextInputAction.done,
+                    keyboardType: TextInputType.number,
                     decoration: InputDecoration(
-                      labelText: 'Riga', border: const OutlineInputBorder(), filled: true,
+                      labelText: 'Riga', hintText: 'Es: 3', border: const OutlineInputBorder(), filled: true,
                       fillColor: Colors.green.withOpacity(_opacityGreen),
                     ),
-                    items: rows.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
-                    onChanged: (v) => setState(() => _selectedRow = v),
+                    validator: (v) {
+                      if ((v?.isEmpty ?? true) && _colCtrl.text.trim().isNotEmpty) return 'Manca riga';
+                      if ((v?.isNotEmpty ?? false) && _colCtrl.text.trim().isEmpty) return 'Manca colonna';
+                      return null;
+                    },
+                    onFieldSubmitted: (_) => _submit(),
                   ),
                 ),
               ]),
@@ -405,7 +422,11 @@ class _ComponentDialogState extends State<ComponentDialog> {
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     final qty    = int.tryParse(_qtyCtrl.text) ?? 0;
-    final drawer = '${_selectedCol!}${_selectedRow!}';
+    
+    // Se entrambi i campi colonna e riga sono vuoti, restituisce stringa vuota (Posizione non assegnata)
+    final col = _colCtrl.text.trim().toUpperCase();
+    final row = _rowCtrl.text.trim();
+    final drawer = col.isEmpty && row.isEmpty ? '' : '$col$row';
 
     final specialValues = <String, String>{};
     for (final st in widget.settings.specialTags) {

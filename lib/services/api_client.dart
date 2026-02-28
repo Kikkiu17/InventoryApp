@@ -160,4 +160,21 @@ class ApiClient {
         headers: _headers, body: jsonEncode(db)).timeout(_timeout);
     await _check(res);
   }
+
+  // ── Backups ──────────────────────────────────────────────────────────────────
+  Future<List<String>> getBackups() async {
+    final res = await http.get(_inv('/backups')).timeout(_timeout);
+    await _check(res);
+    return List<String>.from(jsonDecode(res.body));
+  }
+
+  Future<void> restoreBackup(String filename) async {
+    final res = await http.post(_inv('/backups/$filename/restore'), headers: _headers).timeout(_timeout);
+    await _check(res);
+  }
+
+  Future<void> createBackup() async {
+    final res = await http.post(_inv('/backup'), headers: _headers).timeout(_timeout);
+    await _check(res);
+  }
 }

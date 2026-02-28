@@ -371,8 +371,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ListTile(leading: Icon(Icons.upload_file, color: cs.primary), title: const Text('Esporta dati'), onTap: () async => await ds.exportData()),
             const Divider(height: 1),
             ListTile(leading: Icon(Icons.download_outlined, color: cs.primary), title: const Text('Importa dati'), onTap: () => _importData(ds)),
+            // --- NUOVO BOTTONE PER I BACKUP REMOTI ---
+            if (ds.isRemote && ds.serverConnected) ...[
+              const Divider(height: 1),
+              ListTile(
+                leading: Icon(Icons.restore, color: cs.primary), 
+                title: const Text('Ripristina backup remoto'), 
+                onTap: () => _showRestoreDialog(context, ds),
+              ),
+            ],
           ])),
-          const SizedBox(height: 32),
         ],
       ),
     );
@@ -558,6 +566,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _rowsCtrl.text = _rows.toString();
         _colsCtrl.text = _cols.toString();
       });
+    }
+  }
+
+  Future<void> _showRestoreDialog(BuildContext context, DataService ds) async {
+    final backups = await ds.getBackups();
+    if (!context.mounted) return;
+    if (backups.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Nessun backup trovato')));
+      return;
+    }
+    
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Ripristina backup'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: backups.length,
+            itemBuilder: (_, i) => ListTile(
+              title: Text(backups[i].replaceAll('.json', '').split('_').skip(1).join(' ')), // Formatta il nome per leggerlo meglio
+              leading: const Icon(Icons.history),
+              onTap: () => Navigator.pop(ctx, backups[i]),
+            )
+          )
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annulla'))],
+      )
+    );
+
+    if (choice != null && context.mounted) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Conferma ripristino'),
+          content: const Text('Sovrascrivere i dati attuali? (Verrà creato un backup di sicurezza automatico prima di procedere).'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annulla')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Ripristina'))
+          ]
+        )
+      );
+      
+      if (confirm == true) {
+        final ok = await ds.restoreBackup(choice);
+        if (ok && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Backup ripristinato con successo')));
+        }
+      }
     }
   }
 }

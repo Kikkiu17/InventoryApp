@@ -1,11 +1,18 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:open_filex/open_filex.dart';
+
 import '../models/component.dart';
 import '../models/settings.dart';
 import '../services/data_service.dart';
 import '../widgets/component_tile.dart';
 import '../widgets/component_dialog.dart';
 import 'inventory_list_screen.dart';
+import 'package:flutter/services.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,15 +27,19 @@ class _HomeScreenState extends State<HomeScreen> {
   List<String> _selectedTags = [];
   SortMode _sortMode = SortMode.name;
   String? _sortSpecialTag; 
-  Map<String, String> _specialFilters = {};
+  Map<String, SpecialFilter> _specialFilters = {};
   int? _cabinetFilter; 
+  bool _unassignedPosition = false;
   
   String _lastInventoryId = '';
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkConflict());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkConflict();
+      context.read<DataService>().checkForUpdates(); // Controllo automatico
+    });
   }
 
   void _checkConflict() {
@@ -73,6 +84,64 @@ class _HomeScreenState extends State<HomeScreen> {
     return '$v $unit';
   }
 
+  // Creazione ed esportazione del file PDF
+  Future<void> _exportToPdf(List<Component> items, AppSettings settings) async {
+    final fontData = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
+    final ttf = pw.Font.ttf(fontData);
+
+    final pdf = pw.Document(
+      theme: pw.ThemeData.withFont(base: ttf),
+    );
+
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        build: (context) => [
+          pw.Header(
+            level: 0,
+            child: pw.Text("Inventario Componenti", style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+          ),
+          pw.SizedBox(height: 10),
+          pw.TableHelper.fromTextArray(
+            headers: ['Nome', 'Posizione', 'Qtà', 'Dettagli'],
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+            cellAlignment: pw.Alignment.centerLeft,
+            // Aggiunto per evitare l'a capo sulle colonne strette
+            columnWidths: const {
+              0: pw.FlexColumnWidth(1.6),  // Nome (circa 2/3 di 2.5)
+              1: pw.FixedColumnWidth(70),  // Posizione
+              2: pw.FixedColumnWidth(40),  // Qtà
+              3: pw.FlexColumnWidth(4.9),  // Dettagli (allargata)
+            },
+            data: items.map((c) {
+              final pos = c.drawer.isEmpty ? 'Non ass.' : (settings.numCabinets > 1 ? '${c.cabinet}-${c.drawer}' : c.drawer);
+              final props = c.specialTagValues.entries.map((e) {
+                final st = settings.specialTags.where((s) => s.name == e.key).firstOrNull;
+                return '${e.key}: ${_formatValueWithUnit(e.value, st?.unit ?? '')}';
+              }).join(', ');
+              final details = [if (c.description.isNotEmpty) c.description, if (c.tags.isNotEmpty) c.tags.join(', '), if (props.isNotEmpty) props].join('\n');
+              
+              return [c.name, pos, c.quantity.toString(), details];
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/inventario_export.pdf');
+      await file.writeAsBytes(await pdf.save());
+      await OpenFilex.open(file.path);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Errore esportazione PDF: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ds = context.watch<DataService>();
@@ -84,6 +153,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _selectedTags.clear();
       _specialFilters.clear();
       _cabinetFilter = null;
+      _unassignedPosition = false;
       _sortMode = SortMode.name;
       _sortSpecialTag = null;
     }
@@ -94,8 +164,8 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     }
 
-    final results = ds.search(_query, _selectedTags, _sortMode, _specialFilters, _sortSpecialTag, _cabinetFilter);
-    final hasFilter = _query.isNotEmpty || _selectedTags.isNotEmpty || _specialFilters.isNotEmpty || _cabinetFilter != null;
+    final results = ds.search(_query, _selectedTags, _sortMode, _specialFilters, _sortSpecialTag, _cabinetFilter, _unassignedPosition);
+    final hasFilter = _query.isNotEmpty || _selectedTags.isNotEmpty || _specialFilters.isNotEmpty || _cabinetFilter != null || _unassignedPosition;
 
     return Scaffold(
       appBar: AppBar(
@@ -115,6 +185,11 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf),
+            tooltip: 'Esporta lista in PDF',
+            onPressed: () => _exportToPdf(results, ds.settings),
+          ),
           if (ds.isRemote)
             ds.syncing
                 ? const Padding(
@@ -201,6 +276,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   _selectedTags.clear();
                   _specialFilters.clear();
                   _cabinetFilter = null;
+                  _unassignedPosition = false;
                 }),
               ),
               const SizedBox(width: 8),
@@ -210,22 +286,33 @@ class _HomeScreenState extends State<HomeScreen> {
               selectedTags: _selectedTags,
               specialFilters: _specialFilters,
               selectedCabinet: _cabinetFilter,
-              onChanged: (tags, filters, cab) => setState(() {
+              unassignedPos: _unassignedPosition,
+              onChanged: (tags, filters, cab, unassigned) => setState(() {
                 _selectedTags   = tags;
                 _specialFilters = filters;
-                _cabinetFilter = cab;
+                _cabinetFilter  = cab;
+                _unassignedPosition = unassigned;
               }),
             ),
           ]),
         ),
 
-        if (_selectedTags.isNotEmpty || _specialFilters.isNotEmpty || _cabinetFilter != null)
+        if (_selectedTags.isNotEmpty || _specialFilters.isNotEmpty || _cabinetFilter != null || _unassignedPosition)
           SizedBox(
             height: 44,
             child: ListView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               children: [
+                if (_unassignedPosition)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: InputChip(
+                      avatar: const Icon(Icons.location_off_outlined, size: 16),
+                      label: const Text('Senza posizione', style: TextStyle(fontWeight: FontWeight.bold)),
+                      onDeleted: () => setState(() => _unassignedPosition = false),
+                    ),
+                  ),
                 if (_cabinetFilter != null)
                   Padding(
                     padding: const EdgeInsets.only(right: 6),
@@ -246,13 +333,25 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     )),
                 ..._specialFilters.entries.map((e) {
+                  final f = e.value;
                   final st = ds.settings.specialTags.where((s) => s.name == e.key).firstOrNull;
                   final unit = st?.unit ?? '';
-                  final formattedLabel = _formatValueWithUnit(e.value, unit); // Usa il nuovo formatter
+                  String labelText = '${e.key}: ';
+                  
+                  if (f.exact.isNotEmpty) {
+                    labelText += _formatValueWithUnit(f.exact, unit);
+                  } else if (f.min.isNotEmpty && f.max.isNotEmpty) {
+                    labelText += '${_formatValueWithUnit(f.min, unit)} - ${_formatValueWithUnit(f.max, unit)}';
+                  } else if (f.min.isNotEmpty) {
+                    labelText += '>= ${_formatValueWithUnit(f.min, unit)}';
+                  } else if (f.max.isNotEmpty) {
+                    labelText += '<= ${_formatValueWithUnit(f.max, unit)}';
+                  }
+
                   return Padding(
                     padding: const EdgeInsets.only(right: 6),
                     child: InputChip(
-                      label: Text('${e.key}: $formattedLabel'),
+                      label: Text(labelText),
                       onDeleted: () => setState(() => _specialFilters.remove(e.key)),
                     ),
                   );
@@ -507,15 +606,17 @@ class _ServerBanner extends StatelessWidget {
 class _FilterButton extends StatelessWidget {
   final AppSettings settings;
   final List<String> selectedTags;
-  final Map<String, String> specialFilters;
+  final Map<String, SpecialFilter> specialFilters;
   final int? selectedCabinet;
-  final void Function(List<String>, Map<String, String>, int?) onChanged;
+  final bool unassignedPos;
+  final void Function(List<String>, Map<String, SpecialFilter>, int?, bool) onChanged;
 
   const _FilterButton({
     required this.settings, 
     required this.selectedTags, 
     required this.specialFilters, 
     required this.selectedCabinet,
+    required this.unassignedPos,
     required this.onChanged,
   });
 
@@ -541,9 +642,9 @@ class _FilterButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final active = selectedTags.isNotEmpty || specialFilters.isNotEmpty || selectedCabinet != null;
+    final active = selectedTags.isNotEmpty || specialFilters.isNotEmpty || selectedCabinet != null || unassignedPos;
     final cs     = Theme.of(context).colorScheme;
-    final count  = selectedTags.length + specialFilters.length + (selectedCabinet != null ? 1 : 0);
+    final count  = selectedTags.length + specialFilters.length + (selectedCabinet != null ? 1 : 0) + (unassignedPos ? 1 : 0);
 
     return Badge(
       isLabelVisible: active, label: Text('$count'),
@@ -558,9 +659,17 @@ class _FilterButton extends StatelessWidget {
   void _showFilterSheet(BuildContext context) {
     List<String> tempTags = List.from(selectedTags);
     int? tempCabinet = selectedCabinet;
-    Map<String, TextEditingController> tempCtrls = {};
+    bool tempUnassigned = unassignedPos;
+    
+    // Configurazione controller per i range
+    Map<String, Map<String, TextEditingController>> tempCtrls = {};
     for (final st in settings.specialTags) {
-      tempCtrls[st.name] = TextEditingController(text: specialFilters[st.name] ?? '');
+      final f = specialFilters[st.name];
+      tempCtrls[st.name] = {
+        'exact': TextEditingController(text: f?.exact ?? ''),
+        'min': TextEditingController(text: f?.min ?? ''),
+        'max': TextEditingController(text: f?.max ?? ''),
+      };
     }
 
     List<String> treePath = [];
@@ -581,9 +690,16 @@ class _FilterButton extends StatelessWidget {
     bool showLooseTags = false;
 
     void applyFilters() {
-      final activeFilters = <String, String>{};
-      tempCtrls.forEach((k, v) { if (v.text.trim().isNotEmpty) activeFilters[k] = v.text.trim(); });
-      onChanged(tempTags, activeFilters, tempCabinet);
+      final activeFilters = <String, SpecialFilter>{};
+      tempCtrls.forEach((k, v) { 
+        final exact = v['exact']!.text.trim();
+        final min = v['min']!.text.trim();
+        final max = v['max']!.text.trim();
+        if (exact.isNotEmpty || min.isNotEmpty || max.isNotEmpty) {
+          activeFilters[k] = SpecialFilter(exact: exact, min: min, max: max);
+        }
+      });
+      onChanged(tempTags, activeFilters, tempCabinet, tempUnassigned);
       Navigator.pop(context);
     }
 
@@ -614,7 +730,12 @@ class _FilterButton extends StatelessWidget {
                       tempTags.clear(); 
                       treePath.clear(); 
                       tempCabinet = null;
-                      for (final ctrl in tempCtrls.values) ctrl.clear(); 
+                      tempUnassigned = false;
+                      for (final grp in tempCtrls.values) {
+                        grp['exact']!.clear();
+                        grp['min']!.clear();
+                        grp['max']!.clear();
+                      }
                     }),
                     child: const Text('Rimuovi tutti'),
                   ),
@@ -622,9 +743,18 @@ class _FilterButton extends StatelessWidget {
                 Expanded(
                   child: ListView(controller: sc, children: [
                     
+                    SwitchListTile(
+                      title: const Text('Mostra solo componenti senza posizione', style: TextStyle(fontWeight: FontWeight.w500)),
+                      subtitle: const Text('Nasconde i componenti a cui è già stato assegnato un cassetto'),
+                      value: tempUnassigned,
+                      onChanged: (v) => setSt(() => tempUnassigned = v),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    const Divider(),
+
                     if (tempTags.isNotEmpty || tempCabinet != null) ...[
                       const SizedBox(height: 8),
-                      Text('Filtri attivi', style: Theme.of(ctx2).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+                      Text('Tag rapidi', style: Theme.of(ctx2).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
                       const SizedBox(height: 4),
                       Wrap(
                         spacing: 6, runSpacing: 10,
@@ -746,18 +876,56 @@ class _FilterButton extends StatelessWidget {
 
                     if (settings.specialTags.isNotEmpty) ...[
                       const SizedBox(height: 20),
-                      Text('Proprietà', style: Theme.of(ctx2).textTheme.labelLarge),
+                      Text('Filtri per Proprietà', style: Theme.of(ctx2).textTheme.labelLarge),
                       ...settings.specialTags.map((st) {
-                        final ctrl = tempCtrls[st.name]!;
+                        final grp = tempCtrls[st.name]!;
                         final unit = st.unit.isNotEmpty ? ' (${st.unit})' : '';
+                        
                         return Padding(
-                          padding: const EdgeInsets.only(top: 12),
-                          child: TextField(
-                            controller: ctrl,
-                            textInputAction: TextInputAction.done,
-                            decoration: InputDecoration(labelText: '${st.name}$unit', border: const OutlineInputBorder(), isDense: true),
-                            keyboardType: TextInputType.text,
-                            onSubmitted: (_) => applyFilters(),
+                          padding: const EdgeInsets.only(top: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('${st.name}$unit', style: const TextStyle(fontWeight: FontWeight.w500)),
+                              const SizedBox(height: 8),
+                              if (st.isString)
+                                TextField(
+                                  controller: grp['exact'],
+                                  textInputAction: TextInputAction.done,
+                                  decoration: const InputDecoration(labelText: 'Contiene testo...', border: OutlineInputBorder(), isDense: true),
+                                  onSubmitted: (_) => applyFilters(),
+                                )
+                              else ...[
+                                TextField(
+                                  controller: grp['exact'],
+                                  textInputAction: TextInputAction.next,
+                                  decoration: const InputDecoration(labelText: 'Valore esatto', border: OutlineInputBorder(), isDense: true),
+                                  onSubmitted: (_) => applyFilters(),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextField(
+                                        controller: grp['min'],
+                                        textInputAction: TextInputAction.next,
+                                        decoration: const InputDecoration(labelText: 'Da (min)', border: OutlineInputBorder(), isDense: true),
+                                        onSubmitted: (_) => applyFilters(),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: TextField(
+                                        controller: grp['max'],
+                                        textInputAction: TextInputAction.done,
+                                        decoration: const InputDecoration(labelText: 'A (max)', border: OutlineInputBorder(), isDense: true),
+                                        onSubmitted: (_) => applyFilters(),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ]
+                            ],
                           ),
                         );
                       }),

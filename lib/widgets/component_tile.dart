@@ -26,7 +26,9 @@ class ComponentTile extends StatelessWidget {
     final cs    = theme.colorScheme;
     
     final hasCabinets = settings.numCabinets > 1;
-    final drawerText = hasCabinets ? '${component.cabinet}-${component.drawer}' : component.drawer;
+    final drawerText = component.drawer.isEmpty 
+        ? 'Non\nass.' 
+        : (hasCabinets ? '${component.cabinet}-${component.drawer}' : component.drawer);
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -38,23 +40,24 @@ class ComponentTile extends StatelessWidget {
           child: Row(children: [
             // Badge cassetto
             Container(
-              width: hasCabinets ? 54 : 48,
+              width: hasCabinets || component.drawer.isEmpty ? 54 : 48,
               height: 48,
               decoration: BoxDecoration(
-                color: cs.secondaryContainer,
+                color: component.drawer.isEmpty ? cs.errorContainer : cs.secondaryContainer,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(hasCabinets ? Icons.kitchen_outlined : Icons.inbox_outlined,
-                      size: 14, color: cs.onSecondaryContainer),
+                  Icon(component.drawer.isEmpty ? Icons.location_off_outlined : (hasCabinets ? Icons.kitchen_outlined : Icons.inbox_outlined),
+                      size: 14, color: component.drawer.isEmpty ? cs.onErrorContainer : cs.onSecondaryContainer),
                   const SizedBox(height: 2),
                   Text(drawerText,
+                      textAlign: TextAlign.center,
                       style: TextStyle(
-                          fontSize: 13,
+                          fontSize: component.drawer.isEmpty ? 11 : 13,
                           fontWeight: FontWeight.bold,
-                          color: cs.onSecondaryContainer)),
+                          color: component.drawer.isEmpty ? cs.onErrorContainer : cs.onSecondaryContainer)),
                 ],
               ),
             ),
@@ -132,14 +135,12 @@ String _formatValueWithUnit(String value, String unit) {
   if (unit.isEmpty) return value;
   final v = value.trim();
   
-  // Se la stringa è "Numero + Lettera" (es. 10K, 1.5M)
   final regEnd = RegExp(r'^([0-9]+(?:\.[0-9]+)?)([a-zA-Zµ])$');
   final match = regEnd.firstMatch(v);
   if (match != null) {
-    return '${match.group(1)} ${match.group(2)}$unit'; // "10" + " " + "K" + "Ω"
+    return '${match.group(1)} ${match.group(2)}$unit'; 
   }
   
-  // Per tutti gli altri casi (es. 3K3, 100) aggiunge solo lo spazio e l'unità
   return '$v $unit';
 }
 

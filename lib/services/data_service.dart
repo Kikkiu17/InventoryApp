@@ -2,17 +2,30 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/component.dart';
 import '../models/settings.dart';
 import 'api_client.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:http/http.dart' as http;
 
 export 'api_client.dart' show ApiClient, InventoryMeta;
 
 enum StorageMode { local, remote }
 enum SortMode { none, name, quantity, drawer, specialTag }
+
+// Nuova classe per gestire i filtri a range e testuali
+class SpecialFilter {
+  final String exact;
+  final String min;
+  final String max;
+
+  SpecialFilter({this.exact = '', this.min = '', this.max = ''});
+  bool get isEmpty => exact.isEmpty && min.isEmpty && max.isEmpty;
+}
 
 class SyncConflict {
   final List<Component> localComponents;
@@ -390,7 +403,7 @@ class DataService extends ChangeNotifier {
     final dir  = await getTemporaryDirectory();
     final file = File('${dir.path}/inventario_componenti.json');
     await file.writeAsString(data);
-    await Share.shareXFiles([XFile(file.path)], text: 'Inventario componenti');
+    await SharePlus.instance.share(ShareParams(files: [XFile(file.path)], text: 'Inventario componenti'));
   }
 
   Future<bool> importData() async {
@@ -420,11 +433,15 @@ class DataService extends ChangeNotifier {
     String query,
     List<String> selectedTags,
     SortMode sort,
-    Map<String, String> specialTagFilters,
-    [String? sortSpecialTag, int? cabinetFilter] 
+    Map<String, SpecialFilter> specialTagFilters,
+    [String? sortSpecialTag, int? cabinetFilter, bool unassignedPosition = false] 
   ) {
     var results = _components.toList();
     
+    if (unassignedPosition) {
+      results = results.where((c) => c.drawer.isEmpty).toList();
+    }
+
     if (cabinetFilter != null) {
       results = results.where((c) => c.cabinet == cabinetFilter).toList();
     }
@@ -461,23 +478,38 @@ class DataService extends ChangeNotifier {
           .where((c) => selectedTags.every((t) => c.tags.contains(t))).toList();
     }
     
-    specialTagFilters.forEach((tagName, filterText) {
+    specialTagFilters.forEach((tagName, filter) {
       final tagDef = _settings.specialTags.where((t) => t.name == tagName).firstOrNull;
       final isStr = tagDef?.isString ?? false;
 
-      final parsedFilter = isStr ? null : parseSpecialValue(filterText);
-      final term = filterText.toLowerCase();
-      
       results = results.where((c) {
         final valStr = c.specialTagValues[tagName];
         if (valStr == null) return false;
         
         if (isStr) {
-          return valStr.toLowerCase().contains(term);
+          // Ricerca esatta testuale o inclusione (case insensitive)
+          if (filter.exact.isNotEmpty) {
+            return valStr.toLowerCase().contains(filter.exact.toLowerCase());
+          }
+          return true;
         } else {
+          // Logica per range numerico o valore matematico esatto
           final parsedVal = parseSpecialValue(valStr);
-          if (parsedFilter != null && parsedVal == parsedFilter) return true;
-          return valStr.toLowerCase().contains(term);
+          if (parsedVal == null) return false;
+
+          if (filter.exact.isNotEmpty) {
+            final parsedExact = parseSpecialValue(filter.exact);
+            if (parsedExact != null && parsedVal != parsedExact) return false;
+          }
+          if (filter.min.isNotEmpty) {
+            final parsedMin = parseSpecialValue(filter.min);
+            if (parsedMin != null && parsedVal < parsedMin) return false;
+          }
+          if (filter.max.isNotEmpty) {
+            final parsedMax = parseSpecialValue(filter.max);
+            if (parsedMax != null && parsedVal > parsedMax) return false;
+          }
+          return true;
         }
       }).toList();
     });
@@ -491,6 +523,11 @@ class DataService extends ChangeNotifier {
         break;
       case SortMode.drawer:   
         results.sort((a, b) {
+          // Se sono vuoti (non assegnati), vanno in fondo
+          if (a.drawer.isEmpty && b.drawer.isEmpty) return a.name.compareTo(b.name);
+          if (a.drawer.isEmpty) return 1;
+          if (b.drawer.isEmpty) return -1;
+
           final cab = a.cabinet.compareTo(b.cabinet);
           if (cab != 0) return cab;
           return a.drawer.compareTo(b.drawer);
@@ -507,7 +544,7 @@ class DataService extends ChangeNotifier {
             
             final tagDef = _settings.specialTags.where((t) => t.name == sortSpecialTag).firstOrNull;
             if (tagDef?.isString == true) {
-              return valStrA.compareTo(valStrB); // Fallback nel caso in cui un tag stringa finisca qua
+              return valStrA.compareTo(valStrB);
             }
             
             final numA = parseSpecialValue(valStrA);
@@ -523,5 +560,66 @@ class DataService extends ChangeNotifier {
       case SortMode.none: break;
     }
     return results;
+  }
+
+  // ── Backups ──────────────────────────────────────────────────────────────────
+  Future<List<String>> getBackups() async {
+    if (_mode != StorageMode.remote || !_serverConnected) return [];
+    try {
+      return await _api!.getBackups();
+    } catch (e) { 
+      print('ERRORE BACKUP: $e'); 
+      _lastError = e.toString(); 
+      return []; 
+    }
+  }
+
+  Future<bool> restoreBackup(String filename) async {
+    if (_mode != StorageMode.remote || !_serverConnected) return false;
+    try {
+      await _api!.restoreBackup(filename);
+      await refreshFromServer(); 
+      return true;
+    } catch (e) { 
+      _lastError = e.toString(); 
+      return false; 
+    }
+  }
+
+  // ── Update APK ───────────────────────────────────────────────────────────────
+  Future<void> checkForUpdates() async {
+    if (_mode != StorageMode.remote || !_serverConnected) return;
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final currentVersion = info.version;
+
+      final res = await http.get(Uri.parse('$_serverUrl/api/update/version'))
+          .timeout(const Duration(seconds: 5));
+      
+      if (res.statusCode == 200) {
+        final serverVersion = jsonDecode(res.body)['version'];
+        
+        if (serverVersion != currentVersion) {
+          final apkRes = await http.get(Uri.parse('$_serverUrl/api/update/download'));
+          
+          final dir = await getExternalStorageDirectory(); 
+          final file = File('${dir!.path}/update.apk');
+          await file.writeAsBytes(apkRes.bodyBytes);
+          
+          await OpenFilex.open(file.path);
+        }
+      }
+    } catch (e) {
+      print("Errore aggiornamento: $e");
+    }
+  }
+
+  Future<void> createBackup() async {
+    if (_mode != StorageMode.remote || !_serverConnected) return;
+    try {
+      await _api!.createBackup();
+    } catch (e) {
+      print("Errore creazione backup: $e");
+    }
   }
 }
