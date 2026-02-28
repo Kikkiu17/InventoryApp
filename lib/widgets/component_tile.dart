@@ -26,9 +26,7 @@ class ComponentTile extends StatelessWidget {
     final cs    = theme.colorScheme;
     
     final hasCabinets = settings.numCabinets > 1;
-    final drawerText = component.drawer.isEmpty 
-        ? 'Non\nass.' 
-        : (hasCabinets ? '${component.cabinet}-${component.drawer}' : component.drawer);
+    final drawerText = hasCabinets ? '${component.cabinet}-${component.drawer}' : component.drawer;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -37,92 +35,107 @@ class ComponentTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(12),
-          child: Row(children: [
-            // Badge cassetto
-            Container(
-              width: hasCabinets || component.drawer.isEmpty ? 54 : 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: component.drawer.isEmpty ? cs.errorContainer : cs.secondaryContainer,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(component.drawer.isEmpty ? Icons.location_off_outlined : (hasCabinets ? Icons.kitchen_outlined : Icons.inbox_outlined),
-                      size: 14, color: component.drawer.isEmpty ? cs.onErrorContainer : cs.onSecondaryContainer),
-                  const SizedBox(height: 2),
-                  Text(drawerText,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                          fontSize: component.drawer.isEmpty ? 11 : 13,
-                          fontWeight: FontWeight.bold,
-                          color: component.drawer.isEmpty ? cs.onErrorContainer : cs.onSecondaryContainer)),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Nome + tag
-            Expanded(
-              child: Column(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // RIGA 1: Badge + Info (Tutta la larghezza disponibile)
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(component.name,
-                      style: theme.textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w600)),
-                  if (component.description.isNotEmpty)
-                    Text(component.description,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: cs.onSurfaceVariant),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
-                  // Tag normali
-                  if (component.tags.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
-                      children:
-                          component.tags.map((t) => _TagChip(label: t)).toList(),
+                  // Badge cassetto
+                  Container(
+                    width: hasCabinets ? 54 : 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: cs.secondaryContainer,
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                  ],
-                  // Valori tag speciali
-                  if (component.specialTagValues.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
-                      children: component.specialTagValues.entries.map((e) {
-                        final st = settings.specialTags
-                            .where((s) => s.name == e.key)
-                            .firstOrNull;
-                        final unit = st?.unit ?? '';
-                        final formattedLabel = _formatValueWithUnit(e.value, unit);
-                        return _TagChip(
-                          label: '${e.key}: $formattedLabel',
-                          special: true,
-                        );
-                      }).toList(),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(hasCabinets ? Icons.kitchen_outlined : Icons.inbox_outlined,
+                            size: 14, color: cs.onSecondaryContainer),
+                        const SizedBox(height: 2),
+                        Text(drawerText,
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: cs.onSecondaryContainer)),
+                      ],
                     ),
-                  ],
+                  ),
+                  const SizedBox(width: 12),
+                  // Nome + tag
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(component.name,
+                            style: theme.textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w600)),
+                        if (component.description.isNotEmpty)
+                          Text(component.description,
+                              style: theme.textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        // Tag normali
+                        if (component.tags.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 4,
+                            runSpacing: 4,
+                            children:
+                                component.tags.map((t) => _TagChip(label: t)).toList(),
+                          ),
+                        ],
+                        // Valori tag speciali
+                        if (component.specialTagValues.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 4,
+                            runSpacing: 4,
+                            children: component.specialTagValues.entries.map((e) {
+                              final st = settings.specialTags
+                                  .where((s) => s.name == e.key)
+                                  .firstOrNull;
+                              final unit = st?.unit ?? '';
+                              final formattedLabel = _formatValueWithUnit(e.value, unit);
+                              return _TagChip(
+                                label: '${e.key}: $formattedLabel',
+                                special: true,
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ],
               ),
-            ),
-            // Bottone Duplica
-            IconButton(
-              icon: const Icon(Icons.copy_outlined),
-              color: cs.primary,
-              tooltip: 'Duplica',
-              onPressed: onDuplicate,
-            ),
-            const SizedBox(width: 4),
-            // Quantità
-            _QuantityControl(
-              quantity: component.quantity,
-              onIncrement: onIncrement,
-              onDecrement: onDecrement,
-            ),
-          ]),
+              const SizedBox(height: 8),
+              // RIGA 2: Azioni (Allineate a destra)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  // Bottone Duplica
+                  IconButton(
+                    icon: const Icon(Icons.copy_outlined),
+                    color: cs.primary,
+                    tooltip: 'Duplica',
+                    onPressed: onDuplicate,
+                  ),
+                  const SizedBox(width: 8),
+                  // Quantità
+                  _QuantityControl(
+                    quantity: component.quantity,
+                    onIncrement: onIncrement,
+                    onDecrement: onDecrement,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

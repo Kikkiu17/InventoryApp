@@ -587,7 +587,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             shrinkWrap: true,
             itemCount: backups.length,
             itemBuilder: (_, i) => ListTile(
-              title: Text(backups[i].replaceAll('.json', '').split('_').skip(1).join(' ')), // Formatta il nome per leggerlo meglio
+              title: Text(_formatBackupName(backups[i])), 
               leading: const Icon(Icons.history),
               onTap: () => Navigator.pop(ctx, backups[i]),
             )
@@ -617,6 +617,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }
       }
     }
+  }
+
+  String _formatBackupName(String filename) {
+    try {
+      final parts = filename.replaceAll('.json', '').split('_');
+      if (parts.length >= 3) {
+        final d = parts[parts.length - 2]; // YYYYMMDD
+        final t = parts[parts.length - 1]; // HHMMSS
+        if (d.length == 8 && t.length == 6) {
+          return '${d.substring(6,8)}/${d.substring(4,6)}/${d.substring(0,4)} alle ${t.substring(0,2)}:${t.substring(2,4)}:${t.substring(4,6)}';
+        }
+      }
+    } catch (_) {}
+    return filename; // Fallback se il nome non corrisponde al formato
   }
 }
 
