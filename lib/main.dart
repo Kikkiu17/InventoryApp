@@ -67,6 +67,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     // paused: l'app va in background, detached: l'app viene chiusa
     if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
       context.read<DataService>().createBackup();
+    } else if (state == AppLifecycleState.resumed) {
+      // Sincronizza quando l'app torna in primo piano
+      context.read<DataService>().refreshFromServer();
     }
   }
 

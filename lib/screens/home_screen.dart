@@ -22,6 +22,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  bool _isShowingConflict = false;
   final _searchCtrl = TextEditingController();
   String _query = '';
   List<String> _selectedTags = [];
@@ -38,7 +39,9 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkConflict();
-      context.read<DataService>().checkForUpdates(); // Controllo automatico
+      final ds = context.read<DataService>();
+      ds.checkForUpdates(); // Controllo automatico
+      ds.refreshFromServer(); // <-- Aggiunto per aggiornare all'apertura
     });
   }
 
@@ -158,9 +161,14 @@ class _HomeScreenState extends State<HomeScreen> {
       _sortSpecialTag = null;
     }
 
-    if (ds.pendingConflict != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _showConflictDialog(ds);
+    if (ds.pendingConflict != null && !_isShowingConflict) {
+      _isShowingConflict = true; // Blocca ulteriori popup
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (mounted) {
+          await _showConflictDialog(ds);
+          // Sblocca quando il popup viene chiuso
+          if (mounted) setState(() => _isShowingConflict = false);
+        }
       });
     }
 
