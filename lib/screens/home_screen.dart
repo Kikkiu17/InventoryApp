@@ -38,16 +38,11 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkConflict();
+      
       final ds = context.read<DataService>();
       ds.checkForUpdates(); // Controllo automatico
       ds.refreshFromServer(); // <-- Aggiunto per aggiornare all'apertura
     });
-  }
-
-  void _checkConflict() {
-    final ds = context.read<DataService>();
-    if (ds.pendingConflict != null) _showConflictDialog(ds);
   }
 
   @override
