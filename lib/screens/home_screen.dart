@@ -417,27 +417,38 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _showConflictDialog(DataService ds) async {
     final conflict = ds.pendingConflict;
-    if (conflict == null || !mounted) return;
+    if (conflict == null) return;
 
-    final localTs = conflict.localTimestamp != null
-        ? '${conflict.localTimestamp!.day.toString().padLeft(2, '0')}/${conflict.localTimestamp!.month.toString().padLeft(2, '0')}/${conflict.localTimestamp!.year} ${conflict.localTimestamp!.hour.toString().padLeft(2, '0')}:${conflict.localTimestamp!.minute.toString().padLeft(2, '0')}'
-        : 'data sconosciuta';
+    String formatTs(DateTime? dt) => dt != null 
+        ? "${dt.day}/${dt.month} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}" 
+        : "Sconosciuta";
 
     final choice = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Row(children: [Icon(Icons.sync_problem, color: Colors.orange), SizedBox(width: 8), Text('Dati diversi rilevati')]),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Text('I dati locali e quelli del server sono diversi. Quale versione vuoi usare?'),
-          const SizedBox(height: 16),
-          _ConflictOption(icon: Icons.phone_android, title: 'Dati locali', subtitle: '${conflict.localComponents.length} componenti · Salvati il $localTs'),
-          const SizedBox(height: 8),
-          _ConflictOption(icon: Icons.cloud, title: 'Dati server', subtitle: '${conflict.remoteComponents.length} componenti'),
-        ]),
+        title: const Text('Conflitto di sincronizzazione'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Hai modificato i dati offline, ma il server ha una versione precedente.'),
+            const SizedBox(height: 16),
+            _ConflictOption(
+              icon: Icons.phone_android,
+              title: 'Versione Locale (Più recente)',
+              subtitle: 'Ultima modifica: ${formatTs(conflict.localTimestamp)}',
+            ),
+            const SizedBox(height: 8),
+            _ConflictOption(
+              icon: Icons.cloud,
+              title: 'Versione Server',
+              subtitle: 'Ultima modifica: ${formatTs(conflict.remoteTimestamp)}',
+            ),
+          ],
+        ),
         actions: [
-          OutlinedButton.icon(icon: const Icon(Icons.phone_android), label: const Text('Usa locali'), onPressed: () => Navigator.pop(ctx, true)),
-          FilledButton.icon(icon: const Icon(Icons.cloud), label: const Text('Usa server'), onPressed: () => Navigator.pop(ctx, false)),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Usa Server')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Usa Locali (Aggiorna Server)')),
         ],
       ),
     );

@@ -123,68 +123,56 @@ class DataService extends ChangeNotifier {
   Future<void> _loadFromServer({bool checkConflict = false}) async {
     try {
       _syncing = true;
-      _lastError = null;
       notifyListeners();
 
       final ok = await _api!.ping();
       if (!ok) throw Exception('Server non raggiungibile');
       _serverConnected = true;
 
-      _inventories = await _api!.listInventories();
+      // 1. Fetch Remote Data
+      final remoteDb = await _api!.getFullDb();
+      final remoteComponents = (remoteDb['components'] as List).map((e) => Component.fromJson(e)).toList();
+      final remoteSettings = AppSettings.fromJson(remoteDb['settings']);
+      final remoteTs = DateTime.tryParse(remoteDb['lastUpdated'] ?? '');
 
-      if (_inventories.isNotEmpty &&
-          !_inventories.any((i) => i.id == _currentInventoryId)) {
-        await _switchInventoryId(_inventories.first.id);
-      }
-
-      if (_inventories.isEmpty) {
-        final created = await _api!.createInventory('Inventario principale');
-        _inventories = [created];
-        await _switchInventoryId(created.id);
-      }
-
-      final remoteComponents = await _api!.getComponents();
-      final remoteSettings   = await _api!.getSettings();
-
+      // 2. Fetch Local Data
       final prefs = await SharedPreferences.getInstance();
-      final localJson = prefs.getString(_componentsKey);
+      final localTs = DateTime.tryParse(prefs.getString(_localTimestampKey) ?? '');
+      
+      if (checkConflict && localTs != null && remoteTs != null) {
+        // CASE A: Server is strictly newer -> Auto-update local
+        if (remoteTs.isAfter(localTs)) {
+          _components = remoteComponents;
+          _settings = remoteSettings;
+          await _mirrorToLocal(_components, _settings); // Update local file and timestamp
+        } 
+        // CASE B: Local is newer -> Ask user
+        else if (localTs.isAfter(remoteTs)) {
+          final localComponents = (jsonDecode(prefs.getString(_componentsKey)!) as List)
+              .map((e) => Component.fromJson(e)).toList();
+          final localSettings = AppSettings.fromJson(jsonDecode(prefs.getString(_settingsKey)!));
 
-      if (checkConflict && localJson != null) {
-        final localComponents = (jsonDecode(localJson) as List)
-            .map((e) => Component.fromJson(e)).toList();
-        final lsj = prefs.getString(_settingsKey);
-        final localSettings = lsj != null
-            ? AppSettings.fromJson(jsonDecode(lsj)) : AppSettings();
-
-        final localIds  = localComponents.map((c) => c.id).toSet();
-        final remoteIds = remoteComponents.map((c) => c.id).toSet();
-        final differ = localIds.length != remoteIds.length ||
-            localIds.difference(remoteIds).isNotEmpty;
-
-        if (differ && localComponents.isNotEmpty) {
           _pendingConflict = SyncConflict(
             localComponents: localComponents,
             localSettings: localSettings,
             remoteComponents: remoteComponents,
             remoteSettings: remoteSettings,
-            localTimestamp: DateTime.tryParse(
-                prefs.getString(_localTimestampKey) ?? ''),
+            localTimestamp: localTs,
+            remoteTimestamp: remoteTs,
           );
-          _components = remoteComponents;
-          _settings   = remoteSettings;
-          notifyListeners();
-          return;
+          // Show server data in background but wait for resolution
+          _components = remoteComponents; 
+          _settings = remoteSettings;
         }
+      } else {
+        // Default: overwrite (first load or no local data)
+        _components = remoteComponents;
+        _settings = remoteSettings;
+        await _mirrorToLocal(_components, _settings);
       }
-
-      _components = remoteComponents;
-      _settings   = remoteSettings;
-      await _mirrorToLocal(_components, _settings);
     } catch (e) {
       _serverConnected = false;
       _lastError = e.toString();
-      final prefs = await SharedPreferences.getInstance();
-      await _loadFromLocal(prefs);
     } finally {
       _syncing = false;
       notifyListeners();
