@@ -129,6 +129,9 @@ class DataService extends ChangeNotifier {
       if (!ok) throw Exception('Server non raggiungibile');
       _serverConnected = true;
 
+      // Fetch inventory list so the Inventari tab is populated immediately
+      _inventories = await _api!.listInventories();
+
       // 1. Fetch Remote Data
       final remoteDb = await _api!.getFullDb();
       final remoteComponents = (remoteDb['components'] as List).map((e) => Component.fromJson(e)).toList();
@@ -144,7 +147,8 @@ class DataService extends ChangeNotifier {
         if (remoteTs.isAfter(localTs)) {
           _components = remoteComponents;
           _settings = remoteSettings;
-          await _mirrorToLocal(_components, _settings); // Update local file and timestamp
+          // Use remoteTs so next launch sees equal timestamps → no false conflict
+          await _mirrorToLocal(_components, _settings, timestamp: remoteTs);
         } 
         // CASE B: Local is newer -> Ask user
         else if (localTs.isAfter(remoteTs)) {
@@ -168,11 +172,16 @@ class DataService extends ChangeNotifier {
         // Default: overwrite (first load or no local data)
         _components = remoteComponents;
         _settings = remoteSettings;
-        await _mirrorToLocal(_components, _settings);
+        // Use remoteTs (if available) so next launch sees equal timestamps
+        await _mirrorToLocal(_components, _settings, timestamp: remoteTs);
       }
     } catch (e) {
       _serverConnected = false;
       _lastError = e.toString();
+      // Server unreachable — load the last locally cached data so the app
+      // isn't empty. On the next successful sync it will be overwritten.
+      final prefs = await SharedPreferences.getInstance();
+      await _loadFromLocal(prefs);
     } finally {
       _syncing = false;
       notifyListeners();
@@ -191,20 +200,25 @@ class DataService extends ChangeNotifier {
           'components': _components.map((x) => x.toJson()).toList(),
           'settings':   _settings.toJson(),
         });
+        // Use the timestamp the server assigned after the upload
+        final ts = DateTime.tryParse(_api!.lastUpdated ?? '');
+        await _mirrorToLocal(_components, _settings, timestamp: ts);
       } catch (e) { _lastError = e.toString(); }
     } else {
       _components = c.remoteComponents;
       _settings   = c.remoteSettings;
-      await _mirrorToLocal(_components, _settings);
+      // Use the remote timestamp we already fetched — no need to hit the server again
+      await _mirrorToLocal(_components, _settings, timestamp: c.remoteTimestamp);
     }
     notifyListeners();
   }
 
-  Future<void> _mirrorToLocal(List<Component> comps, AppSettings s) async {
+  Future<void> _mirrorToLocal(List<Component> comps, AppSettings s, {DateTime? timestamp}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_componentsKey, jsonEncode(comps.map((c) => c.toJson()).toList()));
     await prefs.setString(_settingsKey, jsonEncode(s.toJson()));
-    await prefs.setString(_localTimestampKey, DateTime.now().toIso8601String());
+    // Use provided timestamp (e.g. server's lastUpdated) so comparisons stay stable
+    await prefs.setString(_localTimestampKey, (timestamp ?? DateTime.now()).toIso8601String());
   }
 
   Future<void> _saveLocal() async {
@@ -313,7 +327,8 @@ class DataService extends ChangeNotifier {
       try {
         final created = await _api!.createComponent(c);
         _components.add(created);
-        await _mirrorToLocal(_components, _settings);
+        final ts = DateTime.tryParse(_api!.lastUpdated ?? '');
+        await _mirrorToLocal(_components, _settings, timestamp: ts);
       } catch (e) { _lastError = e.toString(); rethrow; }
     } else {
       _components.add(c);
@@ -328,7 +343,8 @@ class DataService extends ChangeNotifier {
         final updated = await _api!.updateComponent(c);
         final idx = _components.indexWhere((e) => e.id == updated.id);
         if (idx != -1) _components[idx] = updated;
-        await _mirrorToLocal(_components, _settings);
+        final ts = DateTime.tryParse(_api!.lastUpdated ?? '');
+        await _mirrorToLocal(_components, _settings, timestamp: ts);
       } catch (e) { _lastError = e.toString(); rethrow; }
     } else {
       final idx = _components.indexWhere((e) => e.id == c.id);
@@ -342,10 +358,14 @@ class DataService extends ChangeNotifier {
     if (_mode == StorageMode.remote && _serverConnected) {
       try {
         await _api!.deleteComponent(id);
+        _components.removeWhere((e) => e.id == id);
+        final ts = DateTime.tryParse(_api!.lastUpdated ?? '');
+        await _mirrorToLocal(_components, _settings, timestamp: ts);
       } catch (e) { _lastError = e.toString(); rethrow; }
+    } else {
+      _components.removeWhere((e) => e.id == id);
+      await _saveLocal();
     }
-    _components.removeWhere((e) => e.id == id);
-    await _saveLocal();
     notifyListeners();
   }
 
@@ -355,7 +375,8 @@ class DataService extends ChangeNotifier {
         final updated = await _api!.patchQuantity(id, delta);
         final idx = _components.indexWhere((e) => e.id == updated.id);
         if (idx != -1) _components[idx] = updated;
-        await _mirrorToLocal(_components, _settings);
+        final ts = DateTime.tryParse(_api!.lastUpdated ?? '');
+        await _mirrorToLocal(_components, _settings, timestamp: ts);
         notifyListeners();
         return;
       } catch (e) { _lastError = e.toString(); }
@@ -374,7 +395,8 @@ class DataService extends ChangeNotifier {
     if (_mode == StorageMode.remote && _serverConnected) {
       try {
         await _api!.updateSettings(s);
-        await _mirrorToLocal(_components, _settings);
+        final ts = DateTime.tryParse(_api!.lastUpdated ?? '');
+        await _mirrorToLocal(_components, _settings, timestamp: ts);
       } catch (e) { _lastError = e.toString(); }
     } else {
       await _saveLocal();

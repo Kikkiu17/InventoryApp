@@ -40,6 +40,10 @@ class ApiClient {
   final String baseUrl;       // es: "http://192.168.1.2:8080"
   final String inventoryId;   // ID inventario attivo
 
+  // Set after every write; callers use this to store the exact server
+  // timestamp locally, preventing false sync-conflict dialogs on relaunch.
+  String? lastUpdated;
+
   ApiClient(this.baseUrl, {this.inventoryId = 'default'});
 
   /// Crea un clone con un inventario diverso
@@ -58,6 +62,8 @@ class ApiClient {
       try { msg = (jsonDecode(res.body)['error'] as String?) ?? msg; } catch (_) {}
       throw ApiException(res.statusCode, msg);
     }
+    // Capture the server timestamp echoed back from every write endpoint.
+    lastUpdated = res.headers['x-last-updated'];
   }
 
   // ── Ping ────────────────────────────────────────────────────────────────────

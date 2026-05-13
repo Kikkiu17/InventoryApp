@@ -38,10 +38,12 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkConflict();
       final ds = context.read<DataService>();
-      ds.checkForUpdates(); // Controllo automatico
-      ds.refreshFromServer(); // <-- Aggiunto per aggiornare all'apertura
+      ds.checkForUpdates();
+      // Retry loading from server in case the initial load() in main() failed
+      // (e.g. network not ready on cold start). Safe: uses checkConflict:false
+      // so it never triggers the conflict dialog.
+      ds.refreshFromServer();
     });
   }
 

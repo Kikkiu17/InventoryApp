@@ -1,8 +1,8 @@
-name: inventory_app
+name: inventario
 description: App per la gestione dell'inventario dei componenti nei cassetti
 
 publish_to: 'none'
-version: 1.1.2
+version: 1.1.8
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -26,8 +26,14 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
   assets:
       - assets/fonts/Roboto-Regular.ttf
+
+flutter_launcher_icons:
+  android: true
+  linux: true
+  image_path: "assets/icon.png"
