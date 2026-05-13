@@ -47,11 +47,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _checkConflict() {
-    final ds = context.read<DataService>();
-    if (ds.pendingConflict != null) _showConflictDialog(ds);
-  }
-
   @override
   void dispose() {
     _searchCtrl.dispose();
