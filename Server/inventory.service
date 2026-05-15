@@ -1,0 +1,20 @@
+[Unit]
+Description=Inventory Server - Gestione componenti
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/inventario
+ExecStart=/home/pi/inventario/inventory_server 8080 /home/pi/inventario/inventories
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

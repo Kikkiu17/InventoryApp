@@ -1,0 +1,1 @@
+/usr/bin/c++ -O2 CMakeFiles/inventory_server.dir/main.cpp.o -o inventory_server  -lstdc++fs /usr/lib64/libssl.so /usr/lib64/libcrypto.so /usr/lib64/libz.so
