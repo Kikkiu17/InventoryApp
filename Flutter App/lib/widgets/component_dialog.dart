@@ -438,11 +438,13 @@ class _ComponentDialogState extends State<ComponentDialog> {
                     );
                   }).toList(),
                 ),
-              Row(
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
                 children: [
                   TextButton.icon(
                     icon: const Icon(Icons.link),
-                    label: const Text('Aggiungi Link'),
+                    label: const Text('Link'),
                     onPressed: () async {
                       final urlCtrl = TextEditingController();
                       final nameCtrl = TextEditingController();
@@ -470,10 +472,9 @@ class _ComponentDialogState extends State<ComponentDialog> {
                       }
                     },
                   ),
-                  const SizedBox(width: 8),
                   TextButton.icon(
                     icon: const Icon(Icons.attach_file),
-                    label: const Text('Aggiungi File'),
+                    label: const Text('Nuovo File'),
                     onPressed: () async {
                       final result = await FilePicker.platform.pickFiles();
                       if (result != null && result.files.single.path != null) {
@@ -483,6 +484,60 @@ class _ComponentDialogState extends State<ComponentDialog> {
                             path: result.files.single.path!,
                             isLink: false,
                           ));
+                        });
+                      }
+                    },
+                  ),
+                  TextButton.icon(
+                    icon: const Icon(Icons.folder_open),
+                    label: const Text('File Esistente'),
+                    onPressed: () async {
+                      final ds = context.read<DataService>();
+                      final existingFiles = ds.components
+                          .expand((c) => c.attachments)
+                          .where((a) => !a.isLink)
+                          .fold<Map<String, Attachment>>({}, (map, a) {
+                            map[a.path] = a;
+                            return map;
+                          })
+                          .values
+                          .toList();
+                      
+                      if (existingFiles.isEmpty) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Nessun file esistente')));
+                        }
+                        return;
+                      }
+                      
+                      final selected = await showDialog<Attachment>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Scegli file esistente'),
+                          content: SizedBox(
+                            width: double.maxFinite,
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: existingFiles.length,
+                              itemBuilder: (_, i) {
+                                final a = existingFiles[i];
+                                return ListTile(
+                                  leading: const Icon(Icons.insert_drive_file),
+                                  title: Text(a.name),
+                                  onTap: () => Navigator.pop(ctx, a),
+                                );
+                              },
+                            ),
+                          ),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annulla')),
+                          ],
+                        ),
+                      );
+
+                      if (selected != null) {
+                        setState(() {
+                          _attachments.add(Attachment(name: selected.name, path: selected.path, isLink: false));
                         });
                       }
                     },

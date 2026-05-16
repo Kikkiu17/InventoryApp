@@ -744,7 +744,9 @@ class _FilterButton extends StatelessWidget {
     }
 
     showModalBottomSheet(
-      context: context, isScrollControlled: true,
+      context: context, 
+      isScrollControlled: true,
+      useSafeArea: true,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, setSt) {
           final cs = Theme.of(ctx2).colorScheme;
@@ -757,7 +759,7 @@ class _FilterButton extends StatelessWidget {
           final sortedLoose = List<String>.from(settings.availableTags)..sort();
 
           return DraggableScrollableSheet(
-            initialChildSize: 0.6, minChildSize: 0.4, maxChildSize: 0.9, expand: false,
+            initialChildSize: 1.0, minChildSize: 0.5, maxChildSize: 1.0, expand: false,
             builder: (_, sc) => Padding(
               padding: const EdgeInsets.all(20),
               child: Column(children: [

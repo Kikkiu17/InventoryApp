@@ -4,6 +4,7 @@ import 'services/data_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/inventory_list_screen.dart';
+import 'screens/files_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -89,6 +90,7 @@ class MainShellState extends State<MainShell> with WidgetsBindingObserver {
     final pages = [
       const HomeScreen(),
       const InventoryListScreen(),
+      const FilesScreen(),
       const SettingsScreen(),
     ];
 
@@ -119,6 +121,11 @@ class MainShellState extends State<MainShell> with WidgetsBindingObserver {
               child: const Icon(Icons.folder),
             ),
             label: 'Inventari',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.attachment_outlined),
+            selectedIcon: Icon(Icons.attachment),
+            label: 'File',
           ),
           const NavigationDestination(
             icon: Icon(Icons.settings_outlined),
