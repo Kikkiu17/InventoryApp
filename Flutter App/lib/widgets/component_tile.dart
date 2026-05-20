@@ -29,14 +29,17 @@ class ComponentTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cs    = theme.colorScheme;
-    
+    final cs = theme.colorScheme;
+
     final hasCabinets = settings.numCabinets > 1;
     final isUnassigned = component.drawer.isEmpty;
-    
-    final drawerText = isUnassigned 
-        ? 'Non\nass.' 
-        : (hasCabinets ? '${component.cabinet}-${component.drawer}' : component.drawer);
+    final hasZone = component.drawerZone != null;
+
+    final drawerText = isUnassigned
+        ? 'Non\nass.'
+        : (hasCabinets
+            ? '${component.cabinet}-${component.drawer}${hasZone ? '\nZ${component.drawerZone}' : ''}'
+            : '${component.drawer}${hasZone ? '\nZ${component.drawerZone}' : ''}');
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -54,30 +57,37 @@ class ComponentTile extends StatelessWidget {
                 children: [
                   // Badge cassetto
                   Container(
-                    width: hasCabinets || isUnassigned ? 54 : 48,
-                    height: 48,
+                    width: 45,
+                    height: 52,
                     decoration: BoxDecoration(
-                      color: isUnassigned ? cs.errorContainer : cs.secondaryContainer,
+                      color: isUnassigned
+                          ? cs.errorContainer
+                          : cs.secondaryContainer,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          isUnassigned 
-                              ? Icons.location_off_outlined 
-                              : (hasCabinets ? Icons.kitchen_outlined : Icons.inbox_outlined),
-                          size: 14, 
-                          color: isUnassigned ? cs.onErrorContainer : cs.onSecondaryContainer
-                        ),
+                            isUnassigned
+                                ? Icons.location_off_outlined
+                                : (hasCabinets
+                                    ? Icons.kitchen_outlined
+                                    : Icons.inbox_outlined),
+                            size: 14,
+                            color: isUnassigned
+                                ? cs.onErrorContainer
+                                : cs.onSecondaryContainer),
                         const SizedBox(height: 2),
                         Text(drawerText,
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                                fontSize: isUnassigned ? 11 : 13,
+                                fontSize: isUnassigned ? 11 : 12,
                                 height: 1.1,
                                 fontWeight: FontWeight.bold,
-                                color: isUnassigned ? cs.onErrorContainer : cs.onSecondaryContainer)),
+                                color: isUnassigned
+                                    ? cs.onErrorContainer
+                                    : cs.onSecondaryContainer)),
                       ],
                     ),
                   ),
@@ -102,8 +112,9 @@ class ComponentTile extends StatelessWidget {
                           Wrap(
                             spacing: 4,
                             runSpacing: 4,
-                            children:
-                                component.tags.map((t) => _TagChip(label: t)).toList(),
+                            children: component.tags
+                                .map((t) => _TagChip(label: t))
+                                .toList(),
                           ),
                         ],
                         // Valori tag speciali
@@ -112,12 +123,14 @@ class ComponentTile extends StatelessWidget {
                           Wrap(
                             spacing: 4,
                             runSpacing: 4,
-                            children: component.specialTagValues.entries.map((e) {
+                            children:
+                                component.specialTagValues.entries.map((e) {
                               final st = settings.specialTags
                                   .where((s) => s.name == e.key)
                                   .firstOrNull;
                               final unit = st?.unit ?? '';
-                              final formattedLabel = _formatValueWithUnit(e.value, unit);
+                              final formattedLabel =
+                                  _formatValueWithUnit(e.value, unit);
                               return _TagChip(
                                 label: '${e.key}: $formattedLabel',
                                 special: true,
@@ -136,18 +149,29 @@ class ComponentTile extends StatelessWidget {
                                 onTap: () => _openAttachment(context, a),
                                 borderRadius: BorderRadius.circular(4),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 3),
                                   decoration: BoxDecoration(
                                     color: cs.surfaceContainerHighest,
                                     borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(color: cs.outlineVariant),
+                                    border:
+                                        Border.all(color: cs.outlineVariant),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(a.isLink ? Icons.link : Icons.insert_drive_file, size: 12, color: cs.primary),
+                                      Icon(
+                                          a.isLink
+                                              ? Icons.link
+                                              : Icons.insert_drive_file,
+                                          size: 12,
+                                          color: cs.primary),
                                       const SizedBox(width: 4),
-                                      Text(a.name, style: TextStyle(fontSize: 10, color: cs.primary, fontWeight: FontWeight.w500)),
+                                      Text(a.name,
+                                          style: TextStyle(
+                                              fontSize: 10,
+                                              color: cs.primary,
+                                              fontWeight: FontWeight.w500)),
                                     ],
                                   ),
                                 ),
@@ -217,18 +241,18 @@ class ComponentTile extends StatelessWidget {
   }
 }
 
-/// Helper per formattare "10K" con "Ω" -> "10KΩ" 
+/// Helper per formattare "10K" con "Ω" -> "10KΩ"
 /// e "3K3" con "Ω" -> "3K3Ω"
 String _formatValueWithUnit(String value, String unit) {
   if (unit.isEmpty) return value;
   final v = value.trim();
-  
+
   final regEnd = RegExp(r'^([0-9]+(?:\.[0-9]+)?)([a-zA-Zµ])$');
   final match = regEnd.firstMatch(v);
   if (match != null) {
-    return '${match.group(1)}${match.group(2)}$unit'; 
+    return '${match.group(1)}${match.group(2)}$unit';
   }
-  
+
   return '$v$unit';
 }
 
@@ -249,8 +273,7 @@ class _TagChip extends StatelessWidget {
       child: Text(label,
           style: TextStyle(
               fontSize: 10,
-              color:
-                  special ? cs.onTertiaryContainer : cs.onPrimaryContainer)),
+              color: special ? cs.onTertiaryContainer : cs.onPrimaryContainer)),
     );
   }
 }

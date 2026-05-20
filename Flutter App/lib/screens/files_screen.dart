@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -30,7 +29,8 @@ class _FilesScreenState extends State<FilesScreen> {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } catch (_) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Impossibile aprire il link')));
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Impossibile aprire il link')));
         }
       }
     } else {
@@ -42,7 +42,8 @@ class _FilesScreenState extends State<FilesScreen> {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
         } catch (_) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Impossibile aprire il file')));
+            ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Impossibile aprire il file')));
           }
         }
       } else {
@@ -51,14 +52,16 @@ class _FilesScreenState extends State<FilesScreen> {
           await OpenFilex.open(localPath);
         } catch (_) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Impossibile aprire il file locale')));
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('Impossibile aprire il file locale')));
           }
         }
       }
     }
   }
 
-  Future<void> _renameAttachment(BuildContext context, Component comp, Attachment a) async {
+  Future<void> _renameAttachment(
+      BuildContext context, Component comp, Attachment a) async {
     final ctrl = TextEditingController(text: a.name);
     final newName = await showDialog<String>(
       context: context,
@@ -73,8 +76,12 @@ class _FilesScreenState extends State<FilesScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annulla')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, ctrl.text.trim()), child: const Text('Salva')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Annulla')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+              child: const Text('Salva')),
         ],
       ),
     );
@@ -88,28 +95,35 @@ class _FilesScreenState extends State<FilesScreen> {
       }).toList();
 
       try {
-        await context.read<DataService>().updateComponent(comp.copyWith(attachments: newAttachments));
+        await context
+            .read<DataService>()
+            .updateComponent(comp.copyWith(attachments: newAttachments));
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Errore: $e')));
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text('Errore: $e')));
         }
       }
     }
   }
 
-  Future<void> _deleteAttachment(BuildContext context, Component comp, Attachment a) async {
+  Future<void> _deleteAttachment(
+      BuildContext context, Component comp, Attachment a) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Elimina file'),
         content: Text('Vuoi eliminare definitivamente "${a.name}"?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annulla')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annulla')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error, foregroundColor: Theme.of(ctx).colorScheme.onError),
-            onPressed: () => Navigator.pop(ctx, true), 
-            child: const Text('Elimina')
-          ),
+              style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(ctx).colorScheme.error,
+                  foregroundColor: Theme.of(ctx).colorScheme.onError),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Elimina')),
         ],
       ),
     );
@@ -120,11 +134,14 @@ class _FilesScreenState extends State<FilesScreen> {
         if (!a.isLink) {
           await ds.deleteAttachment(a.path);
         }
-        final newAttachments = comp.attachments.where((att) => att.path != a.path || att.name != a.name).toList();
+        final newAttachments = comp.attachments
+            .where((att) => att.path != a.path || att.name != a.name)
+            .toList();
         await ds.updateComponent(comp.copyWith(attachments: newAttachments));
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Errore: $e')));
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text('Errore: $e')));
         }
       }
     }
@@ -136,13 +153,15 @@ class _FilesScreenState extends State<FilesScreen> {
     final cs = Theme.of(context).colorScheme;
 
     // Raccoglie tutti i file e i link
-    final allAttachments = ds.components.expand((c) => c.attachments.map((a) => (c, a))).toList();
+    final allAttachments =
+        ds.components.expand((c) => c.attachments.map((a) => (c, a))).toList();
 
     // Filtra per query
     final filtered = allAttachments.where((pair) {
       if (_query.isEmpty) return true;
       final q = _query.toLowerCase();
-      return pair.$2.name.toLowerCase().contains(q) || pair.$1.name.toLowerCase().contains(q);
+      return pair.$2.name.toLowerCase().contains(q) ||
+          pair.$1.name.toLowerCase().contains(q);
     }).toList();
 
     return Scaffold(
@@ -181,7 +200,8 @@ class _FilesScreenState extends State<FilesScreen> {
                     ]
                   : null,
               onChanged: (v) => setState(() => _query = v),
-              padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 16)),
+              padding: const WidgetStatePropertyAll(
+                  EdgeInsets.symmetric(horizontal: 16)),
             ),
           ),
           Padding(
@@ -190,7 +210,10 @@ class _FilesScreenState extends State<FilesScreen> {
               children: [
                 Text(
                   '${filtered.length} file trovati',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: cs.onSurfaceVariant),
                 ),
               ],
             ),
@@ -201,7 +224,9 @@ class _FilesScreenState extends State<FilesScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.attachment_outlined, size: 64, color: cs.onSurfaceVariant.withOpacity(0.4)),
+                        Icon(Icons.attachment_outlined,
+                            size: 64,
+                            color: cs.onSurfaceVariant.withOpacity(0.4)),
                         const SizedBox(height: 12),
                         const Text('Nessun file trovato'),
                       ],
@@ -215,17 +240,22 @@ class _FilesScreenState extends State<FilesScreen> {
                       return ListTile(
                         leading: CircleAvatar(
                           backgroundColor: cs.primaryContainer,
-                          child: Icon(a.isLink ? Icons.link : Icons.insert_drive_file, color: cs.primary),
+                          child: Icon(
+                              a.isLink ? Icons.link : Icons.insert_drive_file,
+                              color: cs.primary),
                         ),
                         title: Text(a.name),
                         subtitle: Text('Componente: ${comp.name}'),
                         onTap: () => _openAttachment(context, a),
                         trailing: PopupMenuButton<String>(
-                          icon: Icon(Icons.more_vert, color: cs.onSurfaceVariant),
+                          icon:
+                              Icon(Icons.more_vert, color: cs.onSurfaceVariant),
                           tooltip: 'Opzioni',
                           onSelected: (val) {
-                            if (val == 'rename') _renameAttachment(context, comp, a);
-                            if (val == 'delete') _deleteAttachment(context, comp, a);
+                            if (val == 'rename')
+                              _renameAttachment(context, comp, a);
+                            if (val == 'delete')
+                              _deleteAttachment(context, comp, a);
                           },
                           itemBuilder: (_) => [
                             const PopupMenuItem(
@@ -239,9 +269,15 @@ class _FilesScreenState extends State<FilesScreen> {
                             PopupMenuItem(
                               value: 'delete',
                               child: Row(children: [
-                                Icon(Icons.delete_outline, size: 18, color: Theme.of(context).colorScheme.error),
+                                Icon(Icons.delete_outline,
+                                    size: 18,
+                                    color: Theme.of(context).colorScheme.error),
                                 const SizedBox(width: 10),
-                                Text('Elimina', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                                Text('Elimina',
+                                    style: TextStyle(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .error)),
                               ]),
                             ),
                           ],

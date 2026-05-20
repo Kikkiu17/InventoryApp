@@ -52,13 +52,34 @@ class ComponentViewDialog extends StatelessWidget {
               const SizedBox(height: 16),
             ],
             // Posizione
-            _InfoRow(
-              icon: Icons.location_on_outlined, 
-              label: 'Posizione', 
-              value: currentComp.drawer.isEmpty 
-                  ? 'Non assegnato' 
-                  : (settings.numCabinets > 1 ? '${currentComp.cabinet}-${currentComp.drawer}' : currentComp.drawer)
-            ),
+            () {
+              if (currentComp.drawer.isEmpty) {
+                return const _InfoRow(
+                  icon: Icons.location_on_outlined, 
+                  label: 'Posizione', 
+                  value: 'Non assegnato'
+                );
+              }
+              final basePos = settings.numCabinets > 1 
+                  ? 'Cassettiera ${currentComp.cabinet}, Cassetto ${currentComp.drawer}' 
+                  : 'Cassetto ${currentComp.drawer}';
+              
+              if (currentComp.drawerZone != null) {
+                final key = '${currentComp.cabinet}_${currentComp.drawer}';
+                final zones = settings.drawerDividers[key] ?? 1;
+                final zoneText = getZoneLabel(currentComp.drawerZone!, zones);
+                return _InfoRow(
+                  icon: Icons.location_on_outlined, 
+                  label: 'Posizione', 
+                  value: '$basePos (Zona: $zoneText)'
+                );
+              }
+              return _InfoRow(
+                icon: Icons.location_on_outlined, 
+                label: 'Posizione', 
+                value: basePos
+              );
+            }(),
             const SizedBox(height: 16),
             // Quantità con bottoni
             Row(

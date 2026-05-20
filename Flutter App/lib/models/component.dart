@@ -80,6 +80,7 @@ class Component {
   List<String> tags;
   Map<String, String> specialTagValues; // Ora salviamo esattamente ciò che scrivi!
   List<Attachment> attachments;
+  int? drawerZone;
 
   Component({
     String? id,
@@ -91,6 +92,7 @@ class Component {
     this.tags = const [],
     Map<String, String>? specialTagValues,
     List<Attachment>? attachments,
+    this.drawerZone,
   })  : id = id ?? const Uuid().v4(),
         specialTagValues = specialTagValues ?? {},
         attachments = attachments ?? [];
@@ -105,6 +107,7 @@ class Component {
         'tags': tags,
         'specialTagValues': specialTagValues,
         'attachments': attachments.map((a) => a.toJson()).toList(),
+        if (drawerZone != null) 'drawerZone': drawerZone,
       };
 
   factory Component.fromJson(Map<String, dynamic> json) => Component(
@@ -131,6 +134,7 @@ class Component {
                 ?.map((e) => Attachment.fromJson(e as Map<String, dynamic>))
                 .toList() ??
             [],
+        drawerZone: json['drawerZone'] as int?,
       );
 
   Component copyWith({
@@ -142,6 +146,7 @@ class Component {
     List<String>? tags,
     Map<String, String>? specialTagValues,
     List<Attachment>? attachments,
+    int? drawerZone,
   }) =>
       Component(
         id: id,
@@ -153,5 +158,13 @@ class Component {
         tags: tags ?? this.tags,
         specialTagValues: specialTagValues ?? this.specialTagValues,
         attachments: attachments ?? this.attachments,
+        drawerZone: drawerZone ?? this.drawerZone,
       );
+}
+
+String getZoneLabel(int zoneIndex, int totalZones) {
+  if (zoneIndex == 1) return 'Vicina (davanti)';
+  if (zoneIndex == totalZones) return 'Lontana (retro)';
+  if (totalZones == 3) return 'In mezzo';
+  return 'In mezzo ($zoneIndex)';
 }

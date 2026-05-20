@@ -23,9 +23,11 @@ class InventoryApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ds = context.watch<DataService>();
     return MaterialApp(
       title: 'Inventario Componenti',
       debugShowCheckedModeBanner: false,
+      themeMode: ds.themeMode,
       theme: ThemeData(
         colorSchemeSeed: const Color(0xFF1565C0),
         useMaterial3: true,

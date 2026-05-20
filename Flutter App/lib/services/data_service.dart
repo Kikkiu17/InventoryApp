@@ -51,6 +51,7 @@ class DataService extends ChangeNotifier {
   static const _serverUrlKey      = 'serverUrl';
   static const _storageModeKey    = 'storageMode';
   static const _inventoryIdKey    = 'currentInventoryId';
+  static const _themeModeKey      = 'themeMode';
 
   List<Component> _components = [];
   AppSettings _settings = AppSettings();
@@ -61,6 +62,7 @@ class DataService extends ChangeNotifier {
   String _currentInventoryId = 'default';
   String? _globalSearchQuery;
   ApiClient? _api;
+  ThemeMode _themeMode = ThemeMode.system;
 
   bool _serverConnected = false;
   bool _syncing = false;
@@ -85,9 +87,17 @@ class DataService extends ChangeNotifier {
   bool get isRemote => _mode == StorageMode.remote;
   SyncConflict? get pendingConflict => _pendingConflict;
   String? get globalSearchQuery => _globalSearchQuery;
+  ThemeMode get themeMode => _themeMode;
 
   void setGlobalSearchQuery(String? query) {
     _globalSearchQuery = query;
+    notifyListeners();
+  }
+
+  Future<void> updateThemeMode(ThemeMode mode) async {
+    _themeMode = mode;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_themeModeKey, mode.name);
     notifyListeners();
   }
 
@@ -110,6 +120,12 @@ class DataService extends ChangeNotifier {
     _currentInventoryId = prefs.getString(_inventoryIdKey) ?? 'default';
     final modeStr = prefs.getString(_storageModeKey) ?? 'local';
     _mode = modeStr == 'remote' ? StorageMode.remote : StorageMode.local;
+
+    final themeStr = prefs.getString(_themeModeKey) ?? 'system';
+    _themeMode = ThemeMode.values.firstWhere(
+      (e) => e.name == themeStr,
+      orElse: () => ThemeMode.system,
+    );
 
     if (_mode == StorageMode.remote) {
       _api = ApiClient(_serverUrl, inventoryId: _currentInventoryId);
@@ -549,7 +565,16 @@ class DataService extends ChangeNotifier {
 
           final cab = a.cabinet.compareTo(b.cabinet);
           if (cab != 0) return cab;
-          return a.drawer.compareTo(b.drawer);
+          
+          final drawerComp = a.drawer.compareTo(b.drawer);
+          if (drawerComp != 0) return drawerComp;
+          
+          final zoneA = a.drawerZone ?? 1;
+          final zoneB = b.drawerZone ?? 1;
+          final zoneComp = zoneA.compareTo(zoneB);
+          if (zoneComp != 0) return zoneComp;
+
+          return a.name.compareTo(b.name);
         }); 
         break;
       case SortMode.specialTag:

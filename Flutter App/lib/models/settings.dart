@@ -25,6 +25,7 @@ class AppSettings {
   List<String> availableTags;
   Map<String, dynamic> tagTree;
   List<SpecialTag> specialTags;
+  Map<String, int> drawerDividers;
 
   AppSettings({
     this.numCabinets = 1,
@@ -33,9 +34,11 @@ class AppSettings {
     List<String>? availableTags,
     Map<String, dynamic>? tagTree,
     List<SpecialTag>? specialTags,
+    Map<String, int>? drawerDividers,
   })  : availableTags = availableTags ?? [],
         tagTree = tagTree ?? {},
-        specialTags = specialTags ?? [];
+        specialTags = specialTags ?? [],
+        drawerDividers = drawerDividers ?? {};
 
   Map<String, dynamic> toJson() => {
         'numCabinets': numCabinets,
@@ -44,6 +47,7 @@ class AppSettings {
         'availableTags': availableTags,
         'tagTree': tagTree,
         'specialTags': specialTags.map((t) => t.toJson()).toList(),
+        'drawerDividers': drawerDividers,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
@@ -56,6 +60,9 @@ class AppSettings {
       specialTags: (json['specialTags'] as List? ?? [])
           .map((e) => SpecialTag.fromJson(e))
           .toList(),
+      drawerDividers: (json['drawerDividers'] as Map<String, dynamic>?)
+              ?.map((k, v) => MapEntry(k, v as int)) ??
+          {},
     );
   }
 

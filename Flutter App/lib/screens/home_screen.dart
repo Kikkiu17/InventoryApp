@@ -117,7 +117,12 @@ class _HomeScreenState extends State<HomeScreen> {
               3: pw.FlexColumnWidth(4.9),  // Dettagli (allargata)
             },
             data: items.map((c) {
-              final pos = c.drawer.isEmpty ? 'Non ass.' : (settings.numCabinets > 1 ? '${c.cabinet}-${c.drawer}' : c.drawer);
+              final key = '${c.cabinet}_${c.drawer}';
+              final zones = settings.drawerDividers[key] ?? 1;
+              var pos = c.drawer.isEmpty ? 'Non ass.' : (settings.numCabinets > 1 ? '${c.cabinet}-${c.drawer}' : c.drawer);
+              if (c.drawer.isNotEmpty && c.drawerZone != null && zones >= 2) {
+                pos += '\nZ${c.drawerZone}';
+              }
               final props = c.specialTagValues.entries.map((e) {
                 final st = settings.specialTags.where((s) => s.name == e.key).firstOrNull;
                 return '${e.key}: ${_formatValueWithUnit(e.value, st?.unit ?? '')}';

@@ -39,6 +39,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
   
   List<Attachment> _attachments = [];
   bool _isSaving = false;
+  int? _selectedZone;
 
   @override
   void initState() {
@@ -52,6 +53,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
     _rowCtrl  = TextEditingController();
 
     _selectedCabinet = e?.cabinet ?? 1;
+    _selectedZone = e?.drawerZone;
 
     final d = e?.drawer ?? '';
     if (d.isNotEmpty) {
@@ -66,7 +68,8 @@ class _ComponentDialogState extends State<ComponentDialog> {
 
     _selectedTags = List.from(e?.tags ?? []);
 
-    Map<String, dynamic> currentTree = widget.settings.tagTree;
+    final settings = Provider.of<DataService>(context, listen: false).settings;
+    Map<String, dynamic> currentTree = settings.tagTree;
     while (true) {
       bool found = false;
       for (final key in currentTree.keys) {
@@ -80,17 +83,26 @@ class _ComponentDialogState extends State<ComponentDialog> {
       if (!found) break;
     }
 
-    for (final st in widget.settings.specialTags) {
+    for (final st in settings.specialTags) {
       _specialTagCtrls[st.name] = TextEditingController(
         text: e?.specialTagValues[st.name] ?? '', 
       );
     }
     
     _attachments = List.from(e?.attachments ?? []);
+    
+    _colCtrl.addListener(_onDrawerCoordinatesChanged);
+    _rowCtrl.addListener(_onDrawerCoordinatesChanged);
+  }
+
+  void _onDrawerCoordinatesChanged() {
+    setState(() {});
   }
 
   @override
   void dispose() {
+    _colCtrl.removeListener(_onDrawerCoordinatesChanged);
+    _rowCtrl.removeListener(_onDrawerCoordinatesChanged);
     _nameCtrl.dispose();
     _descCtrl.dispose();
     _qtyCtrl.dispose();
@@ -124,15 +136,18 @@ class _ComponentDialogState extends State<ComponentDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final ds = Provider.of<DataService>(context);
+    final settings = ds.settings;
+
     final isEdit  = widget.existing != null && !widget.isDuplicate;
     final cs      = Theme.of(context).colorScheme;
 
-    Map<String, dynamic> currentTreeLevel = widget.settings.tagTree;
+    Map<String, dynamic> currentTreeLevel = settings.tagTree;
     for (String step in _treePath) {
       currentTreeLevel = currentTreeLevel[step] ?? <String, dynamic>{};
     }
     final sortedCurrentLevel = currentTreeLevel.keys.toList()..sort();
-    final sortedLoose  = List<String>.from(widget.settings.availableTags)..sort();
+    final sortedLoose  = List<String>.from(settings.availableTags)..sort();
 
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -221,16 +236,16 @@ class _ComponentDialogState extends State<ComponentDialog> {
                     },
                   ),
                 ),
-                if (widget.settings.numCabinets > 1) ...[
+                if (settings.numCabinets > 1) ...[
                   const SizedBox(width: 8),
                   Expanded(
                     child: DropdownButtonFormField<int>(
-                      value: _selectedCabinet > widget.settings.numCabinets ? 1 : _selectedCabinet,
+                      value: _selectedCabinet > settings.numCabinets ? 1 : _selectedCabinet,
                       decoration: InputDecoration(
                         labelText: 'Cassettiera', border: const OutlineInputBorder(), filled: true,
                         fillColor: Colors.green.withOpacity(_opacityGreen),
                       ),
-                      items: List.generate(widget.settings.numCabinets, (i) => i + 1)
+                      items: List.generate(settings.numCabinets, (i) => i + 1)
                           .map((c) => DropdownMenuItem(value: c, child: Text('N° $c'))).toList(),
                       onChanged: (v) => setState(() => _selectedCabinet = v ?? 1),
                     ),
@@ -275,6 +290,51 @@ class _ComponentDialogState extends State<ComponentDialog> {
                   ),
                 ),
               ]),
+              () {
+                final col = _colCtrl.text.trim().toUpperCase();
+                final row = _rowCtrl.text.trim();
+                if (col.isEmpty || row.isEmpty) return const SizedBox.shrink();
+                
+                final drawer = '$col$row';
+                final key = '${_selectedCabinet}_$drawer';
+                final zones = settings.drawerDividers[key] ?? 1;
+                
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.tune, size: 16),
+                        label: Text(zones >= 2 
+                            ? 'Modifica separatori ($zones zone)' 
+                            : 'Configura separatori (cassetto normale)'),
+                        onPressed: () => _configureDrawerSeparators(drawer),
+                      ),
+                    ),
+                    if (zones >= 2) ...[
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<int>(
+                        value: _selectedZone == null || _selectedZone! < 1 || _selectedZone! > zones ? 1 : _selectedZone,
+                        decoration: InputDecoration(
+                          labelText: 'Zona del cassetto (Separatore)',
+                          border: const OutlineInputBorder(),
+                          filled: true,
+                          fillColor: Colors.green.withOpacity(_opacityGreen),
+                        ),
+                        items: List.generate(zones, (i) => i + 1)
+                            .map((z) => DropdownMenuItem(
+                                  value: z,
+                                  child: Text(getZoneLabel(z, zones)),
+                                ))
+                            .toList(),
+                        onChanged: (v) => setState(() => _selectedZone = v ?? 1),
+                      ),
+                    ],
+                  ],
+                );
+              }(),
               const SizedBox(height: 16),
 
               if (_selectedTags.isNotEmpty) ...[
@@ -286,7 +346,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                     label: Text(tag, style: const TextStyle(fontWeight: FontWeight.bold)),
                     backgroundColor: cs.primaryContainer,
                     onDeleted: () => setState(() {
-                      final subtree = _findSubtree(tag, widget.settings.tagTree);
+                      final subtree = _findSubtree(tag, settings.tagTree);
                       _removeNodeAndDescendants(tag, subtree ?? {}, _selectedTags);
                       final idx = _treePath.indexOf(tag);
                       if (idx != -1) _treePath = _treePath.sublist(0, idx);
@@ -298,7 +358,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                 const SizedBox(height: 4),
               ],
 
-              if (widget.settings.tagTree.isNotEmpty) ...[
+              if (settings.tagTree.isNotEmpty) ...[
                 Text('Naviga nell\'albero dei tag', style: Theme.of(context).textTheme.labelLarge),
                 const SizedBox(height: 6),
                 
@@ -349,9 +409,8 @@ class _ComponentDialogState extends State<ComponentDialog> {
                             }
                             
                             if (!_selectedTags.contains(t)) _selectedTags.add(t);
-                            
-                            if (_treePath.isEmpty) {
-                              if (_nameCtrl.text.isEmpty || widget.settings.tagTree.keys.contains(_nameCtrl.text)) {
+                                                        if (_treePath.isEmpty) {
+                              if (_nameCtrl.text.isEmpty || settings.tagTree.keys.contains(_nameCtrl.text)) {
                                 _nameCtrl.text = t;
                               }
                             } else if (_nameCtrl.text.isEmpty) {
@@ -392,10 +451,10 @@ class _ComponentDialogState extends State<ComponentDialog> {
                 const SizedBox(height: 16),
               ],
 
-              if (widget.settings.specialTags.isNotEmpty) ...[
+              if (settings.specialTags.isNotEmpty) ...[
                 Text('Proprietà', style: Theme.of(context).textTheme.labelLarge),
                 const SizedBox(height: 8),
-                ...widget.settings.specialTags.map((st) => Padding(
+                ...settings.specialTags.map((st) => Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: TextFormField(
                         controller: _specialTagCtrls[st.name],
@@ -555,17 +614,120 @@ class _ComponentDialogState extends State<ComponentDialog> {
     );
   }
 
+  Future<void> _configureDrawerSeparators(String label) async {
+    final ds = Provider.of<DataService>(context, listen: false);
+    final currentSettings = ds.settings;
+    
+    final key = '${_selectedCabinet}_$label';
+    final currentZones = currentSettings.drawerDividers[key] ?? 1;
+    int dialogZones = currentZones >= 2 ? currentZones : 2;
+    bool isDivided = currentZones >= 2;
+    
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, dialogState) => AlertDialog(
+          title: Text('Configura separatori per $label (Cassettiera $_selectedCabinet)'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SwitchListTile(
+                title: const Text('Dividi cassetto in zone'),
+                subtitle: const Text('Suddivide in profondità (vicina, in mezzo, lontana)'),
+                value: isDivided,
+                onChanged: (val) => dialogState(() => isDivided = val),
+                contentPadding: EdgeInsets.zero,
+              ),
+              if (isDivided) ...[
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.remove_circle_outline),
+                      onPressed: dialogZones > 2 ? () => dialogState(() => dialogZones--) : null,
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text('$dialogZones zone', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.add_circle_outline),
+                      onPressed: dialogZones < 10 ? () => dialogState(() => dialogZones++) : null,
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Annulla'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, {
+                'isDivided': isDivided,
+                'zones': dialogZones,
+              }),
+              child: const Text('Salva'),
+            ),
+          ],
+        ),
+      ),
+    );
+    
+    if (result != null) {
+      final newDividers = Map<String, int>.from(currentSettings.drawerDividers);
+      if (result['isDivided'] == true) {
+        newDividers[key] = result['zones'] as int;
+      } else {
+        newDividers.remove(key);
+      }
+      
+      final updatedSettings = AppSettings(
+        numCabinets: currentSettings.numCabinets,
+        drawerRows: currentSettings.drawerRows,
+        drawerColumns: currentSettings.drawerColumns,
+        availableTags: currentSettings.availableTags,
+        tagTree: currentSettings.tagTree,
+        specialTags: currentSettings.specialTags,
+        drawerDividers: newDividers,
+      );
+      
+      await ds.updateSettings(updatedSettings);
+      
+      setState(() {
+        final maxZones = newDividers[key] ?? 1;
+        if (_selectedZone == null || _selectedZone! < 1 || _selectedZone! > maxZones) {
+          _selectedZone = maxZones >= 2 ? 1 : null;
+        }
+      });
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     final qty    = int.tryParse(_qtyCtrl.text) ?? 0;
     
+    final settings = Provider.of<DataService>(context, listen: false).settings;
+
     // Se entrambi i campi colonna e riga sono vuoti, restituisce stringa vuota (Posizione non assegnata)
     final col = _colCtrl.text.trim().toUpperCase();
     final row = _rowCtrl.text.trim();
     final drawer = col.isEmpty && row.isEmpty ? '' : '$col$row';
 
+    int? finalZone;
+    if (drawer.isNotEmpty) {
+      final key = '${_selectedCabinet}_$drawer';
+      final zones = settings.drawerDividers[key] ?? 1;
+      if (zones >= 2) {
+        finalZone = _selectedZone ?? 1;
+      }
+    }
+
     final specialValues = <String, String>{};
-    for (final st in widget.settings.specialTags) {
+    for (final st in settings.specialTags) {
       final text = _specialTagCtrls[st.name]?.text.trim() ?? '';
       if (text.isNotEmpty) {
         specialValues[st.name] = text; 
@@ -604,6 +766,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
       tags: _selectedTags,
       specialTagValues: specialValues,
       attachments: finalAttachments,
+      drawerZone: finalZone,
     );
     Navigator.pop(context, result);
   }
