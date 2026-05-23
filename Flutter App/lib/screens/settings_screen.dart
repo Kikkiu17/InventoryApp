@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/settings.dart';
 import '../services/data_service.dart';
-import '../services/api_client.dart';
 import 'inventory_list_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -13,23 +12,19 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  late int _numCabinets;
-  late int _rows;
-  late int _cols;
+  late List<ContainerConfig> _containers;
   late List<String> _tags;
   late Map<String, dynamic> _tagTree;
   late List<SpecialTag> _specialTags;
   int _selectedCabinetPreview = 1;
   late Map<String, int> _drawerDividers;
+  final Set<String> _selectedPreviewDrawers = {};
   
   final _newTagCtrl         = TextEditingController();
   final _newSpecialNameCtrl = TextEditingController();
   final _newSpecialUnitCtrl = TextEditingController();
   final _serverUrlCtrl      = TextEditingController();
   
-  final _cabsCtrl = TextEditingController();
-  final _rowsCtrl = TextEditingController();
-  final _colsCtrl = TextEditingController();
   final _manualDrawerCtrl = TextEditingController();
   
   bool _testingServer = false;
@@ -42,9 +37,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _numCabinets = 1;
-    _rows = 4;
-    _cols = 6;
+    _containers = [];
     _tags = [];
     _tagTree = {};
     _specialTags = [];
@@ -65,9 +58,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _newSpecialNameCtrl.dispose();
     _newSpecialUnitCtrl.dispose();
     _serverUrlCtrl.dispose();
-    _cabsCtrl.dispose();
-    _rowsCtrl.dispose();
-    _colsCtrl.dispose();
     _manualDrawerCtrl.dispose();
     super.dispose();
   }
@@ -75,9 +65,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _save() async {
     final ds = context.read<DataService>();
     await ds.updateSettings(AppSettings(
-      numCabinets: _numCabinets,
-      drawerRows: _rows,
-      drawerColumns: _cols,
+      containers: _containers,
       availableTags: _tags,
       tagTree: _tagTree,
       specialTags: _specialTags,
@@ -91,14 +79,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  String _getExcelColumn(int index) {
-    String name = '';
-    while (index >= 0) {
-      name = String.fromCharCode(65 + (index % 26)) + name;
-      index = (index ~/ 26) - 1;
-    }
-    return name;
-  }
 
   int _excelColumnToIndex(String colStr) {
     int index = 0;
@@ -124,9 +104,417 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return true;
   }
 
-  Future<void> _configureDrawerSeparators(String label) async {
-    final key = '${_selectedCabinetPreview.clamp(1, _numCabinets)}_$label';
+  Future<void> _showAddContainerDialog() async {
+    final nameCtrl = TextEditingController(text: 'Contenitore ${_containers.isEmpty ? 1 : _containers.map((c) => c.id).reduce((a, b) => a > b ? a : b) + 1}');
+    final rowsCtrl = TextEditingController(text: '5');
+    final colsCtrl = TextEditingController(text: '13');
+    final formKey = GlobalKey<FormState>();
+    bool invertRows = false;
+    bool invertColumns = false;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, dialogState) => AlertDialog(
+          title: const Text('Aggiungi Contenitore'),
+          content: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: nameCtrl,
+                    decoration: const InputDecoration(labelText: 'Nome contenitore'),
+                    validator: (v) => v == null || v.trim().isEmpty ? 'Obbligatorio' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: rowsCtrl,
+                          decoration: const InputDecoration(labelText: 'Righe'),
+                          keyboardType: TextInputType.number,
+                          validator: (v) {
+                            final val = int.tryParse(v ?? '');
+                            if (val == null || val <= 0) return 'Valore non valido';
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextFormField(
+                          controller: colsCtrl,
+                          decoration: const InputDecoration(labelText: 'Colonne'),
+                          keyboardType: TextInputType.number,
+                          validator: (v) {
+                            final val = int.tryParse(v ?? '');
+                            if (val == null || val <= 0) return 'Valore non valido';
+                            return null;
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  CheckboxListTile(
+                    title: const Text('Inverti righe'),
+                    subtitle: const Text('Ordine numerico dal basso verso l\'alto (es. N...1)'),
+                    value: invertRows,
+                    onChanged: (val) => dialogState(() => invertRows = val ?? false),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  CheckboxListTile(
+                    title: const Text('Inverti colonne'),
+                    subtitle: const Text('Ordine alfabetico da destra a sinistra (es. Z...A)'),
+                    value: invertColumns,
+                    onChanged: (val) => dialogState(() => invertColumns = val ?? false),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annulla')),
+            FilledButton(
+              onPressed: () {
+                if (formKey.currentState!.validate()) Navigator.pop(ctx, true);
+              },
+              child: const Text('Aggiungi'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result == true) {
+      setState(() {
+        final nextId = _containers.isEmpty ? 1 : _containers.map((c) => c.id).reduce((a, b) => a > b ? a : b) + 1;
+        _containers.add(ContainerConfig(
+          id: nextId,
+          name: nameCtrl.text.trim(),
+          rows: int.parse(rowsCtrl.text),
+          columns: int.parse(colsCtrl.text),
+          disabledDrawers: [],
+          invertRows: invertRows,
+          invertColumns: invertColumns,
+        ));
+        _selectedCabinetPreview = nextId;
+      });
+    }
+  }
+
+  Future<void> _showEditContainerDialog(ContainerConfig container) async {
+    final nameCtrl = TextEditingController(text: container.name);
+    final rowsCtrl = TextEditingController(text: container.rows.toString());
+    final colsCtrl = TextEditingController(text: container.columns.toString());
+    final formKey = GlobalKey<FormState>();
+    bool invertRows = container.invertRows;
+    bool invertColumns = container.invertColumns;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, dialogState) => AlertDialog(
+          title: Text('Modifica Contenitore N° ${container.id}'),
+          content: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: nameCtrl,
+                    decoration: const InputDecoration(labelText: 'Nome contenitore'),
+                    validator: (v) => v == null || v.trim().isEmpty ? 'Obbligatorio' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: rowsCtrl,
+                          decoration: const InputDecoration(labelText: 'Righe'),
+                          keyboardType: TextInputType.number,
+                          validator: (v) {
+                            final val = int.tryParse(v ?? '');
+                            if (val == null || val <= 0) return 'Valore non valido';
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextFormField(
+                          controller: colsCtrl,
+                          decoration: const InputDecoration(labelText: 'Colonne'),
+                          keyboardType: TextInputType.number,
+                          validator: (v) {
+                            final val = int.tryParse(v ?? '');
+                            if (val == null || val <= 0) return 'Valore non valido';
+                            return null;
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  CheckboxListTile(
+                    title: const Text('Inverti righe'),
+                    subtitle: const Text('Ordine numerico dal basso verso l\'alto (es. N...1)'),
+                    value: invertRows,
+                    onChanged: (val) => dialogState(() => invertRows = val ?? false),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  CheckboxListTile(
+                    title: const Text('Inverti colonne'),
+                    subtitle: const Text('Ordine alfabetico da destra a sinistra (es. Z...A)'),
+                    value: invertColumns,
+                    onChanged: (val) => dialogState(() => invertColumns = val ?? false),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annulla')),
+            FilledButton(
+              onPressed: () {
+                if (formKey.currentState!.validate()) Navigator.pop(ctx, true);
+              },
+              child: const Text('Salva'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result == true) {
+      setState(() {
+        container.name = nameCtrl.text.trim();
+        container.rows = int.parse(rowsCtrl.text);
+        container.columns = int.parse(colsCtrl.text);
+        container.invertRows = invertRows;
+        container.invertColumns = invertColumns;
+        
+        final updatedDisabled = <String>[];
+        for (final d in container.disabledDrawers) {
+          final match = RegExp(r'^([A-Z]+)(\d+)$').firstMatch(d);
+          if (match != null) {
+            final colStr = match.group(1)!;
+            final rowVal = int.tryParse(match.group(2)!) ?? 0;
+            int colIdx = 0;
+            for (int i = 0; i < colStr.length; i++) {
+              colIdx = colIdx * 26 + (colStr.codeUnitAt(i) - 65 + 1);
+            }
+            colIdx -= 1;
+            if (rowVal >= 1 && rowVal <= container.rows && colIdx >= 0 && colIdx < container.columns) {
+              updatedDisabled.add(d);
+            }
+          }
+        }
+        container.disabledDrawers = updatedDisabled;
+      });
+    }
+  }
+
+  Future<void> _confirmDeleteContainer(ContainerConfig container) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Elimina Contenitore'),
+        content: Text('Sei sicuro di voler eliminare "${container.name.isNotEmpty ? container.name : 'Contenitore ${container.id}'}"?\nI componenti associati a questo contenitore non avranno più una posizione valida.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annulla')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error, foregroundColor: Theme.of(ctx).colorScheme.onError),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Elimina'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      setState(() {
+        _containers.removeWhere((c) => c.id == container.id);
+        if (_selectedCabinetPreview == container.id) {
+          _selectedCabinetPreview = _containers.isNotEmpty ? _containers.first.id : 1;
+        }
+      });
+    }
+  }
+
+  Future<void> _showBulkActionDialog() async {
+    if (_selectedPreviewDrawers.isEmpty) return;
+    
+    final count = _selectedPreviewDrawers.length;
+    final containerIndex = _containers.indexWhere((c) => c.id == _selectedCabinetPreview);
+    if (containerIndex == -1) return;
+    final container = _containers[containerIndex];
+    
+    final action = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Azione di gruppo ($count cassetti)'),
+        content: const Text(
+          'Cosa vuoi fare con i cassetti selezionati?\n'
+          'Puoi disattivarli, riattivarli, impostare le zone o unire/dividere i cassetti selezionati.'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'cancel'),
+            child: const Text('Annulla'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'enable'),
+            child: const Text('Attiva tutti'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'disable'),
+            child: const Text('Disattiva tutti'),
+          ),
+          if (count > 1)
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'merge'),
+              child: const Text('Unisci cassetti'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'unmerge'),
+            child: const Text('Dividi cassetti'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, 'zones'),
+            child: const Text('Imposta zone...'),
+          ),
+        ],
+      ),
+    );
+    
+    if (action == null || action == 'cancel') {
+      setState(() {
+        _selectedPreviewDrawers.clear();
+      });
+      return;
+    }
+    
+    if (action == 'enable') {
+      setState(() {
+        for (final label in _selectedPreviewDrawers) {
+          container.disabledDrawers.remove(label);
+        }
+        _selectedPreviewDrawers.clear();
+      });
+    } else if (action == 'disable') {
+      setState(() {
+        for (final label in _selectedPreviewDrawers) {
+          if (!container.disabledDrawers.contains(label)) {
+            container.disabledDrawers.add(label);
+          }
+        }
+        _selectedPreviewDrawers.clear();
+      });
+    } else if (action == 'merge') {
+      setState(() {
+        final selectedList = _selectedPreviewDrawers.toList();
+        for (final m in List.from(container.mergedDrawers)) {
+          m.removeWhere((label) => selectedList.contains(label));
+        }
+        container.mergedDrawers.removeWhere((m) => m.length < 2);
+        container.mergedDrawers.add(selectedList);
+        _selectedPreviewDrawers.clear();
+      });
+    } else if (action == 'unmerge') {
+      setState(() {
+        final selectedList = _selectedPreviewDrawers.toList();
+        for (final m in List.from(container.mergedDrawers)) {
+          m.removeWhere((label) => selectedList.contains(label));
+        }
+        container.mergedDrawers.removeWhere((m) => m.length < 2);
+        _selectedPreviewDrawers.clear();
+      });
+    } else if (action == 'zones') {
+      int selectedZones = 2;
+      if (!mounted) return;
+      final zonesResult = await showDialog<int>(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx2, dialogState) => AlertDialog(
+            title: Text('Imposta zone per $count cassetti'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Seleziona il numero di scomparti (zone) per i cassetti selezionati:'),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<int>(
+                  value: selectedZones,
+                  decoration: const InputDecoration(
+                    labelText: 'Numero di zone',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: List.generate(11, (i) => i + 2) // 2 to 12
+                      .map((z) => DropdownMenuItem(
+                            value: z,
+                            child: Text('$z zone'),
+                          ))
+                      .toList(),
+                  onChanged: (v) => dialogState(() => selectedZones = v ?? 2),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Annulla'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, 1),
+                child: const Text('Nessun divisore (1 zona)'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, selectedZones),
+                child: const Text('Applica'),
+              ),
+            ],
+          ),
+        ),
+      );
+      
+      if (zonesResult != null) {
+        setState(() {
+          for (final label in _selectedPreviewDrawers) {
+            final key = '${container.id}_$label';
+            if (zonesResult == 1) {
+              _drawerDividers.remove(key);
+            } else {
+              _drawerDividers[key] = zonesResult;
+            }
+          }
+          _selectedPreviewDrawers.clear();
+        });
+      } else {
+        setState(() {
+          _selectedPreviewDrawers.clear();
+        });
+      }
+    }
+  }
+
+  Future<void> _configureDrawer(String label) async {
+    final containerIndex = _containers.indexWhere((c) => c.id == _selectedCabinetPreview);
+    if (containerIndex == -1) return;
+    
+    final container = _containers[containerIndex];
+    final key = '${container.id}_$label';
     final currentZones = _drawerDividers[key] ?? 1;
+    bool isCurrentlyDisabled = container.disabledDrawers.contains(label);
+    
+    bool dialogIsActive = !isCurrentlyDisabled;
     int dialogZones = currentZones >= 2 ? currentZones : 2;
     bool isDivided = currentZones >= 2;
     
@@ -134,36 +522,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, dialogState) => AlertDialog(
-          title: Text('Configura separatori per $label (Cassettiera ${_selectedCabinetPreview.clamp(1, _numCabinets)})'),
+          title: Text('Cassetto $label (${container.name.isNotEmpty ? container.name : 'Contenitore ${container.id}'})'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               SwitchListTile(
-                title: const Text('Dividi cassetto in zone'),
-                subtitle: const Text('Suddivide in profondità (vicina, in mezzo, lontana)'),
-                value: isDivided,
-                onChanged: (val) => dialogState(() => isDivided = val),
+                title: const Text('Abilitato'),
+                subtitle: const Text('Se disattivato, questo cassetto non esisterà nella cassettiera'),
+                value: dialogIsActive,
+                onChanged: (val) => dialogState(() {
+                  dialogIsActive = val;
+                }),
                 contentPadding: EdgeInsets.zero,
               ),
-              if (isDivided) ...[
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.remove_circle_outline),
-                      onPressed: dialogZones > 2 ? () => dialogState(() => dialogZones--) : null,
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text('$dialogZones zone', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.add_circle_outline),
-                      onPressed: dialogZones < 10 ? () => dialogState(() => dialogZones++) : null,
-                    ),
-                  ],
+              if (dialogIsActive) ...[
+                const Divider(),
+                SwitchListTile(
+                  title: const Text('Dividi in zone'),
+                  subtitle: const Text('Suddivide in profondità (vicina, in mezzo, lontana)'),
+                  value: isDivided,
+                  onChanged: (val) => dialogState(() => isDivided = val),
+                  contentPadding: EdgeInsets.zero,
                 ),
+                if (isDivided) ...[
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.remove_circle_outline),
+                        onPressed: dialogZones > 2 ? () => dialogState(() => dialogZones--) : null,
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text('$dialogZones zone', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.add_circle_outline),
+                        onPressed: dialogZones < 10 ? () => dialogState(() => dialogZones++) : null,
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ],
           ),
@@ -174,6 +574,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, {
+                'isActive': dialogIsActive,
                 'isDivided': isDivided,
                 'zones': dialogZones,
               }),
@@ -186,10 +587,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     
     if (result != null) {
       setState(() {
-        if (result['isDivided'] == true) {
-          _drawerDividers[key] = result['zones'] as int;
-        } else {
+        if (result['isActive'] == false) {
+          if (!container.disabledDrawers.contains(label)) {
+            container.disabledDrawers.add(label);
+          }
           _drawerDividers.remove(key);
+        } else {
+          container.disabledDrawers.remove(label);
+          if (result['isDivided'] == true) {
+            _drawerDividers[key] = result['zones'] as int;
+          } else {
+            _drawerDividers.remove(key);
+          }
         }
       });
     }
@@ -199,7 +608,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final input = _manualDrawerCtrl.text.trim().toUpperCase();
     if (input.isEmpty) return;
     
-    if (!_validateDrawerCoordinate(input, _rows, _cols)) {
+    final container = _containers.firstWhere((c) => c.id == _selectedCabinetPreview, orElse: () => _containers.first);
+    if (!_validateDrawerCoordinate(input, container.rows, container.columns)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Coordinate cassetto non valide per le dimensioni attuali della cassettiera'),
@@ -210,7 +620,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     
     FocusScope.of(context).unfocus();
-    _configureDrawerSeparators(input);
+    _configureDrawer(input);
   }
 
   @override
@@ -222,17 +632,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (_lastSettingsRef != ds.settings) {
       _lastSettingsRef = ds.settings;
       final s = ds.settings;
-      _numCabinets = s.numCabinets;
-      _rows        = s.drawerRows;
-      _cols        = s.drawerColumns;
+      
+      _containers = s.containers.map((c) => ContainerConfig(
+        id: c.id,
+        name: c.name,
+        rows: c.rows,
+        columns: c.columns,
+        disabledDrawers: List<String>.from(c.disabledDrawers),
+        invertRows: c.invertRows,
+        invertColumns: c.invertColumns,
+        mergedDrawers: c.mergedDrawers.map((list) => List<String>.from(list)).toList(),
+      )).toList();
+      
       _tags        = List.from(s.availableTags);
       _tagTree     = _deepCopyTree(s.tagTree);
       _specialTags = s.specialTags.map((t) => SpecialTag(name: t.name, unit: t.unit, isString: t.isString)).toList();
       _drawerDividers = Map.from(s.drawerDividers);
       
-      _cabsCtrl.text = _numCabinets.toString();
-      _rowsCtrl.text = _rows.toString();
-      _colsCtrl.text = _cols.toString();
       _serverUrlCtrl.text = ds.serverUrl;
       _expandedPaths.clear();
     }
@@ -389,65 +805,83 @@ class _SettingsScreenState extends State<SettingsScreen> {
           )),
           const SizedBox(height: 24),
 
-          _SectionHeader(title: 'Configurazione cassetti', icon: Icons.grid_view),
+          _SectionHeader(title: 'Configurazione contenitori (cassetti)', icon: Icons.grid_view),
           Card(child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Cassettiere: $_numCabinets · Colonne: A–${_getExcelColumn(_cols > 0 ? _cols - 1 : 0)} · Righe: 1–$_rows · Totale: ${_rows * _cols} cassetti x cassettiera', style: theme.textTheme.bodyMedium),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _cabsCtrl,
-                      decoration: const InputDecoration(labelText: 'Cassettiere', border: OutlineInputBorder(), isDense: true),
-                      keyboardType: TextInputType.number,
-                      onChanged: (v) {
-                        final val = int.tryParse(v);
-                        if (val != null && val > 0) setState(() => _numCabinets = val);
-                      },
+              Text('Gestisci i contenitori fisici. Ciascun contenitore può avere dimensioni personalizzate e forme ritagliate disattivando cassetti nell\'anteprima.', style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+              const SizedBox(height: 12),
+              
+              ..._containers.map((container) {
+                return Card(
+                  color: cs.surfaceContainerLow,
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    leading: CircleAvatar(
+                      backgroundColor: cs.primary,
+                      foregroundColor: cs.onPrimary,
+                      child: Text('${container.id}'),
+                    ),
+                    title: Text(
+                      container.name.isNotEmpty ? container.name : 'Contenitore ${container.id}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Text(
+                      '${container.rows} righe x ${container.columns} colonne · ${container.rows * container.columns - container.disabledDrawers.length} cassetti attivi (${container.disabledDrawers.length} disattivati)',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined),
+                          tooltip: 'Modifica dimensioni e nome',
+                          onPressed: () => _showEditContainerDialog(container),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          color: cs.error,
+                          tooltip: 'Elimina contenitore',
+                          onPressed: _containers.length > 1 ? () => _confirmDeleteContainer(container) : null,
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _colsCtrl,
-                      decoration: const InputDecoration(labelText: 'Colonne', border: OutlineInputBorder(), isDense: true),
-                      keyboardType: TextInputType.number,
-                      onChanged: (v) {
-                        final val = int.tryParse(v);
-                        if (val != null && val > 0) setState(() => _cols = val);
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _rowsCtrl,
-                      decoration: const InputDecoration(labelText: 'Righe', border: OutlineInputBorder(), isDense: true),
-                      keyboardType: TextInputType.number,
-                      onChanged: (v) {
-                        final val = int.tryParse(v);
-                        if (val != null && val > 0) setState(() => _rows = val);
-                      },
-                    ),
-                  ),
-                ],
+                );
+              }),
+              
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _showAddContainerDialog,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Aggiungi contenitore'),
+                ),
               ),
-              const SizedBox(height: 16),
-              if (_numCabinets > 1) ...[
+              
+              const Divider(height: 32),
+              
+              if (_containers.isNotEmpty) ...[
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Cassettiera da visualizzare/modificare: ', style: TextStyle(fontWeight: FontWeight.w500)),
-                    const SizedBox(width: 8),
+                    Text(
+                      'Anteprima e forma',
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                    ),
                     DropdownButton<int>(
-                      value: _selectedCabinetPreview.clamp(1, _numCabinets),
-                      items: List.generate(_numCabinets, (i) => i + 1)
-                          .map((cab) => DropdownMenuItem(
-                                value: cab,
-                                child: Text('Cassettiera $cab'),
-                              ))
-                          .toList(),
+                      value: _containers.any((c) => c.id == _selectedCabinetPreview)
+                          ? _selectedCabinetPreview
+                          : _containers.first.id,
+                      underline: const SizedBox.shrink(),
+                      items: _containers.map((c) {
+                        return DropdownMenuItem(
+                          value: c.id,
+                          child: Text(c.name.isNotEmpty ? c.name : 'Contenitore ${c.id}'),
+                        );
+                      }).toList(),
                       onChanged: (val) {
                         if (val != null) {
                           setState(() => _selectedCabinetPreview = val);
@@ -456,51 +890,62 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-              ],
-              _DrawerGrid(
-                rows: _rows,
-                cols: _cols,
-                getColName: _getExcelColumn,
-                selectedCabinet: _selectedCabinetPreview.clamp(1, _numCabinets),
-                drawerDividers: _drawerDividers,
-                onDrawerClick: (label, currentZones) {
-                  _configureDrawerSeparators(label);
-                },
-              ),
-              const SizedBox(height: 16),
-              const Divider(),
-              const SizedBox(height: 8),
-              Text(
-                'Configura cassetto per coordinate (per cassetti non visibili nell\'anteprima)',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: cs.onSurfaceVariant,
+                const SizedBox(height: 12),
+                _DrawerGrid(
+                  container: _containers.firstWhere((c) => c.id == _selectedCabinetPreview, orElse: () => _containers.first),
+                  drawerDividers: _drawerDividers,
+                  selectedDrawers: _selectedPreviewDrawers,
+                  onDrawerClick: (label) {
+                    _configureDrawer(label);
+                  },
+                  onSelectStart: (label) {
+                    setState(() {
+                      _selectedPreviewDrawers.add(label);
+                    });
+                  },
+                  onSelectUpdate: (label) {
+                    setState(() {
+                      _selectedPreviewDrawers.add(label);
+                    });
+                  },
+                  onSelectEnd: () {
+                    _showBulkActionDialog();
+                  },
                 ),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _manualDrawerCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Codice cassetto',
-                        hintText: 'Es: A20 o K4',
-                        border: OutlineInputBorder(),
-                        isDense: true,
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 8),
+                Text(
+                  'Configura cassetto per coordinate (per cassetti non visibili nell\'anteprima)',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _manualDrawerCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Codice cassetto',
+                          hintText: 'Es: A20 o K4',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        textCapitalization: TextCapitalization.characters,
+                        onSubmitted: (_) => _configureManualDrawer(),
                       ),
-                      textCapitalization: TextCapitalization.characters,
-                      onSubmitted: (_) => _configureManualDrawer(),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton(
-                    onPressed: _configureManualDrawer,
-                    child: const Text('Configura'),
-                  ),
-                ],
-              ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: _configureManualDrawer,
+                      child: const Text('Configura'),
+                    ),
+                  ],
+                ),
+              ],
             ]),
           )),
           const SizedBox(height: 24),
@@ -794,16 +1239,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (ok) {
       _lastSettingsRef = ds.settings; 
       setState(() {
-        _numCabinets = ds.settings.numCabinets;
-        _rows        = ds.settings.drawerRows;
-        _cols        = ds.settings.drawerColumns;
+        _containers = ds.settings.containers.map((c) => ContainerConfig(
+          id: c.id,
+          name: c.name,
+          rows: c.rows,
+          columns: c.columns,
+          disabledDrawers: List<String>.from(c.disabledDrawers),
+          invertRows: c.invertRows,
+          invertColumns: c.invertColumns,
+          mergedDrawers: c.mergedDrawers.map((list) => List<String>.from(list)).toList(),
+        )).toList();
         _tags        = List.from(ds.settings.availableTags);
         _tagTree     = _deepCopyTree(ds.settings.tagTree);
         _specialTags = ds.settings.specialTags.map((t) => SpecialTag(name: t.name, unit: t.unit, isString: t.isString)).toList();
         _drawerDividers = Map.from(ds.settings.drawerDividers);
-        _cabsCtrl.text = _numCabinets.toString();
-        _rowsCtrl.text = _rows.toString();
-        _colsCtrl.text = _cols.toString();
       });
     }
   }
@@ -822,15 +1271,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: const Text('Ripristina backup'),
         content: SizedBox(
           width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: backups.length,
-            itemBuilder: (_, i) => ListTile(
-              title: Text(_formatBackupName(backups[i])), 
-              leading: const Icon(Icons.history),
-              onTap: () => Navigator.pop(ctx, backups[i]),
-            )
-          )
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: backups.map((backup) => ListTile(
+                title: Text(_formatBackupName(backup)), 
+                leading: const Icon(Icons.history),
+                onTap: () => Navigator.pop(ctx, backup),
+              )).toList(),
+            ),
+          ),
         ),
         actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annulla'))],
       )
@@ -893,129 +1343,304 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _DrawerGrid extends StatelessWidget {
-  final int rows, cols;
-  final String Function(int) getColName;
-  final int selectedCabinet;
+  final ContainerConfig container;
   final Map<String, int> drawerDividers;
-  final void Function(String label, int currentZones) onDrawerClick;
+  final void Function(String label) onDrawerClick;
+  final Set<String> selectedDrawers;
+  final void Function(String label) onSelectStart;
+  final void Function(String label) onSelectUpdate;
+  final VoidCallback onSelectEnd;
 
   const _DrawerGrid({
-    required this.rows,
-    required this.cols,
-    required this.getColName,
-    required this.selectedCabinet,
+    required this.container,
     required this.drawerDividers,
     required this.onDrawerClick,
+    required this.selectedDrawers,
+    required this.onSelectStart,
+    required this.onSelectUpdate,
+    required this.onSelectEnd,
   });
+
+  Map<String, int> _parseLabelCoords(String label) {
+    final match = RegExp(r'^([A-Z]+)(\d+)$').firstMatch(label);
+    if (match == null) return {'col': 0, 'row': 0};
+    final colStr = match.group(1)!;
+    final rowVal = int.tryParse(match.group(2)!) ?? 1;
+    
+    int colIdx = 0;
+    for (int i = 0; i < colStr.length; i++) {
+      colIdx = colIdx * 26 + (colStr.codeUnitAt(i) - 65 + 1);
+    }
+    colIdx -= 1;
+    return {'col': colIdx, 'row': rowVal - 1};
+  }
+
+  String? _getLabelFromOffset(Offset offset) {
+    final x = offset.dx - 8;
+    final y = offset.dy - 8;
+    
+    final colIdx = (x / 54).floor().clamp(0, container.columns - 1);
+    final rowIdx = (y / 38).floor().clamp(0, container.rows - 1);
+    
+    final displayRow = container.invertRows ? (container.rows - 1 - rowIdx) : rowIdx;
+    final displayCol = container.invertColumns ? (container.columns - 1 - colIdx) : colIdx;
+    
+    if (displayCol >= 0 && displayCol < container.columnLabels.length && displayRow >= 0 && displayRow < container.rows) {
+      return '${container.columnLabels[displayCol]}${displayRow + 1}';
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final rows = container.rows;
+    final cols = container.columns;
+
+    // Create merge lookup
+    final Map<String, List<String>> mergeGroups = {};
+    for (final group in container.mergedDrawers) {
+      for (final label in group) {
+        mergeGroups[label] = group;
+      }
+    }
+
+    final List<Widget> positionedCells = [];
+
+    for (int r = 0; r < rows; r++) {
+      for (int c = 0; c < cols; c++) {
+        final label = '${container.columnLabels[c]}${r + 1}';
+        final group = mergeGroups[label];
+
+        int minCol = c;
+        int maxCol = c;
+        int minRow = r;
+        int maxRow = r;
+        int minDCol = container.invertColumns ? (cols - 1 - c) : c;
+        int maxDCol = minDCol;
+        int minDRow = container.invertRows ? (rows - 1 - r) : r;
+        int maxDRow = minDRow;
+
+        if (group != null) {
+          // Parse all coordinates in the group
+          final coordsList = group.map((lbl) {
+            final coords = _parseLabelCoords(lbl);
+            final col = coords['col']!;
+            final row = coords['row']!;
+            final dCol = container.invertColumns ? (cols - 1 - col) : col;
+            final dRow = container.invertRows ? (rows - 1 - row) : row;
+            return {
+              'col': col,
+              'row': row,
+              'dCol': dCol,
+              'dRow': dRow,
+            };
+          }).toList();
+
+          minCol = coordsList.map((e) => e['col']!).reduce((a, b) => a < b ? a : b);
+          maxCol = coordsList.map((e) => e['col']!).reduce((a, b) => a > b ? a : b);
+          minRow = coordsList.map((e) => e['row']!).reduce((a, b) => a < b ? a : b);
+          maxRow = coordsList.map((e) => e['row']!).reduce((a, b) => a > b ? a : b);
+
+          minDCol = coordsList.map((e) => e['dCol']!).reduce((a, b) => a < b ? a : b);
+          maxDCol = coordsList.map((e) => e['dCol']!).reduce((a, b) => a > b ? a : b);
+          minDRow = coordsList.map((e) => e['dRow']!).reduce((a, b) => a < b ? a : b);
+          maxDRow = coordsList.map((e) => e['dRow']!).reduce((a, b) => a > b ? a : b);
+
+          // Skip if this is not the top-left cell of the group in logical coordinates
+          if (c != minCol || r != minRow) {
+            continue;
+          }
+        }
+
+        final cellLabel = group != null ? group.join('+') : label;
+        final key = '${container.id}_$label'; // Dividers are saved by primary label
+        final zones = drawerDividers[key] ?? 1;
+        final isDisabled = container.disabledDrawers.contains(label);
+        final isSelected = selectedDrawers.contains(label) || (group != null && group.any((l) => selectedDrawers.contains(l)));
+
+        Widget cellWidget = isDisabled
+            ? Container(
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: cs.outlineVariant.withOpacity(0.3)),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  cellLabel,
+                  style: TextStyle(
+                    fontSize: group != null ? 8 : 9,
+                    color: cs.onSurfaceVariant.withOpacity(0.3),
+                    decoration: TextDecoration.lineThrough,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              )
+            : (zones < 2
+                ? Container(
+                    decoration: BoxDecoration(
+                      color: cs.primaryContainer,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      cellLabel,
+                      style: TextStyle(
+                        fontSize: group != null ? 8 : 10,
+                        color: cs.onPrimaryContainer,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  )
+                : Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Column(
+                        children: List.generate(
+                          zones,
+                          (i) => Expanded(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: cs.primaryContainer,
+                                borderRadius: i == 0
+                                    ? const BorderRadius.vertical(top: Radius.circular(4))
+                                    : i == zones - 1
+                                        ? const BorderRadius.vertical(bottom: Radius.circular(4))
+                                        : null,
+                                border: i < zones - 1
+                                    ? Border(
+                                        bottom: BorderSide(
+                                          color: cs.primary.withOpacity(0.4),
+                                          width: 1,
+                                        ),
+                                      )
+                                    : null,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      IgnorePointer(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: cs.primaryContainer.withOpacity(0.85),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: Text(
+                            cellLabel,
+                            style: TextStyle(
+                              fontSize: group != null ? 8 : 9,
+                              color: cs.onPrimaryContainer,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ));
+
+        if (isSelected) {
+          cellWidget = Stack(
+            children: [
+              cellWidget,
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: cs.primary, width: 2.5),
+                    borderRadius: BorderRadius.circular(4),
+                    color: cs.primary.withOpacity(0.15),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+
+        final double left = minDCol * 54.0 + 3.0;
+        final double top = minDRow * 38.0 + 3.0;
+        final double width = (maxDCol - minDCol + 1) * 54.0 - 6.0;
+        final double height = (maxDRow - minDRow + 1) * 38.0 - 6.0;
+
+        positionedCells.add(Positioned(
+          left: left,
+          top: top,
+          width: width,
+          height: height,
+          child: InkWell(
+            onTap: () => onDrawerClick(label),
+            borderRadius: BorderRadius.circular(4),
+            child: cellWidget,
+          ),
+        ));
+      }
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Anteprima (clicca su un cassetto per dividere in zone/separatori)',
+        Text('Anteprima (clicca per configurare, premi a lungo e trascina per selezionare in blocco)',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
-        const SizedBox(height: 6),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (int r = 0; r < rows.clamp(0, 6); r++)
-                Row(
-                  children: [
-                    for (int c = 0; c < cols.clamp(0, 8); c++) () {
-                      final label = '${getColName(c)}${r + 1}';
-                      final key = '${selectedCabinet}_$label';
-                      final zones = drawerDividers[key] ?? 1;
-                      return InkWell(
-                        onTap: () => onDrawerClick(label, zones),
-                        borderRadius: BorderRadius.circular(4),
-                        child: Container(
-                          width: 44,
-                          height: 32,
-                          margin: const EdgeInsets.all(3),
-                          child: zones < 2
-                              ? Container(
-                                  decoration: BoxDecoration(
-                                    color: cs.primaryContainer,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Text(
-                                    label,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: cs.onPrimaryContainer,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                )
-                              : Stack(
-                                  alignment: Alignment.center,
-                                  children: [
-                                    Column(
-                                      children: List.generate(
-                                        zones,
-                                        (i) => Expanded(
-                                          child: Container(
-                                            decoration: BoxDecoration(
-                                              color: cs.primaryContainer,
-                                              borderRadius: i == 0
-                                                  ? const BorderRadius.vertical(top: Radius.circular(4))
-                                                  : i == zones - 1
-                                                      ? const BorderRadius.vertical(bottom: Radius.circular(4))
-                                                      : null,
-                                              border: i < zones - 1
-                                                  ? Border(
-                                                      bottom: BorderSide(
-                                                        color: cs.primary.withOpacity(0.4),
-                                                        width: 1,
-                                                      ),
-                                                    )
-                                                  : null,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    IgnorePointer(
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: cs.primaryContainer.withOpacity(0.85),
-                                          borderRadius: BorderRadius.circular(3),
-                                        ),
-                                        child: Text(
-                                          label,
-                                          style: TextStyle(
-                                            fontSize: 9,
-                                            color: cs.onPrimaryContainer,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                        ),
-                      );
-                    }(),
-                    if (cols > 8)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 4),
-                        child: Text('…', style: TextStyle(color: cs.onSurfaceVariant)),
-                      ),
-                  ],
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: cs.outlineVariant.withOpacity(0.5)),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          height: (rows * 38 + 16).toDouble().clamp(100.0, 320.0), // Limite altezza a 320px scrollabile
+          child: SingleChildScrollView(
+            scrollDirection: Axis.vertical,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onLongPressStart: (details) {
+                  final label = _getLabelFromOffset(details.localPosition);
+                  if (label != null) {
+                    final group = mergeGroups[label];
+                    if (group != null) {
+                      for (final lbl in group) {
+                        onSelectStart(lbl);
+                      }
+                    } else {
+                      onSelectStart(label);
+                    }
+                  }
+                },
+                onLongPressMoveUpdate: (details) {
+                  final label = _getLabelFromOffset(details.localPosition);
+                  if (label != null) {
+                    final group = mergeGroups[label];
+                    if (group != null) {
+                      for (final lbl in group) {
+                        onSelectUpdate(lbl);
+                      }
+                    } else {
+                      onSelectUpdate(label);
+                    }
+                  }
+                },
+                onLongPressEnd: (details) {
+                  onSelectEnd();
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: SizedBox(
+                    width: cols * 54.0,
+                    height: rows * 38.0,
+                    child: Stack(
+                      children: positionedCells,
+                    ),
+                  ),
                 ),
-              if (rows > 6)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text('… e altre ${rows - 6} righe',
-                      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-                ),
-            ],
+              ),
+            ),
           ),
         ),
       ],

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -5,6 +6,7 @@ import 'package:open_filex/open_filex.dart';
 import '../models/component.dart';
 import '../models/settings.dart';
 import '../services/data_service.dart';
+import 'image_viewer.dart';
 
 class ComponentTile extends StatelessWidget {
   final Component component;
@@ -56,39 +58,50 @@ class ComponentTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Badge cassetto
-                  Container(
-                    width: 45,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: isUnassigned
-                          ? cs.errorContainer
-                          : cs.secondaryContainer,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                            isUnassigned
-                                ? Icons.location_off_outlined
-                                : (hasCabinets
-                                    ? Icons.kitchen_outlined
-                                    : Icons.inbox_outlined),
-                            size: 14,
-                            color: isUnassigned
-                                ? cs.onErrorContainer
-                                : cs.onSecondaryContainer),
-                        const SizedBox(height: 2),
-                        Text(drawerText,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                                fontSize: isUnassigned ? 11 : 12,
-                                height: 1.1,
-                                fontWeight: FontWeight.bold,
-                                color: isUnassigned
-                                    ? cs.onErrorContainer
-                                    : cs.onSecondaryContainer)),
-                      ],
+                  Tooltip(
+                    message: isUnassigned
+                        ? 'Posizione non assegnata'
+                        : () {
+                            final container = settings.containers.firstWhere(
+                              (c) => c.id == component.cabinet,
+                              orElse: () => ContainerConfig(id: component.cabinet, name: 'Contenitore ${component.cabinet}', rows: 4, columns: 6),
+                            );
+                            return container.name.isNotEmpty ? container.name : 'Contenitore ${container.id}';
+                          }(),
+                    child: Container(
+                      width: 45,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: isUnassigned
+                            ? cs.errorContainer
+                            : cs.secondaryContainer,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                              isUnassigned
+                                  ? Icons.location_off_outlined
+                                  : (hasCabinets
+                                      ? Icons.kitchen_outlined
+                                      : Icons.inbox_outlined),
+                              size: 14,
+                              color: isUnassigned
+                                  ? cs.onErrorContainer
+                                  : cs.onSecondaryContainer),
+                          const SizedBox(height: 2),
+                          Text(drawerText,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: isUnassigned ? 11 : 12,
+                                  height: 1.1,
+                                  fontWeight: FontWeight.bold,
+                                  color: isUnassigned
+                                      ? cs.onErrorContainer
+                                      : cs.onSecondaryContainer)),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -182,6 +195,30 @@ class ComponentTile extends StatelessWidget {
                       ],
                     ),
                   ),
+                  if (component.images.isNotEmpty) ...[
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => FullscreenImageViewer(
+                              images: component.images,
+                              initialIndex: 0,
+                            ),
+                          ),
+                        );
+                      },
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: SizedBox(
+                          width: 60,
+                          height: 60,
+                          child: _buildImageWidget(context, component.images.first),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
               const SizedBox(height: 8),
@@ -236,6 +273,38 @@ class ComponentTile extends StatelessWidget {
       } else {
         final localPath = await ds.getLocalAttachmentPath(a.path);
         await OpenFilex.open(localPath);
+      }
+    }
+  }
+
+  Widget _buildImageWidget(BuildContext context, String imagePath) {
+    final ds = Provider.of<DataService>(context, listen: false);
+    if (imagePath.startsWith('/')) {
+      return Image.file(
+        File(imagePath),
+        fit: BoxFit.cover,
+        errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image),
+      );
+    } else if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return Image.network(
+        imagePath,
+        fit: BoxFit.cover,
+        errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image),
+      );
+    } else {
+      if (ds.mode == StorageMode.remote && ds.serverConnected) {
+        return Image.network(
+          ds.getAttachmentUrl(imagePath),
+          fit: BoxFit.cover,
+          errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image),
+        );
+      } else {
+        final localPath = ds.getLocalAttachmentPathSync(imagePath);
+        return Image.file(
+          File(localPath),
+          fit: BoxFit.cover,
+          errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image),
+        );
       }
     }
   }

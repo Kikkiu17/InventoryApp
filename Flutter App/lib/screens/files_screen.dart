@@ -1,9 +1,27 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:open_filex/open_filex.dart';
 import '../services/data_service.dart';
 import '../models/component.dart';
+import '../widgets/image_viewer.dart';
+
+class FilesScreenItem {
+  final Component component;
+  final String name;
+  final String path;
+  final bool isLink;
+  final bool isImage;
+
+  FilesScreenItem({
+    required this.component,
+    required this.name,
+    required this.path,
+    this.isLink = false,
+    this.isImage = false,
+  });
+}
 
 class FilesScreen extends StatefulWidget {
   const FilesScreen({super.key});
@@ -22,9 +40,22 @@ class _FilesScreenState extends State<FilesScreen> {
     super.dispose();
   }
 
-  Future<void> _openAttachment(BuildContext context, Attachment a) async {
-    if (a.isLink) {
-      final uri = Uri.parse(a.path);
+  Future<void> _openAttachment(BuildContext context, FilesScreenItem item) async {
+    if (item.isImage) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => FullscreenImageViewer(
+            images: [item.path],
+            initialIndex: 0,
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (item.isLink) {
+      final uri = Uri.parse(item.path);
       try {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } catch (_) {
@@ -36,7 +67,7 @@ class _FilesScreenState extends State<FilesScreen> {
     } else {
       final ds = Provider.of<DataService>(context, listen: false);
       if (ds.mode == StorageMode.remote && ds.serverConnected) {
-        final url = ds.getAttachmentUrl(a.path);
+        final url = ds.getAttachmentUrl(item.path);
         final uri = Uri.parse(url);
         try {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -48,7 +79,7 @@ class _FilesScreenState extends State<FilesScreen> {
         }
       } else {
         try {
-          final localPath = await ds.getLocalAttachmentPath(a.path);
+          final localPath = await ds.getLocalAttachmentPath(item.path);
           await OpenFilex.open(localPath);
         } catch (_) {
           if (context.mounted) {
@@ -61,8 +92,9 @@ class _FilesScreenState extends State<FilesScreen> {
   }
 
   Future<void> _renameAttachment(
-      BuildContext context, Component comp, Attachment a) async {
-    final ctrl = TextEditingController(text: a.name);
+      BuildContext context, FilesScreenItem item) async {
+    if (item.isImage) return; // Images don't support custom display names in this screen
+    final ctrl = TextEditingController(text: item.name);
     final newName = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -86,10 +118,10 @@ class _FilesScreenState extends State<FilesScreen> {
       ),
     );
 
-    if (newName != null && newName.isNotEmpty && newName != a.name) {
-      final newAttachments = comp.attachments.map((att) {
-        if (att.path == a.path && att.name == a.name) {
-          return Attachment(name: newName, path: a.path, isLink: a.isLink);
+    if (newName != null && newName.isNotEmpty && newName != item.name) {
+      final newAttachments = item.component.attachments.map((att) {
+        if (att.path == item.path && att.name == item.name) {
+          return Attachment(name: newName, path: item.path, isLink: item.isLink);
         }
         return att;
       }).toList();
@@ -97,7 +129,7 @@ class _FilesScreenState extends State<FilesScreen> {
       try {
         await context
             .read<DataService>()
-            .updateComponent(comp.copyWith(attachments: newAttachments));
+            .updateComponent(item.component.copyWith(attachments: newAttachments));
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context)
@@ -108,12 +140,12 @@ class _FilesScreenState extends State<FilesScreen> {
   }
 
   Future<void> _deleteAttachment(
-      BuildContext context, Component comp, Attachment a) async {
+      BuildContext context, FilesScreenItem item) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Elimina file'),
-        content: Text('Vuoi eliminare definitivamente "${a.name}"?'),
+        title: Text(item.isImage ? 'Elimina immagine' : 'Elimina file'),
+        content: Text('Vuoi eliminare definitivamente "${item.name}"?'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -131,13 +163,20 @@ class _FilesScreenState extends State<FilesScreen> {
     if (confirm == true) {
       final ds = context.read<DataService>();
       try {
-        if (!a.isLink) {
-          await ds.deleteAttachment(a.path);
+        if (!item.isLink) {
+          await ds.deleteAttachment(item.path);
         }
-        final newAttachments = comp.attachments
-            .where((att) => att.path != a.path || att.name != a.name)
-            .toList();
-        await ds.updateComponent(comp.copyWith(attachments: newAttachments));
+        if (item.isImage) {
+          final newImages = item.component.images
+              .where((img) => img != item.path)
+              .toList();
+          await ds.updateComponent(item.component.copyWith(images: newImages));
+        } else {
+          final newAttachments = item.component.attachments
+              .where((att) => att.path != item.path || att.name != item.name)
+              .toList();
+          await ds.updateComponent(item.component.copyWith(attachments: newAttachments));
+        }
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context)
@@ -147,21 +186,72 @@ class _FilesScreenState extends State<FilesScreen> {
     }
   }
 
+  Widget _buildImageWidget(BuildContext context, String imagePath) {
+    final ds = Provider.of<DataService>(context, listen: false);
+    if (imagePath.startsWith('/')) {
+      return Image.file(
+        File(imagePath),
+        fit: BoxFit.cover,
+        errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image),
+      );
+    } else if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return Image.network(
+        imagePath,
+        fit: BoxFit.cover,
+        errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image),
+      );
+    } else {
+      if (ds.mode == StorageMode.remote && ds.serverConnected) {
+        return Image.network(
+          ds.getAttachmentUrl(imagePath),
+          fit: BoxFit.cover,
+          errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image),
+        );
+      } else {
+        final localPath = ds.getLocalAttachmentPathSync(imagePath);
+        return Image.file(
+          File(localPath),
+          fit: BoxFit.cover,
+          errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ds = context.watch<DataService>();
     final cs = Theme.of(context).colorScheme;
 
-    // Raccoglie tutti i file e i link
-    final allAttachments =
-        ds.components.expand((c) => c.attachments.map((a) => (c, a))).toList();
+    // Raccoglie tutti i file, i link e le immagini
+    final List<FilesScreenItem> allItems = [];
+    for (final c in ds.components) {
+      for (final a in c.attachments) {
+        allItems.add(FilesScreenItem(
+          component: c,
+          name: a.name,
+          path: a.path,
+          isLink: a.isLink,
+          isImage: false,
+        ));
+      }
+      for (final imgPath in c.images) {
+        allItems.add(FilesScreenItem(
+          component: c,
+          name: imgPath.split('/').last,
+          path: imgPath,
+          isLink: false,
+          isImage: true,
+        ));
+      }
+    }
 
     // Filtra per query
-    final filtered = allAttachments.where((pair) {
+    final filtered = allItems.where((item) {
       if (_query.isEmpty) return true;
       final q = _query.toLowerCase();
-      return pair.$2.name.toLowerCase().contains(q) ||
-          pair.$1.name.toLowerCase().contains(q);
+      return item.name.toLowerCase().contains(q) ||
+          item.component.name.toLowerCase().contains(q);
     }).toList();
 
     return Scaffold(
@@ -235,37 +325,48 @@ class _FilesScreenState extends State<FilesScreen> {
                 : ListView.builder(
                     itemCount: filtered.length,
                     itemBuilder: (ctx, i) {
-                      final comp = filtered[i].$1;
-                      final a = filtered[i].$2;
+                      final item = filtered[i];
                       return ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: cs.primaryContainer,
-                          child: Icon(
-                              a.isLink ? Icons.link : Icons.insert_drive_file,
-                              color: cs.primary),
-                        ),
-                        title: Text(a.name),
-                        subtitle: Text('Componente: ${comp.name}'),
-                        onTap: () => _openAttachment(context, a),
+                        leading: item.isImage
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: SizedBox(
+                                  width: 40,
+                                  height: 40,
+                                  child: _buildImageWidget(context, item.path),
+                                ),
+                              )
+                            : CircleAvatar(
+                                backgroundColor: cs.primaryContainer,
+                                child: Icon(
+                                    item.isLink ? Icons.link : Icons.insert_drive_file,
+                                    color: cs.primary),
+                              ),
+                        title: Text(item.name),
+                        subtitle: Text('Componente: ${item.component.name}'),
+                        onTap: () => _openAttachment(context, item),
                         trailing: PopupMenuButton<String>(
                           icon:
                               Icon(Icons.more_vert, color: cs.onSurfaceVariant),
                           tooltip: 'Opzioni',
                           onSelected: (val) {
-                            if (val == 'rename')
-                              _renameAttachment(context, comp, a);
-                            if (val == 'delete')
-                              _deleteAttachment(context, comp, a);
+                            if (val == 'rename') {
+                              _renameAttachment(context, item);
+                            }
+                            if (val == 'delete') {
+                              _deleteAttachment(context, item);
+                            }
                           },
                           itemBuilder: (_) => [
-                            const PopupMenuItem(
-                              value: 'rename',
-                              child: Row(children: [
-                                Icon(Icons.edit_outlined, size: 18),
-                                SizedBox(width: 10),
-                                Text('Rinomina'),
-                              ]),
-                            ),
+                            if (!item.isImage)
+                              const PopupMenuItem(
+                                value: 'rename',
+                                child: Row(children: [
+                                  Icon(Icons.edit_outlined, size: 18),
+                                  SizedBox(width: 10),
+                                  Text('Rinomina'),
+                                ]),
+                              ),
                             PopupMenuItem(
                               value: 'delete',
                               child: Row(children: [

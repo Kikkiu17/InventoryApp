@@ -1,10 +1,16 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
 import 'services/data_service.dart';
 import 'screens/home_screen.dart';
+import 'screens/buffer_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/inventory_list_screen.dart';
 import 'screens/files_screen.dart';
+import 'widgets/component_dialog.dart';
+import 'models/component.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,6 +65,102 @@ class MainShellState extends State<MainShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _restoreDraftIfNeeded();
+    });
+  }
+
+  Future<void> _restoreDraftIfNeeded() async {
+    final prefs = await SharedPreferences.getInstance();
+    final draftStr = prefs.getString('pending_component_draft');
+    if (draftStr == null) return;
+
+    final Map<String, dynamic> draft = jsonDecode(draftStr);
+
+    // Check for lost data from image_picker
+    final picker = ImagePicker();
+    final lostData = await picker.retrieveLostData();
+    if (!lostData.isEmpty && lostData.file != null) {
+      final List<String> images = List<String>.from(draft['images'] ?? []);
+      images.add(lostData.file!.path);
+      draft['images'] = images;
+      // Save again with new image
+      await prefs.setString('pending_component_draft', jsonEncode(draft));
+    }
+
+    if (!mounted) return;
+
+    final ds = Provider.of<DataService>(context, listen: false);
+
+    // Find existing component if we were editing
+    Component? existing;
+    final existingId = draft['existingId'];
+    final isBuffer = draft['isBuffer'] == true;
+    if (existingId != null) {
+      final list = isBuffer ? ds.bufferComponents : ds.components;
+      existing = list.firstWhere(
+        (c) => c.id == existingId,
+        orElse: () => Component(id: existingId, name: draft['name'] ?? '', drawer: ''),
+      );
+    }
+
+    // Show dialog
+    final result = await showDialog<dynamic>(
+      context: context,
+      builder: (_) => ComponentDialog(
+        existing: existing,
+        settings: ds.settings,
+        isDuplicate: draft['isDuplicate'] ?? false,
+        bagName: draft['bagName'],
+        isBuffer: isBuffer,
+        prefilledCabinet: draft['prefilledCabinet'],
+        prefilledDrawer: draft['prefilledDrawer'],
+        prefilledDrawerZone: draft['prefilledDrawerZone'],
+        draft: draft,
+      ),
+    );
+
+    // Process result
+    if (result is Component) {
+      try {
+        if (isBuffer) {
+          if (existing != null) {
+            await ds.updateBufferComponent(result);
+          } else {
+            await ds.addBufferComponent(result);
+          }
+        } else {
+          if (existing != null && draft['isDuplicate'] != true) {
+            await ds.updateComponent(result);
+          } else {
+            await ds.addComponent(result);
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Errore nel salvare: $e')),
+          );
+        }
+      }
+    } else if (result == 'DELETE' && existing != null) {
+      try {
+        if (isBuffer) {
+          await ds.deleteBufferComponent(existing.id);
+        } else {
+          await ds.deleteComponent(existing.id);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Errore nell\'eliminare: $e')),
+          );
+        }
+      }
+    }
+
+    // Clear draft
+    await prefs.remove('pending_component_draft');
   }
 
   @override
@@ -91,6 +193,7 @@ class MainShellState extends State<MainShell> with WidgetsBindingObserver {
     // Le pagine sono ricreate per permettere l'aggiornamento della tab inventari
     final pages = [
       const HomeScreen(),
+      const BufferScreen(),
       const InventoryListScreen(),
       const FilesScreen(),
       const SettingsScreen(),
@@ -109,6 +212,11 @@ class MainShellState extends State<MainShell> with WidgetsBindingObserver {
             icon: Icon(Icons.inventory_2_outlined),
             selectedIcon: Icon(Icons.inventory_2),
             label: 'Inventario',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.shopping_bag_outlined),
+            selectedIcon: Icon(Icons.shopping_bag),
+            label: 'Buffer',
           ),
           NavigationDestination(
             icon: Badge(

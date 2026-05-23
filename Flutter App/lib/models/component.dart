@@ -81,7 +81,11 @@ class Component {
   Map<String, String> specialTagValues; // Ora salviamo esattamente ciò che scrivi!
   List<Attachment> attachments;
   int? drawerZone;
-
+  String? bagName;
+  String note;
+  String? targetInventoryId;
+  List<String> images;
+ 
   Component({
     String? id,
     required this.name,
@@ -93,10 +97,15 @@ class Component {
     Map<String, String>? specialTagValues,
     List<Attachment>? attachments,
     this.drawerZone,
+    this.bagName,
+    this.note = '',
+    this.targetInventoryId,
+    List<String>? images,
   })  : id = id ?? const Uuid().v4(),
         specialTagValues = specialTagValues ?? {},
-        attachments = attachments ?? [];
-
+        attachments = attachments ?? [],
+        images = images ?? [];
+ 
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
@@ -108,8 +117,12 @@ class Component {
         'specialTagValues': specialTagValues,
         'attachments': attachments.map((a) => a.toJson()).toList(),
         if (drawerZone != null) 'drawerZone': drawerZone,
+        if (bagName != null) 'bagName': bagName,
+        'note': note,
+        if (targetInventoryId != null) 'targetInventoryId': targetInventoryId,
+        'images': images,
       };
-
+ 
   factory Component.fromJson(Map<String, dynamic> json) => Component(
         id: json['id'] as String,
         name: json['name'] as String,
@@ -135,8 +148,12 @@ class Component {
                 .toList() ??
             [],
         drawerZone: json['drawerZone'] as int?,
+        bagName: json['bagName'] as String?,
+        note: json['note'] as String? ?? '',
+        targetInventoryId: json['targetInventoryId'] as String?,
+        images: List<String>.from(json['images'] as List? ?? []),
       );
-
+ 
   Component copyWith({
     String? name,
     String? description,
@@ -147,6 +164,12 @@ class Component {
     Map<String, String>? specialTagValues,
     List<Attachment>? attachments,
     int? drawerZone,
+    String? bagName,
+    bool clearBagName = false,
+    String? note,
+    String? targetInventoryId,
+    bool clearTargetInventoryId = false,
+    List<String>? images,
   }) =>
       Component(
         id: id,
@@ -159,6 +182,10 @@ class Component {
         specialTagValues: specialTagValues ?? this.specialTagValues,
         attachments: attachments ?? this.attachments,
         drawerZone: drawerZone ?? this.drawerZone,
+        bagName: clearBagName ? null : (bagName ?? this.bagName),
+        note: note ?? this.note,
+        targetInventoryId: clearTargetInventoryId ? null : (targetInventoryId ?? this.targetInventoryId),
+        images: images ?? this.images,
       );
 }
 

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -5,6 +6,7 @@ import 'package:open_filex/open_filex.dart';
 import '../models/component.dart';
 import '../models/settings.dart';
 import '../services/data_service.dart';
+import 'image_viewer.dart';
 
 class ComponentViewDialog extends StatelessWidget {
   final Component component;
@@ -60,8 +62,14 @@ class ComponentViewDialog extends StatelessWidget {
                   value: 'Non assegnato'
                 );
               }
+              final container = settings.containers.firstWhere(
+                (c) => c.id == currentComp.cabinet,
+                orElse: () => ContainerConfig(id: currentComp.cabinet, name: 'Contenitore ${currentComp.cabinet}', rows: 4, columns: 6),
+              );
+              final containerDisplayName = container.name.isNotEmpty ? container.name : 'Contenitore ${container.id}';
+              
               final basePos = settings.numCabinets > 1 
-                  ? 'Cassettiera ${currentComp.cabinet}, Cassetto ${currentComp.drawer}' 
+                  ? '$containerDisplayName, Cassetto ${currentComp.drawer}' 
                   : 'Cassetto ${currentComp.drawer}';
               
               if (currentComp.drawerZone != null) {
@@ -131,6 +139,48 @@ class ComponentViewDialog extends StatelessWidget {
               }),
               const SizedBox(height: 16),
             ],
+            // Immagini
+            if (currentComp.images.isNotEmpty) ...[
+              const Text('Immagini:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 100,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: currentComp.images.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final path = entry.value;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8.0),
+                        child: GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => FullscreenImageViewer(
+                                  images: currentComp.images,
+                                  initialIndex: index,
+                                ),
+                              ),
+                            );
+                          },
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: SizedBox(
+                              width: 100,
+                              height: 100,
+                              child: _buildImageWidget(context, path),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             // Allegati
             if (currentComp.attachments.isNotEmpty) ...[
               const Text('Allegati:', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -180,6 +230,38 @@ class ComponentViewDialog extends StatelessWidget {
       } else {
         final localPath = await ds.getLocalAttachmentPath(a.path);
         await OpenFilex.open(localPath);
+      }
+    }
+  }
+
+  Widget _buildImageWidget(BuildContext context, String imagePath) {
+    final ds = Provider.of<DataService>(context, listen: false);
+    if (imagePath.startsWith('/')) {
+      return Image.file(
+        File(imagePath),
+        fit: BoxFit.cover,
+        errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image),
+      );
+    } else if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return Image.network(
+        imagePath,
+        fit: BoxFit.cover,
+        errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image),
+      );
+    } else {
+      if (ds.mode == StorageMode.remote && ds.serverConnected) {
+        return Image.network(
+          ds.getAttachmentUrl(imagePath),
+          fit: BoxFit.cover,
+          errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image),
+        );
+      } else {
+        final localPath = ds.getLocalAttachmentPathSync(imagePath);
+        return Image.file(
+          File(localPath),
+          fit: BoxFit.cover,
+          errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image),
+        );
       }
     }
   }

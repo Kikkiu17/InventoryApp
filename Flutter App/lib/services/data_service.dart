@@ -54,6 +54,7 @@ class DataService extends ChangeNotifier {
   static const _themeModeKey      = 'themeMode';
 
   List<Component> _components = [];
+  List<Component> _bufferComponents = [];
   AppSettings _settings = AppSettings();
   List<InventoryMeta> _inventories = [];
 
@@ -63,22 +64,29 @@ class DataService extends ChangeNotifier {
   String? _globalSearchQuery;
   ApiClient? _api;
   ThemeMode _themeMode = ThemeMode.system;
+  String? _localAppDocDir;
 
   bool _serverConnected = false;
   bool _syncing = false;
   String? _lastError;
   SyncConflict? _pendingConflict;
 
-  String get _componentsKey     => 'components_$_currentInventoryId';
-  String get _settingsKey       => 'settings_$_currentInventoryId';
-  String get _localTimestampKey => 'localTimestamp_$_currentInventoryId';
+  String get _componentsKey       => 'components_$_currentInventoryId';
+  String get _settingsKey         => 'settings_$_currentInventoryId';
+  String get _localTimestampKey   => 'localTimestamp_$_currentInventoryId';
+  String get _bufferComponentsKey => 'components__buffer_';
 
   List<Component> get components => _components;
+  List<Component> get bufferComponents => _bufferComponents;
   AppSettings get settings => _settings;
   List<InventoryMeta> get inventories => _inventories;
   String get currentInventoryId => _currentInventoryId;
-  InventoryMeta? get currentInventory =>
-      _inventories.where((i) => i.id == _currentInventoryId).firstOrNull;
+  InventoryMeta? get currentInventory {
+    if (_mode == StorageMode.local) {
+      return InventoryMeta(id: 'default', name: 'Inventario Locale');
+    }
+    return _inventories.where((i) => i.id == _currentInventoryId).firstOrNull;
+  }
   StorageMode get mode => _mode;
   String get serverUrl => _serverUrl;
   bool get serverConnected => _serverConnected;
@@ -103,6 +111,10 @@ class DataService extends ChangeNotifier {
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
+    try {
+      final docDir = await getApplicationDocumentsDirectory();
+      _localAppDocDir = docDir.path;
+    } catch (_) {}
 
     if (prefs.containsKey('components') && prefs.containsKey('settings')) {
       final oldC = prefs.getString('components');
@@ -130,8 +142,10 @@ class DataService extends ChangeNotifier {
     if (_mode == StorageMode.remote) {
       _api = ApiClient(_serverUrl, inventoryId: _currentInventoryId);
       await _loadFromServer(checkConflict: true);
+      await _loadBufferFromServer();
     } else {
       await _loadFromLocal(prefs);
+      await _loadBufferFromLocal(prefs);
     }
     notifyListeners();
   }
@@ -333,10 +347,12 @@ class DataService extends ChangeNotifier {
     if (mode == StorageMode.remote) {
       _api = ApiClient(_serverUrl, inventoryId: _currentInventoryId);
       await _loadFromServer(checkConflict: true);
+      await _loadBufferFromServer();
     } else {
       _serverConnected = false;
       _inventories = [];
       await _loadFromLocal(prefs);
+      await _loadBufferFromLocal(prefs);
     }
     notifyListeners();
   }
@@ -344,6 +360,7 @@ class DataService extends ChangeNotifier {
   Future<void> refreshFromServer() async {
     if (_mode != StorageMode.remote) return;
     await _loadFromServer(checkConflict: false);
+    await _loadBufferFromServer();
     notifyListeners();
   }
 
@@ -429,6 +446,92 @@ class DataService extends ChangeNotifier {
     notifyListeners();
   }
 
+  List<String> getBags() {
+    final bags = {
+      ..._settings.bufferBags,
+      ..._components.map((c) => c.bagName).whereType<String>()
+    }.toList();
+    bags.sort();
+    return bags;
+  }
+
+  List<Component> getComponentsInBag(String bagName) {
+    return _components.where((c) => c.bagName == bagName).toList();
+  }
+
+  Future<void> createBag(String name) async {
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty) return;
+    if (!_settings.bufferBags.contains(trimmedName)) {
+      _settings.bufferBags.add(trimmedName);
+      await updateSettings(_settings);
+    }
+  }
+
+  Future<void> renameBag(String oldName, String newName) async {
+    final trimmedNew = newName.trim();
+    if (trimmedNew.isEmpty || trimmedNew == oldName) return;
+    
+    final idx = _settings.bufferBags.indexOf(oldName);
+    if (idx != -1) {
+      _settings.bufferBags[idx] = trimmedNew;
+    } else if (!_settings.bufferBags.contains(trimmedNew)) {
+      _settings.bufferBags.add(trimmedNew);
+    }
+    
+    for (var c in _components) {
+      if (c.bagName == oldName) {
+        c.bagName = trimmedNew;
+      }
+    }
+    
+    if (_mode == StorageMode.remote && _serverConnected) {
+      try {
+        await _api!.uploadFullDb({
+          'components': _components.map((x) => x.toJson()).toList(),
+          'settings': _settings.toJson(),
+        });
+        final ts = DateTime.tryParse(_api!.lastUpdated ?? '');
+        await _mirrorToLocal(_components, _settings, timestamp: ts);
+      } catch (e) {
+        _lastError = e.toString();
+      }
+    } else {
+      await _saveLocal();
+    }
+    notifyListeners();
+  }
+
+  Future<void> deleteBag(String name, {bool deleteComponents = true}) async {
+    _settings.bufferBags.remove(name);
+    
+    if (deleteComponents) {
+      _components.removeWhere((c) => c.bagName == name);
+    } else {
+      for (var c in _components) {
+        if (c.bagName == name) {
+          c.bagName = null;
+        }
+      }
+    }
+    
+    if (_mode == StorageMode.remote && _serverConnected) {
+      try {
+        await _api!.uploadFullDb({
+          'components': _components.map((x) => x.toJson()).toList(),
+          'settings': _settings.toJson(),
+        });
+        final ts = DateTime.tryParse(_api!.lastUpdated ?? '');
+        await _mirrorToLocal(_components, _settings, timestamp: ts);
+      } catch (e) {
+        _lastError = e.toString();
+      }
+    } else {
+      await _saveLocal();
+    }
+    notifyListeners();
+  }
+
   Future<void> exportData() async {
     final data = jsonEncode({
       'components': _components.map((c) => c.toJson()).toList(),
@@ -471,7 +574,7 @@ class DataService extends ChangeNotifier {
     Map<String, SpecialFilter> specialTagFilters,
     [String? sortSpecialTag, int? cabinetFilter, bool unassignedPosition = false] 
   ) {
-    var results = _components.toList();
+    var results = _components.where((c) => c.bagName == null).toList();
     
     if (unassignedPosition) {
       results = results.where((c) => c.drawer.isEmpty).toList();
@@ -724,6 +827,11 @@ class DataService extends ChangeNotifier {
     return '${dir.path}/attachments/$_currentInventoryId/$filename';
   }
 
+  String getLocalAttachmentPathSync(String filename) {
+    if (_localAppDocDir == null) return '';
+    return '$_localAppDocDir/attachments/$_currentInventoryId/$filename';
+  }
+
   String getAttachmentUrl(String filename) {
     if (_api != null) {
       return _api!.getAttachmentUrl(filename);
@@ -778,5 +886,150 @@ class DataService extends ChangeNotifier {
       return matches;
     }
     return [];
+  }
+
+  // ── Shared Buffer Operations ───────────────────────────────────────────────
+  Future<void> _loadBufferFromLocal(SharedPreferences prefs) async {
+    final cj = prefs.getString(_bufferComponentsKey);
+    _bufferComponents = cj != null
+        ? (jsonDecode(cj) as List).map((e) => Component.fromJson(e)).toList()
+        : [];
+  }
+
+  Future<void> _saveBufferLocal() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_bufferComponentsKey, jsonEncode(_bufferComponents.map((c) => c.toJson()).toList()));
+  }
+
+  Future<void> _loadBufferFromServer() async {
+    if (_mode != StorageMode.remote || !_serverConnected || _api == null) return;
+    try {
+      final bufferApi = _api!.withInventory('_buffer_');
+      final remoteDb = await bufferApi.getFullDb();
+      _bufferComponents = (remoteDb['components'] as List).map((e) => Component.fromJson(e)).toList();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_bufferComponentsKey, jsonEncode(_bufferComponents.map((c) => c.toJson()).toList()));
+    } catch (e) {
+      debugPrint('Error loading buffer from server: $e');
+      final prefs = await SharedPreferences.getInstance();
+      await _loadBufferFromLocal(prefs);
+    }
+  }
+
+  Future<void> _saveBufferServer() async {
+    if (_mode != StorageMode.remote || !_serverConnected || _api == null) return;
+    try {
+      final bufferApi = _api!.withInventory('_buffer_');
+      await bufferApi.uploadFullDb({
+        'components': _bufferComponents.map((x) => x.toJson()).toList(),
+        'settings': AppSettings().toJson(),
+      });
+    } catch (e) {
+      debugPrint('Error saving buffer to server: $e');
+      _lastError = e.toString();
+    }
+  }
+
+  Future<void> addBufferComponent(Component c) async {
+    _bufferComponents.add(c);
+    if (_mode == StorageMode.remote && _serverConnected) {
+      await _saveBufferServer();
+    }
+    await _saveBufferLocal();
+    notifyListeners();
+  }
+
+  Future<void> updateBufferComponent(Component c) async {
+    final idx = _bufferComponents.indexWhere((e) => e.id == c.id);
+    if (idx != -1) {
+      _bufferComponents[idx] = c;
+      if (_mode == StorageMode.remote && _serverConnected) {
+        await _saveBufferServer();
+      }
+      await _saveBufferLocal();
+      notifyListeners();
+    }
+  }
+
+  Future<void> deleteBufferComponent(String id) async {
+    _bufferComponents.removeWhere((e) => e.id == id);
+    if (_mode == StorageMode.remote && _serverConnected) {
+      await _saveBufferServer();
+    }
+    await _saveBufferLocal();
+    notifyListeners();
+  }
+
+  Future<void> updateBufferQuantity(String id, int delta) async {
+    final idx = _bufferComponents.indexWhere((e) => e.id == id);
+    if (idx != -1) {
+      _bufferComponents[idx] = _bufferComponents[idx].copyWith(
+        quantity: (_bufferComponents[idx].quantity + delta).clamp(0, 99999),
+      );
+      if (_mode == StorageMode.remote && _serverConnected) {
+        await _saveBufferServer();
+      }
+      await _saveBufferLocal();
+      notifyListeners();
+    }
+  }
+
+  Future<void> placeComponent(Component c, String targetInventoryId, int cabinet, String drawer, int? zone) async {
+    _bufferComponents.removeWhere((e) => e.id == c.id);
+    if (_mode == StorageMode.remote && _serverConnected) {
+      await _saveBufferServer();
+    }
+    await _saveBufferLocal();
+
+    final placedComponent = c.copyWith(
+      cabinet: cabinet,
+      drawer: drawer,
+      drawerZone: zone,
+      clearBagName: true,
+      clearTargetInventoryId: true,
+    );
+
+    if (targetInventoryId == _currentInventoryId) {
+      await addComponent(placedComponent);
+    } else {
+      if (_mode == StorageMode.remote && _serverConnected) {
+        try {
+          final targetApi = _api!.withInventory(targetInventoryId);
+          await targetApi.createComponent(placedComponent);
+        } catch (e) {
+          _lastError = e.toString();
+          await _placeLocalOnly(placedComponent, targetInventoryId);
+        }
+      } else {
+        await _placeLocalOnly(placedComponent, targetInventoryId);
+      }
+    }
+    notifyListeners();
+  }
+
+  Future<void> _placeLocalOnly(Component c, String targetInventoryId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final targetKey = 'components_$targetInventoryId';
+    final cj = prefs.getString(targetKey);
+    final List<Component> targetComps = cj != null
+        ? (jsonDecode(cj) as List).map((e) => Component.fromJson(e)).toList()
+        : [];
+    targetComps.add(c);
+    await prefs.setString(targetKey, jsonEncode(targetComps.map((x) => x.toJson()).toList()));
+    await prefs.setString('localTimestamp_$targetInventoryId', DateTime.now().toIso8601String());
+  }
+
+  Future<AppSettings> getSettingsForInventory(String inventoryId) async {
+    if (_mode == StorageMode.remote && _serverConnected && _api != null) {
+      try {
+        final targetApi = _api!.withInventory(inventoryId);
+        return await targetApi.getSettings();
+      } catch (e) {
+        debugPrint('Error getting settings for inventory $inventoryId: $e');
+      }
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final sj = prefs.getString('settings_$inventoryId');
+    return sj != null ? AppSettings.fromJson(jsonDecode(sj)) : AppSettings();
   }
 }

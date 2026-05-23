@@ -103,6 +103,7 @@ class InventoryListScreen extends StatelessWidget {
       body: body,
       floatingActionButton: ds.isRemote && ds.serverConnected
           ? FloatingActionButton.extended(
+              heroTag: 'fab_inventories',
               onPressed: () => _showCreateDialog(context, ds),
               icon: const Icon(Icons.add),
               label: const Text('Nuovo inventario'),

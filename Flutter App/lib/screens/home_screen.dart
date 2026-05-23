@@ -12,7 +12,7 @@ import '../services/data_service.dart';
 import '../widgets/component_tile.dart';
 import '../widgets/component_dialog.dart';
 import '../widgets/component_view_dialog.dart';
-import 'inventory_list_screen.dart';
+import '../widgets/cabinet_map_view.dart';
 import 'package:flutter/services.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -32,6 +32,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, SpecialFilter> _specialFilters = {};
   int? _cabinetFilter; 
   bool _unassignedPosition = false;
+  String _viewMode = 'list';
   
   String _lastInventoryId = '';
 
@@ -189,18 +190,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Consumer<DataService>(
-          builder: (_, ds, __) => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Inventario Componenti'),
-              if (ds.isRemote && ds.currentInventory != null)
-                Text(
-                  ds.currentInventory!.name,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant),
-                ),
-            ],
+          builder: (_, ds, __) => Text(
+            ds.currentInventory?.name ?? 'Inventario Componenti',
           ),
         ),
         actions: [
@@ -256,170 +247,285 @@ class _HomeScreenState extends State<HomeScreen> {
             inventoryName: ds.currentInventory?.name,
             inventoryCount: ds.inventories.length,
             onSwitchTap: () {
-              DefaultTabController.of(context).animateTo(1);
-              Navigator.push(context, MaterialPageRoute(
-                  builder: (_) => const InventoryListScreen()));
+              showDialog(
+                context: context,
+                builder: (context) {
+                  return Consumer<DataService>(
+                    builder: (context, ds, _) {
+                      return AlertDialog(
+                        title: const Text('Seleziona Inventario'),
+                        content: SizedBox(
+                          width: double.maxFinite,
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: ds.inventories.length,
+                            itemBuilder: (context, index) {
+                              final inv = ds.inventories[index];
+                              final isCurrent = inv.id == ds.currentInventoryId;
+                              return ListTile(
+                                leading: Icon(
+                                  isCurrent ? Icons.inventory_2 : Icons.inventory_2_outlined,
+                                  color: isCurrent ? Theme.of(context).colorScheme.primary : null,
+                                ),
+                                title: Text(
+                                  inv.name,
+                                  style: TextStyle(
+                                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                ),
+                                trailing: isCurrent ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary) : null,
+                                onTap: () async {
+                                  Navigator.pop(context);
+                                  try {
+                                    await ds.switchInventory(inv.id);
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Errore nel cambio inventario: $e')),
+                                      );
+                                    }
+                                  }
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Chiudi'),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
+              );
             },
           ),
 
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-          child: Row(children: [
-            Expanded(
-              child: SearchBar(
-                controller: _searchCtrl,
-                hintText: 'Cerca per nome, cassetto…',
-                leading: const Icon(Icons.search),
-                trailing: _query.isNotEmpty
-                    ? [
-                        IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchCtrl.clear();
-                            setState(() => _query = '');
-                          },
-                        )
-                      ]
-                    : null,
-                onChanged: (v) => setState(() => _query = v),
-                padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 16)),
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+          child: SegmentedButton<String>(
+            segments: const [
+              ButtonSegment<String>(
+                value: 'list',
+                label: Text('Lista Componenti'),
+                icon: Icon(Icons.list),
               ),
+              ButtonSegment<String>(
+                value: 'map',
+                label: Text('Mappa Cassetti'),
+                icon: Icon(Icons.grid_view),
+              ),
+            ],
+            selected: {_viewMode},
+            onSelectionChanged: (newSelection) {
+              setState(() {
+                _viewMode = newSelection.first;
+              });
+            },
+          ),
+        ),
+
+        if (_viewMode == 'map')
+          Expanded(
+            child: CabinetMapView(
+              settings: ds.settings,
+              dataService: ds,
+              onViewComponent: (comp) => _viewComponent(context, comp),
+              onEditComponent: (comp) => _editComponent(context, comp),
+              onAddComponentAt: (cabinetId, drawerLabel, zoneIndex) async {
+                final result = await showDialog<Component>(
+                  context: context,
+                  builder: (_) => ComponentDialog(
+                    settings: ds.settings,
+                    prefilledCabinet: cabinetId,
+                    prefilledDrawer: drawerLabel,
+                    prefilledDrawerZone: zoneIndex,
+                  ),
+                );
+                if (result != null) {
+                  try {
+                    await ds.addComponent(result);
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Errore: $e')),
+                      );
+                    }
+                  }
+                }
+              },
             ),
-            const SizedBox(width: 8),
-            if (hasFilter && _query.isEmpty) ...[
-              IconButton.filledTonal(
-                icon: const Icon(Icons.filter_alt_off),
-                color: Theme.of(context).colorScheme.error,
-                tooltip: 'Azzera filtri',
-                onPressed: () => setState(() {
-                  _selectedTags.clear();
-                  _specialFilters.clear();
-                  _cabinetFilter = null;
-                  _unassignedPosition = false;
-                }),
+          )
+        else ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: Row(children: [
+              Expanded(
+                child: SearchBar(
+                  controller: _searchCtrl,
+                  hintText: 'Cerca per nome, cassetto…',
+                  leading: const Icon(Icons.search),
+                  trailing: _query.isNotEmpty
+                      ? [
+                          IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchCtrl.clear();
+                              setState(() => _query = '');
+                            },
+                          )
+                        ]
+                      : null,
+                  onChanged: (v) => setState(() => _query = v),
+                  padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 16)),
+                ),
               ),
               const SizedBox(width: 8),
-            ],
-            _FilterButton(
-              settings: ds.settings,
-              selectedTags: _selectedTags,
-              specialFilters: _specialFilters,
-              selectedCabinet: _cabinetFilter,
-              unassignedPos: _unassignedPosition,
-              onChanged: (tags, filters, cab, unassigned) => setState(() {
-                _selectedTags   = tags;
-                _specialFilters = filters;
-                _cabinetFilter  = cab;
-                _unassignedPosition = unassigned;
-              }),
-            ),
-          ]),
-        ),
-
-        if (_selectedTags.isNotEmpty || _specialFilters.isNotEmpty || _cabinetFilter != null || _unassignedPosition)
-          SizedBox(
-            height: 44,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              children: [
-                if (_unassignedPosition)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: InputChip(
-                      avatar: const Icon(Icons.location_off_outlined, size: 16),
-                      label: const Text('Senza posizione', style: TextStyle(fontWeight: FontWeight.bold)),
-                      onDeleted: () => setState(() => _unassignedPosition = false),
-                    ),
-                  ),
-                if (_cabinetFilter != null)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: InputChip(
-                      avatar: const Icon(Icons.kitchen_outlined, size: 16),
-                      label: Text('N° $_cabinetFilter'),
-                      onDeleted: () => setState(() => _cabinetFilter = null),
-                    ),
-                  ),
-                ..._selectedTags.map((t) => Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: InputChip(
-                        label: Text(t),
-                        onDeleted: () => setState(() {
-                          final subtree = _findSubtree(t, ds.settings.tagTree);
-                          _removeNodeAndDescendants(t, subtree ?? {}, _selectedTags);
-                        }),
-                      ),
-                    )),
-                ..._specialFilters.entries.map((e) {
-                  final f = e.value;
-                  final st = ds.settings.specialTags.where((s) => s.name == e.key).firstOrNull;
-                  final unit = st?.unit ?? '';
-                  String labelText = '${e.key}: ';
-                  
-                  if (f.exact.isNotEmpty) {
-                    labelText += _formatValueWithUnit(f.exact, unit);
-                  } else if (f.min.isNotEmpty && f.max.isNotEmpty) {
-                    labelText += '${_formatValueWithUnit(f.min, unit)} - ${_formatValueWithUnit(f.max, unit)}';
-                  } else if (f.min.isNotEmpty) {
-                    labelText += '>= ${_formatValueWithUnit(f.min, unit)}';
-                  } else if (f.max.isNotEmpty) {
-                    labelText += '<= ${_formatValueWithUnit(f.max, unit)}';
-                  }
-
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: InputChip(
-                      label: Text(labelText),
-                      onDeleted: () => setState(() => _specialFilters.remove(e.key)),
-                    ),
-                  );
-                }),
+              if (hasFilter && _query.isEmpty) ...[
+                IconButton.filledTonal(
+                  icon: const Icon(Icons.filter_alt_off),
+                  color: Theme.of(context).colorScheme.error,
+                  tooltip: 'Azzera filtri',
+                  onPressed: () => setState(() {
+                    _selectedTags.clear();
+                    _specialFilters.clear();
+                    _cabinetFilter = null;
+                    _unassignedPosition = false;
+                  }),
+                ),
+                const SizedBox(width: 8),
               ],
-            ),
+              _FilterButton(
+                settings: ds.settings,
+                selectedTags: _selectedTags,
+                specialFilters: _specialFilters,
+                selectedCabinet: _cabinetFilter,
+                unassignedPos: _unassignedPosition,
+                onChanged: (tags, filters, cab, unassigned) => setState(() {
+                  _selectedTags   = tags;
+                  _specialFilters = filters;
+                  _cabinetFilter  = cab;
+                  _unassignedPosition = unassigned;
+                }),
+              ),
+            ]),
           ),
 
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-          child: Row(children: [
-            Text(
-              hasFilter
-                  ? '${results.length} risultati'
-                  : '${results.length} componenti · ${_sortLabel()}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-            ),
-          ]),
-        ),
-        const SizedBox(height: 4),
+          if (_selectedTags.isNotEmpty || _specialFilters.isNotEmpty || _cabinetFilter != null || _unassignedPosition)
+            SizedBox(
+              height: 44,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                children: [
+                  if (_unassignedPosition)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: InputChip(
+                        avatar: const Icon(Icons.location_off_outlined, size: 16),
+                        label: const Text('Senza posizione', style: TextStyle(fontWeight: FontWeight.bold)),
+                        onDeleted: () => setState(() => _unassignedPosition = false),
+                      ),
+                    ),
+                  if (_cabinetFilter != null)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: InputChip(
+                        avatar: const Icon(Icons.kitchen_outlined, size: 16),
+                        label: Text(() {
+                          final container = ds.settings.containers.firstWhere(
+                            (c) => c.id == _cabinetFilter,
+                            orElse: () => ContainerConfig(id: _cabinetFilter!, name: 'Contenitore $_cabinetFilter', rows: 4, columns: 6),
+                          );
+                          return container.name.isNotEmpty ? container.name : 'Contenitore ${container.id}';
+                        }()),
+                        onDeleted: () => setState(() => _cabinetFilter = null),
+                      ),
+                    ),
+                  ..._selectedTags.map((t) => Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: InputChip(
+                          label: Text(t),
+                          onDeleted: () => setState(() {
+                            final subtree = _findSubtree(t, ds.settings.tagTree);
+                            _removeNodeAndDescendants(t, subtree ?? {}, _selectedTags);
+                          }),
+                        ),
+                      )),
+                  ..._specialFilters.entries.map((e) {
+                    final f = e.value;
+                    final st = ds.settings.specialTags.where((s) => s.name == e.key).firstOrNull;
+                    final unit = st?.unit ?? '';
+                    String labelText = '${e.key}: ';
+                    
+                    if (f.exact.isNotEmpty) {
+                      labelText += _formatValueWithUnit(f.exact, unit);
+                    } else if (f.min.isNotEmpty && f.max.isNotEmpty) {
+                      labelText += '${_formatValueWithUnit(f.min, unit)} - ${_formatValueWithUnit(f.max, unit)}';
+                    } else if (f.min.isNotEmpty) {
+                      labelText += '>= ${_formatValueWithUnit(f.min, unit)}';
+                    } else if (f.max.isNotEmpty) {
+                      labelText += '<= ${_formatValueWithUnit(f.max, unit)}';
+                    }
 
-        Expanded(
-          child: results.isEmpty
-              ? Center(
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.search_off, size: 64, color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.4)),
-                    const SizedBox(height: 12),
-                    const Text('Nessun componente trovato'),
-                  ]),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.only(bottom: 80),
-                  itemCount: results.length,
-                  itemBuilder: (ctx, i) {
-                    final comp = results[i];
-                    return ComponentTile(
-                      component: comp,
-                      settings: ds.settings,
-                      onTapTile: () => _viewComponent(ctx, comp),
-                      onEdit: () => _editComponent(ctx, comp),
-                      onDuplicate: () => _duplicateComponent(ctx, comp),
-                      onIncrement: () => ds.updateQuantity(comp.id, 1),
-                      onDecrement: () => ds.updateQuantity(comp.id, -1),
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: InputChip(
+                        label: Text(labelText),
+                        onDeleted: () => setState(() => _specialFilters.remove(e.key)),
+                      ),
                     );
-                  },
-                ),
-        ),
+                  }),
+                ],
+              ),
+            ),
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+            child: Row(children: [
+              Text(
+                hasFilter
+                    ? '${results.length} risultati'
+                    : '${results.length} componenti · ${_sortLabel()}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 4),
+
+          Expanded(
+            child: results.isEmpty
+                ? Center(
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.search_off, size: 64, color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.4)),
+                      const SizedBox(height: 12),
+                      const Text('Nessun componente trovato'),
+                    ]),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.only(bottom: 80),
+                    itemCount: results.length,
+                    itemBuilder: (ctx, i) {
+                      final comp = results[i];
+                      return ComponentTile(
+                        component: comp,
+                        settings: ds.settings,
+                        onTapTile: () => _viewComponent(ctx, comp),
+                        onEdit: () => _editComponent(ctx, comp),
+                        onDuplicate: () => _duplicateComponent(ctx, comp),
+                        onIncrement: () => ds.updateQuantity(comp.id, 1),
+                        onDecrement: () => ds.updateQuantity(comp.id, -1),
+                      );
+                    },
+                  ),
+          ),
+        ],
       ]),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_home',
         onPressed: () => _addComponent(context),
         icon: const Icon(Icons.add),
         label: const Text('Aggiungi'),
@@ -829,19 +935,20 @@ class _FilterButton extends StatelessWidget {
                       const Divider(),
                     ],
 
-                    if (settings.numCabinets > 1) ...[
+                    if (settings.containers.length > 1) ...[
                       const SizedBox(height: 12),
-                      Text('Cassettiera', style: Theme.of(ctx2).textTheme.labelLarge),
+                      Text('Contenitore / Cassettiera', style: Theme.of(ctx2).textTheme.labelLarge),
                       const SizedBox(height: 8),
                       Wrap(
                         spacing: 8, runSpacing: 8,
-                        children: List.generate(settings.numCabinets, (i) => i + 1).map((cab) {
+                        children: settings.containers.map((container) {
+                          final labelText = container.name.isNotEmpty ? container.name : 'Contenitore ${container.id}';
                           return ChoiceChip(
-                            label: Text('N° $cab'),
-                            selected: tempCabinet == cab,
+                            label: Text(labelText),
+                            selected: tempCabinet == container.id,
                             selectedColor: cs.primaryContainer,
                             onSelected: (val) {
-                              setSt(() => tempCabinet = val ? cab : null);
+                              setSt(() => tempCabinet = val ? container.id : null);
                             },
                           );
                         }).toList(),

@@ -1,9 +1,14 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/component.dart';
 import '../models/settings.dart';
 import '../services/data_service.dart';
+import 'image_viewer.dart';
 
 const double _opacityPrimary = 0.4;
 const double _opacityNeutral = 0.6;
@@ -14,20 +19,44 @@ class ComponentDialog extends StatefulWidget {
   final Component? existing;
   final AppSettings settings;
   final bool isDuplicate;
+  final String? bagName;
+  final bool isBuffer;
+  final int? prefilledCabinet;
+  final String? prefilledDrawer;
+  final int? prefilledDrawerZone;
+  final Map<String, dynamic>? draft;
 
-  const ComponentDialog({super.key, this.existing, required this.settings, this.isDuplicate = false});
+  const ComponentDialog({
+    super.key,
+    this.existing,
+    required this.settings,
+    this.isDuplicate = false,
+    this.bagName,
+    this.isBuffer = false,
+    this.prefilledCabinet,
+    this.prefilledDrawer,
+    this.prefilledDrawerZone,
+    this.draft,
+  });
 
   @override
   State<ComponentDialog> createState() => _ComponentDialogState();
 }
 
 class _ComponentDialogState extends State<ComponentDialog> {
+  bool get _isInBag => widget.isBuffer || widget.bagName != null || (widget.existing?.bagName != null && !widget.isDuplicate);
+
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameCtrl;
   late TextEditingController _descCtrl;
   late TextEditingController _qtyCtrl;
   late TextEditingController _colCtrl;
   late TextEditingController _rowCtrl;
+  late TextEditingController _noteCtrl;
+
+  String? _selectedTargetInventoryId;
+  AppSettings? _targetSettings;
+  bool _isLoadingSettings = false;
 
   int _selectedCabinet = 1;
   
@@ -38,61 +67,196 @@ class _ComponentDialogState extends State<ComponentDialog> {
   Map<String, TextEditingController> _specialTagCtrls = {};
   
   List<Attachment> _attachments = [];
+  List<String> _images = [];
   bool _isSaving = false;
   int? _selectedZone;
 
   @override
   void initState() {
     super.initState();
+    final dMap = widget.draft;
     final e = widget.existing;
 
-    _nameCtrl = TextEditingController(text: e?.name ?? '');
-    _descCtrl = TextEditingController(text: e?.description ?? '');
-    _qtyCtrl  = TextEditingController(text: (e?.quantity ?? 0).toString());
-    _colCtrl  = TextEditingController();
-    _rowCtrl  = TextEditingController();
+    if (dMap != null) {
+      _nameCtrl = TextEditingController(text: dMap['name'] ?? '');
+      _descCtrl = TextEditingController(text: dMap['description'] ?? '');
+      _qtyCtrl  = TextEditingController(text: dMap['quantity'] ?? '0');
+      _colCtrl  = TextEditingController(text: dMap['col'] ?? '');
+      _rowCtrl  = TextEditingController(text: dMap['row'] ?? '');
+      _noteCtrl = TextEditingController(text: dMap['note'] ?? '');
+      _selectedCabinet = dMap['selectedCabinet'] ?? 1;
+      _selectedZone = dMap['selectedZone'];
+      _selectedTags = List<String>.from(dMap['selectedTags'] ?? []);
+      _images = List<String>.from(dMap['images'] ?? []);
+      
+      final atts = dMap['attachments'] as List<dynamic>? ?? [];
+      _attachments = atts.map((a) => Attachment(
+        name: a['name'] ?? '',
+        path: a['path'] ?? '',
+        isLink: a['isLink'] ?? false,
+      )).toList();
+    } else {
+      _nameCtrl = TextEditingController(text: e?.name ?? '');
+      _descCtrl = TextEditingController(text: e?.description ?? '');
+      _qtyCtrl  = TextEditingController(text: (e?.quantity ?? 0).toString());
+      _colCtrl  = TextEditingController();
+      _rowCtrl  = TextEditingController();
+      _noteCtrl = TextEditingController(text: e?.note ?? '');
 
-    _selectedCabinet = e?.cabinet ?? 1;
-    _selectedZone = e?.drawerZone;
+      _selectedCabinet = e?.cabinet ?? widget.prefilledCabinet ?? 1;
+      _selectedZone = e?.drawerZone ?? widget.prefilledDrawerZone;
 
-    final d = e?.drawer ?? '';
-    if (d.isNotEmpty) {
-      final match = RegExp(r'^([A-Za-z]+)(\d+)$').firstMatch(d);
-      if (match != null) {
-        _colCtrl.text = match.group(1) ?? '';
-        _rowCtrl.text = match.group(2) ?? '';
-      } else {
-        _colCtrl.text = d;
-      }
-    }
-
-    _selectedTags = List.from(e?.tags ?? []);
-
-    final settings = Provider.of<DataService>(context, listen: false).settings;
-    Map<String, dynamic> currentTree = settings.tagTree;
-    while (true) {
-      bool found = false;
-      for (final key in currentTree.keys) {
-        if (_selectedTags.contains(key)) {
-          _treePath.add(key);
-          currentTree = currentTree[key] as Map<String, dynamic>;
-          found = true;
-          break;
+      final d = e?.drawer ?? widget.prefilledDrawer ?? '';
+      if (d.isNotEmpty) {
+        final match = RegExp(r'^([A-Za-z]+)(\d+)$').firstMatch(d);
+        if (match != null) {
+          _colCtrl.text = match.group(1) ?? '';
+          _rowCtrl.text = match.group(2) ?? '';
+        } else {
+          _colCtrl.text = d;
         }
       }
-      if (!found) break;
+      _selectedTags = List.from(e?.tags ?? []);
+      _attachments = List.from(e?.attachments ?? []);
+      _images = List.from(e?.images ?? []);
     }
 
-    for (final st in settings.specialTags) {
-      _specialTagCtrls[st.name] = TextEditingController(
-        text: e?.specialTagValues[st.name] ?? '', 
-      );
-    }
+    final ds = Provider.of<DataService>(context, listen: false);
     
-    _attachments = List.from(e?.attachments ?? []);
+    if (widget.isBuffer) {
+      _selectedTargetInventoryId = dMap != null ? dMap['selectedTargetInventoryId'] : e?.targetInventoryId;
+      if (_selectedTargetInventoryId != null) {
+        _isLoadingSettings = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          final tSettings = await ds.getSettingsForInventory(_selectedTargetInventoryId!);
+          if (mounted) {
+            setState(() {
+              _targetSettings = tSettings;
+              _isLoadingSettings = false;
+              
+              _specialTagCtrls.clear();
+              for (final st in tSettings.specialTags) {
+                final Map? specialVals = dMap != null ? dMap['specialTagValues'] as Map? : null;
+                final val = specialVals != null ? specialVals[st.name] : e?.specialTagValues[st.name];
+                _specialTagCtrls[st.name] = TextEditingController(
+                  text: val ?? '',
+                );
+              }
+              
+              _treePath.clear();
+              Map<String, dynamic> currentTree = tSettings.tagTree;
+              while (true) {
+                bool found = false;
+                for (final key in currentTree.keys) {
+                  if (_selectedTags.contains(key)) {
+                    _treePath.add(key);
+                    currentTree = currentTree[key] as Map<String, dynamic>;
+                    found = true;
+                    break;
+                  }
+                }
+                if (!found) break;
+              }
+            });
+          }
+        });
+      }
+    } else {
+      final settings = ds.settings;
+      Map<String, dynamic> currentTree = settings.tagTree;
+      while (true) {
+        bool found = false;
+        for (final key in currentTree.keys) {
+          if (_selectedTags.contains(key)) {
+            _treePath.add(key);
+            currentTree = currentTree[key] as Map<String, dynamic>;
+            found = true;
+            break;
+          }
+        }
+        if (!found) break;
+      }
+
+      for (final st in settings.specialTags) {
+        final Map? specialVals = dMap != null ? dMap['specialTagValues'] as Map? : null;
+        final val = specialVals != null ? specialVals[st.name] : e?.specialTagValues[st.name];
+        _specialTagCtrls[st.name] = TextEditingController(
+          text: val ?? '', 
+        );
+      }
+    }
     
     _colCtrl.addListener(_onDrawerCoordinatesChanged);
     _rowCtrl.addListener(_onDrawerCoordinatesChanged);
+  }
+
+  Future<void> _onTargetInventoryChanged(String? newId) async {
+    if (newId == _selectedTargetInventoryId) return;
+    
+    setState(() {
+      _selectedTargetInventoryId = newId;
+      _targetSettings = null;
+      _selectedTags.clear();
+      _treePath.clear();
+      for (final c in _specialTagCtrls.values) {
+        c.dispose();
+      }
+      _specialTagCtrls.clear();
+    });
+
+    if (newId == null) return;
+
+    setState(() => _isLoadingSettings = true);
+    final ds = Provider.of<DataService>(context, listen: false);
+    final tSettings = await ds.getSettingsForInventory(newId);
+    
+    if (mounted && _selectedTargetInventoryId == newId) {
+      setState(() {
+        _targetSettings = tSettings;
+        _isLoadingSettings = false;
+        for (final st in tSettings.specialTags) {
+          _specialTagCtrls[st.name] = TextEditingController();
+        }
+      });
+    }
+  }
+
+  Future<void> _saveDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    final draft = {
+      'name': _nameCtrl.text,
+      'description': _descCtrl.text,
+      'quantity': _qtyCtrl.text,
+      'selectedCabinet': _selectedCabinet,
+      'col': _colCtrl.text,
+      'row': _rowCtrl.text,
+      'selectedZone': _selectedZone,
+      'selectedTags': _selectedTags,
+      'specialTagValues': {
+        for (final entry in _specialTagCtrls.entries)
+          entry.key: entry.value.text
+      },
+      'attachments': _attachments.map((a) => {
+        'name': a.name,
+        'path': a.path,
+        'isLink': a.isLink,
+      }).toList(),
+      'images': _images,
+      'isDuplicate': widget.isDuplicate,
+      'isBuffer': widget.isBuffer,
+      'existingId': widget.existing?.id,
+      'bagName': widget.bagName,
+      'prefilledCabinet': widget.prefilledCabinet,
+      'prefilledDrawer': widget.prefilledDrawer,
+      'prefilledDrawerZone': widget.prefilledDrawerZone,
+      'note': _noteCtrl.text,
+    };
+    await prefs.setString('pending_component_draft', jsonEncode(draft));
+  }
+
+  static Future<void> clearDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('pending_component_draft');
   }
 
   void _onDrawerCoordinatesChanged() {
@@ -108,6 +272,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
     _qtyCtrl.dispose();
     _colCtrl.dispose();
     _rowCtrl.dispose();
+    _noteCtrl.dispose();
     for (final c in _specialTagCtrls.values) {
       c.dispose();
     }
@@ -142,12 +307,14 @@ class _ComponentDialogState extends State<ComponentDialog> {
     final isEdit  = widget.existing != null && !widget.isDuplicate;
     final cs      = Theme.of(context).colorScheme;
 
-    Map<String, dynamic> currentTreeLevel = settings.tagTree;
+    final AppSettings? activeSettingsForTags = widget.isBuffer ? _targetSettings : settings;
+
+    Map<String, dynamic> currentTreeLevel = activeSettingsForTags?.tagTree ?? {};
     for (String step in _treePath) {
       currentTreeLevel = currentTreeLevel[step] ?? <String, dynamic>{};
     }
     final sortedCurrentLevel = currentTreeLevel.keys.toList()..sort();
-    final sortedLoose  = List<String>.from(settings.availableTags)..sort();
+    final sortedLoose  = List<String>.from(activeSettingsForTags?.availableTags ?? [])..sort();
 
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -177,7 +344,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                     ],
                   ),
                 );
-                if (confirm == true) {
+                 if (confirm == true && context.mounted) {
                   Navigator.pop(context, 'DELETE');
                 }
               },
@@ -217,6 +384,46 @@ class _ComponentDialogState extends State<ComponentDialog> {
                 ),
                 onFieldSubmitted: (_) => _submit(),
               ),
+              if (widget.isBuffer) ...[
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _noteCtrl,
+                  textInputAction: TextInputAction.next,
+                  decoration: InputDecoration(
+                    labelText: 'Nota (promemoria)',
+                    border: const OutlineInputBorder(),
+                    filled: true,
+                    fillColor: cs.surfaceContainerHighest.withOpacity(_opacityNeutral),
+                  ),
+                  onFieldSubmitted: (_) => _submit(),
+                ),
+                const SizedBox(height: 12),
+                () {
+                  final List<InventoryMeta> availableInventories = ds.isRemote
+                      ? ds.inventories
+                      : [InventoryMeta(id: 'default', name: 'Inventario Locale')];
+                  return DropdownButtonFormField<String?>(
+                    value: _selectedTargetInventoryId,
+                    decoration: InputDecoration(
+                      labelText: 'Inventario di destinazione',
+                      border: const OutlineInputBorder(),
+                      filled: true,
+                      fillColor: cs.primaryContainer.withOpacity(_opacityPrimary),
+                    ),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('Nessuno (Da selezionare)'),
+                      ),
+                      ...availableInventories.map((inv) => DropdownMenuItem<String?>(
+                            value: inv.id,
+                            child: Text(inv.name),
+                          )),
+                    ],
+                    onChanged: (v) => _onTargetInventoryChanged(v),
+                  );
+                }(),
+              ],
               const SizedBox(height: 12),
               Row(children: [
                 Expanded(
@@ -236,244 +443,314 @@ class _ComponentDialogState extends State<ComponentDialog> {
                     },
                   ),
                 ),
-                if (settings.numCabinets > 1) ...[
+                if (!_isInBag && settings.containers.length > 1) ...[
                   const SizedBox(width: 8),
                   Expanded(
                     child: DropdownButtonFormField<int>(
-                      value: _selectedCabinet > settings.numCabinets ? 1 : _selectedCabinet,
+                      value: settings.containers.any((c) => c.id == _selectedCabinet)
+                          ? _selectedCabinet
+                          : (settings.containers.isNotEmpty ? settings.containers.first.id : 1),
                       decoration: InputDecoration(
                         labelText: 'Cassettiera', border: const OutlineInputBorder(), filled: true,
                         fillColor: Colors.green.withOpacity(_opacityGreen),
                       ),
-                      items: List.generate(settings.numCabinets, (i) => i + 1)
-                          .map((c) => DropdownMenuItem(value: c, child: Text('N° $c'))).toList(),
+                      items: settings.containers
+                          .map((c) => DropdownMenuItem(
+                                value: c.id,
+                                child: Text(c.name.isNotEmpty ? c.name : 'N° ${c.id}'),
+                              ))
+                          .toList(),
                       onChanged: (v) => setState(() => _selectedCabinet = v ?? 1),
                     ),
                   ),
                 ],
               ]),
-              const SizedBox(height: 12),
-              Row(children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _colCtrl,
-                    textInputAction: TextInputAction.next,
-                    textCapitalization: TextCapitalization.characters,
-                    decoration: InputDecoration(
-                      labelText: 'Colonna', hintText: 'Es: A', border: const OutlineInputBorder(), filled: true,
-                      fillColor: Colors.green.withOpacity(_opacityGreen),
-                    ),
-                    validator: (v) {
-                      if ((v?.isEmpty ?? true) && _rowCtrl.text.trim().isNotEmpty) return 'Manca colonna';
-                      if ((v?.isNotEmpty ?? false) && _rowCtrl.text.trim().isEmpty) return 'Manca riga';
-                      return null;
-                    },
-                    onFieldSubmitted: (_) => _submit(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextFormField(
-                    controller: _rowCtrl,
-                    textInputAction: TextInputAction.done,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'Riga', hintText: 'Es: 3', border: const OutlineInputBorder(), filled: true,
-                      fillColor: Colors.green.withOpacity(_opacityGreen),
-                    ),
-                    validator: (v) {
-                      if ((v?.isEmpty ?? true) && _colCtrl.text.trim().isNotEmpty) return 'Manca riga';
-                      if ((v?.isNotEmpty ?? false) && _colCtrl.text.trim().isEmpty) return 'Manca colonna';
-                      return null;
-                    },
-                    onFieldSubmitted: (_) => _submit(),
-                  ),
-                ),
-              ]),
-              () {
-                final col = _colCtrl.text.trim().toUpperCase();
-                final row = _rowCtrl.text.trim();
-                if (col.isEmpty || row.isEmpty) return const SizedBox.shrink();
-                
-                final drawer = '$col$row';
-                final key = '${_selectedCabinet}_$drawer';
-                final zones = settings.drawerDividers[key] ?? 1;
-                
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.tune, size: 16),
-                        label: Text(zones >= 2 
-                            ? 'Modifica separatori ($zones zone)' 
-                            : 'Configura separatori (cassetto normale)'),
-                        onPressed: () => _configureDrawerSeparators(drawer),
+              if (!_isInBag) ...[
+                const SizedBox(height: 12),
+                Row(children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _colCtrl,
+                      textInputAction: TextInputAction.next,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: InputDecoration(
+                        labelText: 'Colonna', hintText: 'Es: A', border: const OutlineInputBorder(), filled: true,
+                        fillColor: Colors.green.withOpacity(_opacityGreen),
                       ),
+                      validator: (v) {
+                        if ((v?.isEmpty ?? true) && _rowCtrl.text.trim().isNotEmpty) return 'Manca colonna';
+                        if ((v?.isNotEmpty ?? false) && _rowCtrl.text.trim().isEmpty) return 'Manca riga';
+                        if (v != null && v.trim().isNotEmpty) {
+                          final col = _colCtrl.text.trim().toUpperCase();
+                          final row = _rowCtrl.text.trim();
+                          if (col.isNotEmpty && row.isNotEmpty) {
+                            final label = '$col$row';
+                            final container = settings.containers.firstWhere((c) => c.id == _selectedCabinet, orElse: () => settings.containers.first);
+                            if (container.disabledDrawers.contains(label)) {
+                              return 'Cassetto disattivato';
+                            }
+                            if (!container.isDrawerValid(label)) {
+                              return 'Max: ${container.columnLabels.last}${container.rows}';
+                            }
+                          }
+                        }
+                        return null;
+                      },
+                      onFieldSubmitted: (_) => _submit(),
                     ),
-                    if (zones >= 2) ...[
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<int>(
-                        value: _selectedZone == null || _selectedZone! < 1 || _selectedZone! > zones ? 1 : _selectedZone,
-                        decoration: InputDecoration(
-                          labelText: 'Zona del cassetto (Separatore)',
-                          border: const OutlineInputBorder(),
-                          filled: true,
-                          fillColor: Colors.green.withOpacity(_opacityGreen),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _rowCtrl,
+                      textInputAction: TextInputAction.done,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Riga', hintText: 'Es: 3', border: const OutlineInputBorder(), filled: true,
+                        fillColor: Colors.green.withOpacity(_opacityGreen),
+                      ),
+                      validator: (v) {
+                        if ((v?.isEmpty ?? true) && _colCtrl.text.trim().isNotEmpty) return 'Manca riga';
+                        if ((v?.isNotEmpty ?? false) && _colCtrl.text.trim().isEmpty) return 'Manca colonna';
+                        if (v != null && v.trim().isNotEmpty) {
+                          final col = _colCtrl.text.trim().toUpperCase();
+                          final row = _rowCtrl.text.trim();
+                          if (col.isNotEmpty && row.isNotEmpty) {
+                            final label = '$col$row';
+                            final container = settings.containers.firstWhere((c) => c.id == _selectedCabinet, orElse: () => settings.containers.first);
+                            if (container.disabledDrawers.contains(label)) {
+                              return 'Cassetto disattivato';
+                            }
+                            if (!container.isDrawerValid(label)) {
+                              return 'Max: ${container.columnLabels.last}${container.rows}';
+                            }
+                          }
+                        }
+                        return null;
+                      },
+                      onFieldSubmitted: (_) => _submit(),
+                    ),
+                  ),
+                ]),
+                () {
+                  final col = _colCtrl.text.trim().toUpperCase();
+                  final row = _rowCtrl.text.trim();
+                  if (col.isEmpty || row.isEmpty) return const SizedBox.shrink();
+                  
+                  final drawer = '$col$row';
+                  final key = '${_selectedCabinet}_$drawer';
+                  final zones = settings.drawerDividers[key] ?? 1;
+                  
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.tune, size: 16),
+                          label: Text(zones >= 2 
+                              ? 'Modifica separatori ($zones zone)' 
+                              : 'Configura separatori (cassetto normale)'),
+                          onPressed: () => _configureDrawerSeparators(drawer),
                         ),
-                        items: List.generate(zones, (i) => i + 1)
-                            .map((z) => DropdownMenuItem(
-                                  value: z,
-                                  child: Text(getZoneLabel(z, zones)),
-                                ))
-                            .toList(),
-                        onChanged: (v) => setState(() => _selectedZone = v ?? 1),
                       ),
+                      if (zones >= 2) ...[
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<int>(
+                          value: _selectedZone == null || _selectedZone! < 1 || _selectedZone! > zones ? 1 : _selectedZone,
+                          decoration: InputDecoration(
+                            labelText: 'Zona del cassetto (Separatore)',
+                            border: const OutlineInputBorder(),
+                            filled: true,
+                            fillColor: Colors.green.withOpacity(_opacityGreen),
+                          ),
+                          items: List.generate(zones, (i) => i + 1)
+                              .map((z) => DropdownMenuItem(
+                                    value: z,
+                                    child: Text(getZoneLabel(z, zones)),
+                                  ))
+                              .toList(),
+                          onChanged: (v) => setState(() => _selectedZone = v ?? 1),
+                        ),
+                      ],
                     ],
-                  ],
-                );
-              }(),
+                  );
+                }(),
+              ],
               const SizedBox(height: 16),
 
-              if (_selectedTags.isNotEmpty) ...[
-                Text('Tag selezionati', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 6, runSpacing: 10,
-                  children: _selectedTags.map((tag) => InputChip(
-                    label: Text(tag, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    backgroundColor: cs.primaryContainer,
-                    onDeleted: () => setState(() {
-                      final subtree = _findSubtree(tag, settings.tagTree);
-                      _removeNodeAndDescendants(tag, subtree ?? {}, _selectedTags);
-                      final idx = _treePath.indexOf(tag);
-                      if (idx != -1) _treePath = _treePath.sublist(0, idx);
-                    }),
-                  )).toList(),
-                ),
-                const SizedBox(height: 12),
-                const Divider(),
-                const SizedBox(height: 4),
-              ],
-
-              if (settings.tagTree.isNotEmpty) ...[
-                Text('Naviga nell\'albero dei tag', style: Theme.of(context).textTheme.labelLarge),
-                const SizedBox(height: 6),
-                
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  decoration: BoxDecoration(color: cs.surfaceContainerHighest.withOpacity(0.5), borderRadius: BorderRadius.circular(6)),
-                  child: Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 4, runSpacing: 4,
+              if (_isLoadingSettings) ...[
+                const SizedBox(height: 16),
+                const Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      ActionChip(
-                        label: const Text('Inizio'),
-                        avatar: const Icon(Icons.home, size: 16),
-                        onPressed: () => setState(() => _treePath.clear()),
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
                       ),
-                      for (int i = 0; i < _treePath.length; i++) ...[
-                        const Icon(Icons.chevron_right, size: 16),
-                        ActionChip(
-                          label: Text(_treePath[i]),
-                          onPressed: () => setState(() => _treePath = _treePath.sublist(0, i + 1)),
-                        ),
-                      ]
-                    ]
+                      SizedBox(width: 12),
+                      Text('Caricamento tag...'),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                
-                if (sortedCurrentLevel.isEmpty)
-                  Text('Nessun sottotag disponibile.', style: TextStyle(fontStyle: FontStyle.italic, color: cs.onSurfaceVariant))
-                else
+              ] else if (activeSettingsForTags == null) ...[
+                const SizedBox(height: 16),
+                Card(
+                  color: cs.surfaceContainerHighest.withOpacity(0.5),
+                  child: const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, size: 20),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Seleziona un inventario di destinazione per impostare tag e proprietà.',
+                            style: TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ] else ...[
+                if (_selectedTags.isNotEmpty) ...[
+                  Text('Tag selezionati', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+                  const SizedBox(height: 6),
                   Wrap(
-                    spacing: 8, runSpacing: 12,
-                    children: sortedCurrentLevel.map((t) {
-                      final isSelected = _selectedTags.contains(t);
-                      return ChoiceChip(
-                        label: Text(t),
-                        selected: isSelected,
-                        selectedColor: cs.primaryContainer,
-                        onSelected: (sel) {
-                          if (!sel) return; 
-                          setState(() {
-                            final siblings = sortedCurrentLevel.where((k) => k != t);
-                            for (final s in siblings) {
-                              if (_selectedTags.contains(s)) {
-                                _removeNodeAndDescendants(s, currentTreeLevel[s], _selectedTags);
+                    spacing: 6, runSpacing: 10,
+                    children: _selectedTags.map((tag) => InputChip(
+                      label: Text(tag, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      backgroundColor: cs.primaryContainer,
+                      onDeleted: () => setState(() {
+                        final subtree = _findSubtree(tag, activeSettingsForTags.tagTree);
+                        _removeNodeAndDescendants(tag, subtree ?? {}, _selectedTags);
+                        final idx = _treePath.indexOf(tag);
+                        if (idx != -1) _treePath = _treePath.sublist(0, idx);
+                      }),
+                    )).toList(),
+                  ),
+                  const SizedBox(height: 12),
+                  const Divider(),
+                  const SizedBox(height: 4),
+                ],
+
+                if (activeSettingsForTags.tagTree.isNotEmpty) ...[
+                  Text('Naviga nell\'albero dei tag', style: Theme.of(context).textTheme.labelLarge),
+                  const SizedBox(height: 6),
+                  
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(color: cs.surfaceContainerHighest.withOpacity(0.5), borderRadius: BorderRadius.circular(6)),
+                    child: Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 4, runSpacing: 4,
+                      children: [
+                        ActionChip(
+                          label: const Text('Inizio'),
+                          avatar: const Icon(Icons.home, size: 16),
+                          onPressed: () => setState(() => _treePath.clear()),
+                        ),
+                        for (int i = 0; i < _treePath.length; i++) ...[
+                          const Icon(Icons.chevron_right, size: 16),
+                          ActionChip(
+                            label: Text(_treePath[i]),
+                            onPressed: () => setState(() => _treePath = _treePath.sublist(0, i + 1)),
+                          ),
+                        ]
+                      ]
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  if (sortedCurrentLevel.isEmpty)
+                    Text('Nessun sottotag disponibile.', style: TextStyle(fontStyle: FontStyle.italic, color: cs.onSurfaceVariant))
+                  else
+                    Wrap(
+                      spacing: 8, runSpacing: 12,
+                      children: sortedCurrentLevel.map((t) {
+                        final isSelected = _selectedTags.contains(t);
+                        return ChoiceChip(
+                          label: Text(t),
+                          selected: isSelected,
+                          selectedColor: cs.primaryContainer,
+                          onSelected: (sel) {
+                            if (!sel) return; 
+                            setState(() {
+                              final siblings = sortedCurrentLevel.where((k) => k != t);
+                              for (final s in siblings) {
+                                if (_selectedTags.contains(s)) {
+                                  _removeNodeAndDescendants(s, currentTreeLevel[s], _selectedTags);
+                                }
                               }
-                            }
-                            
-                            if (!_selectedTags.contains(t)) _selectedTags.add(t);
-                                                        if (_treePath.isEmpty) {
-                              if (_nameCtrl.text.isEmpty || settings.tagTree.keys.contains(_nameCtrl.text)) {
+                              
+                              if (!_selectedTags.contains(t)) _selectedTags.add(t);
+                              if (_nameCtrl.text.isEmpty || activeSettingsForTags.tagTree.keys.contains(_nameCtrl.text)) {
                                 _nameCtrl.text = t;
                               }
-                            } else if (_nameCtrl.text.isEmpty) {
-                              _nameCtrl.text = t;
-                            }
-                            
-                            _treePath.add(t);
-                          });
-                        },
-                      );
-                    }).toList(),
-                  ),
-                const SizedBox(height: 16),
-              ],
-
-              if (sortedLoose.isNotEmpty) ...[
-                TextButton.icon(
-                  icon: Icon(_showLooseTags ? Icons.expand_less : Icons.expand_more),
-                  label: const Text('Mostra tag generici (sfusi)'),
-                  onPressed: () => setState(() => _showLooseTags = !_showLooseTags),
-                ),
-                if (_showLooseTags) ...[
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8, runSpacing: 12,
-                    children: sortedLoose.map((tag) {
-                      final selected = _selectedTags.contains(tag);
-                      return FilterChip(
-                        label: Text(tag),
-                        selected: selected,
-                        selectedColor: cs.primaryContainer,
-                        backgroundColor: cs.surfaceContainerHighest,
-                        onSelected: (v) => setState(() => v ? _selectedTags.add(tag) : _selectedTags.remove(tag)),
-                      );
-                    }).toList(),
-                  ),
+                              
+                              _treePath.add(t);
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  const SizedBox(height: 16),
                 ],
-                const SizedBox(height: 16),
-              ],
 
-              if (settings.specialTags.isNotEmpty) ...[
-                Text('Proprietà', style: Theme.of(context).textTheme.labelLarge),
-                const SizedBox(height: 8),
-                ...settings.specialTags.map((st) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: TextFormField(
-                        controller: _specialTagCtrls[st.name],
-                        textInputAction: TextInputAction.done,
-                        decoration: InputDecoration(
-                          labelText: st.unit.isNotEmpty ? '${st.name} (${st.unit})' : st.name,
-                          border: const OutlineInputBorder(), 
-                          hintText: st.isString ? 'Testo libero' : 'Lascia vuoto o usa K, V, M... (es. 1K2)',
-                          filled: true, fillColor: cs.tertiaryContainer.withOpacity(_opacityTertiary),
+                if (sortedLoose.isNotEmpty) ...[
+                  TextButton.icon(
+                    icon: Icon(_showLooseTags ? Icons.expand_less : Icons.expand_more),
+                    label: const Text('Mostra tag generici (sfusi)'),
+                    onPressed: () => setState(() => _showLooseTags = !_showLooseTags),
+                  ),
+                  if (_showLooseTags) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8, runSpacing: 12,
+                      children: sortedLoose.map((tag) {
+                        final selected = _selectedTags.contains(tag);
+                        return FilterChip(
+                          label: Text(tag),
+                          selected: selected,
+                          selectedColor: cs.primaryContainer,
+                          backgroundColor: cs.surfaceContainerHighest,
+                          onSelected: (v) => setState(() => v ? _selectedTags.add(tag) : _selectedTags.remove(tag)),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                ],
+
+                if (activeSettingsForTags.specialTags.isNotEmpty) ...[
+                  Text('Proprietà', style: Theme.of(context).textTheme.labelLarge),
+                  const SizedBox(height: 8),
+                  ...activeSettingsForTags.specialTags.map((st) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: TextFormField(
+                          controller: _specialTagCtrls[st.name],
+                          textInputAction: TextInputAction.done,
+                          decoration: InputDecoration(
+                            labelText: st.unit.isNotEmpty ? '${st.name} (${st.unit})' : st.name,
+                            border: const OutlineInputBorder(), 
+                            hintText: st.isString ? 'Testo libero' : 'Lascia vuoto o usa K, V, M... (es. 1K2)',
+                            filled: true, fillColor: cs.tertiaryContainer.withOpacity(_opacityTertiary),
+                          ),
+                          keyboardType: TextInputType.text,
+                          onFieldSubmitted: (_) => _submit(),
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return null;
+                            if (!st.isString && parseSpecialValue(v) == null) return 'Formato numerico non valido';
+                            return null;
+                          },
                         ),
-                        keyboardType: TextInputType.text,
-                        onFieldSubmitted: (_) => _submit(),
-                        validator: (v) {
-                          if (v == null || v.isEmpty) return null;
-                          if (!st.isString && parseSpecialValue(v) == null) return 'Formato numerico non valido';
-                          return null;
-                        },
-                      ),
-                    )),
+                      )),
+                ],
               ],
 
               const SizedBox(height: 16),
@@ -575,17 +852,17 @@ class _ComponentDialogState extends State<ComponentDialog> {
                           title: const Text('Scegli file esistente'),
                           content: SizedBox(
                             width: double.maxFinite,
-                            child: ListView.builder(
-                              shrinkWrap: true,
-                              itemCount: existingFiles.length,
-                              itemBuilder: (_, i) {
-                                final a = existingFiles[i];
-                                return ListTile(
-                                  leading: const Icon(Icons.insert_drive_file),
-                                  title: Text(a.name),
-                                  onTap: () => Navigator.pop(ctx, a),
-                                );
-                              },
+                            child: SingleChildScrollView(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: existingFiles.map((a) {
+                                  return ListTile(
+                                    leading: const Icon(Icons.insert_drive_file),
+                                    title: Text(a.name),
+                                    onTap: () => Navigator.pop(ctx, a),
+                                  );
+                                }).toList(),
+                              ),
                             ),
                           ),
                           actions: [
@@ -603,15 +880,199 @@ class _ComponentDialogState extends State<ComponentDialog> {
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
+              Text('Immagini', style: Theme.of(context).textTheme.labelLarge),
+              const SizedBox(height: 8),
+              if (_images.isNotEmpty) ...[
+                SizedBox(
+                  height: 90,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: _images.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final path = entry.value;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: Stack(
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => FullscreenImageViewer(
+                                        images: _images,
+                                        initialIndex: index,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: SizedBox(
+                                    width: 80,
+                                    height: 80,
+                                    child: _buildImageWidget(context, path),
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                top: 2,
+                                right: 2,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _images.removeAt(index);
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.black54,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.delete,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              if (index == 0)
+                                Positioned(
+                                  bottom: 2,
+                                  left: 2,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).colorScheme.primaryContainer,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      'Icona',
+                                      style: TextStyle(
+                                        fontSize: 8,
+                                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+              TextButton.icon(
+                onPressed: () async {
+                  FocusScope.of(context).unfocus();
+                  await _saveDraft();
+                  final source = await showModalBottomSheet<ImageSource>(
+                    context: context,
+                    builder: (ctx) => SafeArea(
+                      child: Wrap(
+                        children: [
+                          ListTile(
+                            leading: const Icon(Icons.camera_alt),
+                            title: const Text('Scatta Foto Ora'),
+                            onTap: () => Navigator.pop(ctx, ImageSource.camera),
+                          ),
+                          ListTile(
+                            leading: const Icon(Icons.photo_library),
+                            title: const Text('Seleziona dalla Galleria'),
+                            onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+
+                  if (source == null) return;
+                  final picker = ImagePicker();
+
+                  if (source == ImageSource.camera) {
+                    final photo = await picker.pickImage(
+                      source: ImageSource.camera,
+                      imageQuality: 80,
+                      maxWidth: 1920,
+                      maxHeight: 1920,
+                    );
+                    if (photo != null) {
+                      setState(() {
+                        _images.add(photo.path);
+                      });
+                    }
+                  } else {
+                    final photos = await picker.pickMultiImage(
+                      imageQuality: 80,
+                      maxWidth: 1920,
+                      maxHeight: 1920,
+                    );
+                    if (photos.isNotEmpty) {
+                      setState(() {
+                        _images.addAll(photos.map((p) => p.path));
+                      });
+                    }
+                  }
+                },
+                icon: const Icon(Icons.add_a_photo_outlined),
+                label: const Text('Aggiungi Foto'),
+              ),
             ],
           ),
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annulla')),
+        TextButton(
+          onPressed: () async {
+            await clearDraft();
+            if (context.mounted) {
+              Navigator.pop(context);
+            }
+          },
+          child: const Text('Annulla'),
+        ),
         FilledButton(onPressed: _isSaving ? null : _submit, child: _isSaving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : Text(isEdit ? 'Salva' : 'Aggiungi')),
       ],
     );
+  }
+
+  Widget _buildImageWidget(BuildContext context, String imagePath) {
+    final ds = Provider.of<DataService>(context, listen: false);
+    if (imagePath.startsWith('/')) {
+      return Image.file(
+        File(imagePath),
+        fit: BoxFit.cover,
+        errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image),
+      );
+    } else if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return Image.network(
+        imagePath,
+        fit: BoxFit.cover,
+        errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image),
+      );
+    } else {
+      if (ds.mode == StorageMode.remote && ds.serverConnected) {
+        return Image.network(
+          ds.getAttachmentUrl(imagePath),
+          fit: BoxFit.cover,
+          errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image),
+        );
+      } else {
+        final localPath = ds.getLocalAttachmentPathSync(imagePath);
+        return Image.file(
+          File(localPath),
+          fit: BoxFit.cover,
+          errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image),
+        );
+      }
+    }
   }
 
   Future<void> _configureDrawerSeparators(String label) async {
@@ -686,9 +1147,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
       }
       
       final updatedSettings = AppSettings(
-        numCabinets: currentSettings.numCabinets,
-        drawerRows: currentSettings.drawerRows,
-        drawerColumns: currentSettings.drawerColumns,
+        containers: currentSettings.containers,
         availableTags: currentSettings.availableTags,
         tagTree: currentSettings.tagTree,
         specialTags: currentSettings.specialTags,
@@ -726,17 +1185,21 @@ class _ComponentDialogState extends State<ComponentDialog> {
       }
     }
 
+    final activeSettings = widget.isBuffer ? _targetSettings : settings;
     final specialValues = <String, String>{};
-    for (final st in settings.specialTags) {
-      final text = _specialTagCtrls[st.name]?.text.trim() ?? '';
-      if (text.isNotEmpty) {
-        specialValues[st.name] = text; 
+    if (activeSettings != null) {
+      for (final st in activeSettings.specialTags) {
+        final text = _specialTagCtrls[st.name]?.text.trim() ?? '';
+        if (text.isNotEmpty) {
+          specialValues[st.name] = text; 
+        }
       }
     }
 
     final isEdit = widget.existing != null && !widget.isDuplicate;
     
     setState(() => _isSaving = true);
+    await clearDraft();
     
     final ds = Provider.of<DataService>(context, listen: false);
     List<Attachment> finalAttachments = [];
@@ -756,18 +1219,39 @@ class _ComponentDialogState extends State<ComponentDialog> {
       }
     }
 
+    List<String> finalImages = [];
+    for (var path in _images) {
+      if (!path.startsWith('/')) {
+        finalImages.add(path);
+      } else {
+        final filename = path.split('/').last;
+        final newName = await ds.uploadAttachment(path, filename);
+        if (newName != null) {
+          finalImages.add(newName);
+        } else {
+          finalImages.add(path);
+        }
+      }
+    }
+
     final result = Component(
       id: isEdit ? widget.existing?.id : null,
       name: _nameCtrl.text.trim(),
       description: _descCtrl.text.trim(),
       quantity: qty,
-      cabinet: _selectedCabinet,
-      drawer: drawer,
+      cabinet: _isInBag ? 1 : _selectedCabinet,
+      drawer: _isInBag ? '' : drawer,
       tags: _selectedTags,
       specialTagValues: specialValues,
       attachments: finalAttachments,
-      drawerZone: finalZone,
+      drawerZone: _isInBag ? null : finalZone,
+      bagName: _isInBag ? (widget.bagName ?? widget.existing?.bagName) : null,
+      note: _noteCtrl.text.trim(),
+      targetInventoryId: widget.isBuffer ? _selectedTargetInventoryId : null,
+      images: finalImages,
     );
-    Navigator.pop(context, result);
+    if (context.mounted) {
+      Navigator.pop(context, result);
+    }
   }
 }

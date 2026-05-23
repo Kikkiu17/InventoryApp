@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'package:image/image.dart' as img;
 import '../models/component.dart';
 import '../models/settings.dart';
 
@@ -196,9 +198,32 @@ class ApiClient {
   // ── Attachments ──────────────────────────────────────────────────────────────
   Future<String> uploadAttachment(String filePath, String filename) async {
     final file = File(filePath);
+    Uint8List bytes = await file.readAsBytes();
+
+    // Compress large images if they didn't go through the compressed picker pipeline
+    final ext = filename.split('.').last.toLowerCase();
+    if ((ext == 'jpg' || ext == 'jpeg' || ext == 'png' || ext == 'webp') && bytes.length > 1.5 * 1024 * 1024) {
+      try {
+        final image = img.decodeImage(bytes);
+        if (image != null) {
+          img.Image resized = image;
+          if (image.width > 1920 || image.height > 1920) {
+            if (image.width > image.height) {
+              resized = img.copyResize(image, width: 1920);
+            } else {
+              resized = img.copyResize(image, height: 1920);
+            }
+          }
+          bytes = img.encodeJpg(resized, quality: 80);
+        }
+      } catch (_) {
+        // Fallback to original bytes on error
+      }
+    }
+
     final req = http.Request('POST', _inv('/attachments'));
     req.headers['X-Filename'] = filename;
-    req.bodyBytes = await file.readAsBytes();
+    req.bodyBytes = bytes;
     final res = await req.send().timeout(_timeout);
     final bodyStr = await res.stream.bytesToString();
     if (res.statusCode < 200 || res.statusCode >= 300) {
