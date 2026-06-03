@@ -47,6 +47,51 @@ class SyncConflict {
   });
 }
 
+bool matchesQuery(Component c, String query, AppSettings settings) {
+  final trimmed = query.trim();
+  if (trimmed.isEmpty) return true;
+  final rawTerms = trimmed.split(' ').where((s) => s.isNotEmpty).toList();
+  
+  return rawTerms.every((rawTerm) {
+    final parsedTerm = parseSpecialValue(rawTerm);
+    final term = rawTerm.toLowerCase();
+    
+    return c.name.toLowerCase().contains(term) ||
+      c.drawer.toLowerCase().contains(term) ||
+      c.cabinet.toString().contains(term) ||
+      c.description.toLowerCase().contains(term) ||
+      c.tags.any((t) => t.toLowerCase().contains(term)) ||
+      c.specialTagValues.entries.any((entry) {
+        final tagDef = settings.specialTags.where((t) => t.name == entry.key).firstOrNull;
+        final isStr = tagDef?.isString ?? false;
+        
+        if (isStr) {
+          return entry.value.toLowerCase().contains(term);
+        } else {
+          final parsedVal = parseSpecialValue(entry.value);
+          
+          double? parsedTermWithUnitStripped;
+          bool termMatchesUnit = false;
+          if (tagDef != null && tagDef.unit.isNotEmpty) {
+            final unitLower = tagDef.unit.toLowerCase();
+            if (term.endsWith(unitLower)) {
+              final stripped = term.substring(0, term.length - unitLower.length).trim();
+              parsedTermWithUnitStripped = parseSpecialValue(stripped);
+            }
+            if (unitLower.contains(term)) {
+              termMatchesUnit = true;
+            }
+          }
+
+          return entry.value.toLowerCase().contains(term) || 
+                 (parsedTerm != null && parsedVal == parsedTerm) ||
+                 (parsedTermWithUnitStripped != null && parsedVal == parsedTermWithUnitStripped) ||
+                 termMatchesUnit;
+        }
+      });
+  });
+}
+
 class DataService extends ChangeNotifier {
   static const _serverUrlKey      = 'serverUrl';
   static const _storageModeKey    = 'storageMode';
@@ -411,6 +456,28 @@ class DataService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> moveComponent(String componentId, String targetInventoryId) async {
+    if (_mode == StorageMode.remote && _serverConnected) {
+      try {
+        await _api!.moveComponent(componentId, targetInventoryId);
+        _components.removeWhere((e) => e.id == componentId);
+        final ts = DateTime.tryParse(_api!.lastUpdated ?? '');
+        await _mirrorToLocal(_components, _settings, timestamp: ts);
+
+        // Invalidate target inventory local mirror
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('components_$targetInventoryId');
+        await prefs.remove('localTimestamp_$targetInventoryId');
+      } catch (e) {
+        _lastError = e.toString();
+        rethrow;
+      }
+    } else {
+      throw Exception('Lo spostamento è supportato solo in modalità remota con server connesso');
+    }
+    notifyListeners();
+  }
+
   Future<void> updateQuantity(String id, int delta) async {
     if (_mode == StorageMode.remote && _serverConnected) {
       try {
@@ -585,30 +652,7 @@ class DataService extends ChangeNotifier {
     }
     
     if (query.isNotEmpty) {
-      final rawTerms = query.split(' ').where((s) => s.isNotEmpty).toList();
-      
-      results = results.where((c) => rawTerms.every((rawTerm) {
-        final parsedTerm = parseSpecialValue(rawTerm);
-        final term = rawTerm.toLowerCase();
-        
-        return c.name.toLowerCase().contains(term) ||
-          c.drawer.toLowerCase().contains(term) ||
-          c.cabinet.toString().contains(term) ||
-          c.description.toLowerCase().contains(term) ||
-          c.tags.any((t) => t.toLowerCase().contains(term)) ||
-          c.specialTagValues.entries.any((entry) {
-              final tagDef = _settings.specialTags.where((t) => t.name == entry.key).firstOrNull;
-              final isStr = tagDef?.isString ?? false;
-              
-              if (isStr) {
-                return entry.value.toLowerCase().contains(term);
-              } else {
-                final parsedVal = parseSpecialValue(entry.value);
-                return entry.value.toLowerCase().contains(term) || 
-                       (parsedTerm != null && parsedVal == parsedTerm);
-              }
-          });
-      })).toList();
+      results = results.where((c) => matchesQuery(c, query, _settings)).toList();
     }
     
     if (selectedTags.isNotEmpty) {
@@ -861,20 +905,12 @@ class DataService extends ChangeNotifier {
         final cj = prefs.getString('components_${inv.id}');
         if (cj == null) continue;
         
+        final sj = prefs.getString('settings_${inv.id}');
+        final settings = sj != null ? AppSettings.fromJson(jsonDecode(sj)) : AppSettings();
+        
         final comps = (jsonDecode(cj) as List).map((e) => Component.fromJson(e)).toList();
         for (var c in comps) {
-          bool match = false;
-          if (c.name.toLowerCase().contains(q) || c.description.toLowerCase().contains(q)) {
-            match = true;
-          } else {
-            for (var t in c.tags) {
-              if (t.toLowerCase().contains(q)) {
-                match = true;
-                break;
-              }
-            }
-          }
-          if (match) {
+          if (matchesQuery(c, query, settings)) {
             matches.add(GlobalSearchResult(
               inventoryId: inv.id,
               inventoryName: inv.name,

@@ -235,6 +235,15 @@ class ApiClient {
     return jsonResponse['filename'] as String;
   }
 
+  Future<void> moveComponent(String componentId, String targetInventoryId) async {
+    final res = await http.post(
+      _inv('/components/$componentId/move'),
+      headers: _headers,
+      body: jsonEncode({'targetInventoryId': targetInventoryId}),
+    ).timeout(_timeout);
+    await _check(res);
+  }
+
   Future<void> deleteAttachment(String filename) async {
     final res = await http.delete(_inv('/attachments/$filename')).timeout(_timeout);
     await _check(res);

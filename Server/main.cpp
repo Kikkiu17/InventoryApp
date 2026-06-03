@@ -11,6 +11,8 @@
 #include <iomanip>
 #include <algorithm>
 #include <vector>
+#include <regex>
+#include <optional>
 
 using json = nlohmann::json;
 namespace fs = std::filesystem;
@@ -51,6 +53,187 @@ std::string gen_id() {
 bool valid_id(const std::string& id) {
     if (id.empty() || id.size() > 64) return false;
     for (char c : id) if (!isalnum(c) && c != '-' && c != '_') return false;
+    return true;
+}
+
+std::string trim(std::string s) {
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) {
+        return !std::isspace(ch);
+    }));
+    s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) {
+        return !std::isspace(ch);
+    }).base(), s.end());
+    return s;
+}
+
+double get_multiplier(const std::string& letter) {
+    if (letter == "T" || letter == "t") return 1e12;
+    if (letter == "G" || letter == "g") return 1e9;
+    if (letter == "M") return 1e6;
+    if (letter == "k" || letter == "K") return 1e3;
+    if (letter == "m") return 1e-3;
+    if (letter == "u" || letter == "U" || letter == "µ" || letter == "\xc2\xb5" || letter == "\xce\xbc") return 1e-6; 
+    if (letter == "n" || letter == "N") return 1e-9;
+    if (letter == "p" || letter == "P") return 1e-12;
+    if (letter == "f" || letter == "F") return 1e-15;
+    return 1.0;
+}
+
+std::optional<double> parse_special_value(const std::string& text) {
+    std::string v = trim(text);
+    std::replace(v.begin(), v.end(), ',', '.');
+    if (v.empty()) return std::nullopt;
+
+    try {
+        size_t idx = 0;
+        double direct = std::stod(v, &idx);
+        if (idx == v.size()) {
+            return direct;
+        }
+    } catch (...) {}
+
+    std::regex reg1("^([0-9]+)([a-zA-Z]|\\xc2\\xb5|\\xce\\xbc)([0-9]*)$");
+    std::smatch match1;
+    if (std::regex_match(v, match1, reg1)) {
+        std::string part1 = match1[1].str();
+        std::string letter = match1[2].str();
+        std::string part2 = match1[3].str();
+        
+        std::string num_str = part1 + "." + (part2.empty() ? "0" : part2);
+        try {
+            double base_num = std::stod(num_str);
+            return base_num * get_multiplier(letter);
+        } catch (...) {}
+    }
+
+    std::regex reg2("^([0-9]*\\.?[0-9]+)([a-zA-Z]|\\xc2\\xb5|\\xce\\xbc)$");
+    std::smatch match2;
+    if (std::regex_match(v, match2, reg2)) {
+        std::string base_str = match2[1].str();
+        std::string letter = match2[2].str();
+        try {
+            double base_num = std::stod(base_str);
+            return base_num * get_multiplier(letter);
+        } catch (...) {}
+    }
+
+    return std::nullopt;
+}
+
+bool matches_query(const json& comp, const std::string& query, const json& settings) {
+    std::string trimmed_query = trim(query);
+    if (trimmed_query.empty()) return true;
+
+    auto to_lower = [](std::string s) {
+        std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return std::tolower(c); });
+        return s;
+    };
+    std::string query_lower = to_lower(trimmed_query);
+
+    std::vector<std::string> raw_terms;
+    std::stringstream ss(query_lower);
+    std::string temp;
+    while (ss >> temp) {
+        raw_terms.push_back(temp);
+    }
+
+    if (raw_terms.empty()) return true;
+
+    std::string cname = to_lower(comp.value("name", ""));
+    std::string cdesc = to_lower(comp.value("description", ""));
+    std::string cdrawer = to_lower(comp.value("drawer", ""));
+    std::string ccabinet = "";
+    if (comp.contains("cabinet")) {
+        if (comp["cabinet"].is_number()) {
+            ccabinet = std::to_string(comp["cabinet"].get<int>());
+        } else if (comp["cabinet"].is_string()) {
+            ccabinet = to_lower(comp["cabinet"].get<std::string>());
+        }
+    }
+
+    std::vector<std::string> ctags;
+    if (comp.contains("tags") && comp["tags"].is_array()) {
+        for (const auto& t : comp["tags"]) {
+            if (t.is_string()) {
+                ctags.push_back(to_lower(t.get<std::string>()));
+            }
+        }
+    }
+
+    auto term_matches = [&](const std::string& term) {
+        if (cname.find(term) != std::string::npos) return true;
+        if (cdrawer.find(term) != std::string::npos) return true;
+        if (ccabinet.find(term) != std::string::npos) return true;
+        if (cdesc.find(term) != std::string::npos) return true;
+        
+        for (const auto& t : ctags) {
+            if (t.find(term) != std::string::npos) return true;
+        }
+
+        if (comp.contains("specialTagValues") && comp["specialTagValues"].is_object()) {
+            auto special_vals = comp["specialTagValues"];
+            for (auto it = special_vals.begin(); it != special_vals.end(); ++it) {
+                std::string key = it.key();
+                bool is_str = false;
+                std::string unit = "";
+                if (settings.contains("specialTags") && settings["specialTags"].is_array()) {
+                    for (const auto& st : settings["specialTags"]) {
+                        if (st.contains("name") && st["name"].is_string() && st["name"].get<std::string>() == key) {
+                            is_str = st.value("isString", false);
+                            unit = to_lower(st.value("unit", ""));
+                            break;
+                        }
+                    }
+                }
+
+                std::string val_str = "";
+                if (it.value().is_string()) {
+                    val_str = to_lower(it.value().get<std::string>());
+                } else if (it.value().is_number()) {
+                    double dval = it.value().get<double>();
+                    if (dval == static_cast<int>(dval)) {
+                        val_str = std::to_string(static_cast<int>(dval));
+                    } else {
+                        std::ostringstream strs;
+                        strs << dval;
+                        val_str = strs.str();
+                    }
+                }
+
+                if (is_str) {
+                    if (val_str.find(term) != std::string::npos) return true;
+                } else {
+                    auto parsed_val = parse_special_value(val_str);
+                    auto parsed_term = parse_special_value(term);
+
+                    std::optional<double> parsed_term_unit_stripped;
+                    bool term_matches_unit = false;
+                    if (!unit.empty()) {
+                        if (term.size() >= unit.size() && term.compare(term.size() - unit.size(), unit.size(), unit) == 0) {
+                            std::string stripped = term.substr(0, term.size() - unit.size());
+                            parsed_term_unit_stripped = parse_special_value(stripped);
+                        }
+                        if (unit.find(term) != std::string::npos) {
+                            term_matches_unit = true;
+                        }
+                    }
+
+                    bool sub_match = (val_str.find(term) != std::string::npos);
+                    bool val_term_eq = (parsed_term.has_value() && parsed_val.has_value() && parsed_val.value() == parsed_term.value());
+                    bool val_stripped_eq = (parsed_term_unit_stripped.has_value() && parsed_val.has_value() && parsed_val.value() == parsed_term_unit_stripped.value());
+
+                    if (sub_match || val_term_eq || val_stripped_eq || term_matches_unit) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    };
+
+    for (const auto& term : raw_terms) {
+        if (!term_matches(term)) return false;
+    }
     return true;
 }
 
@@ -285,14 +468,9 @@ int main(int argc, char* argv[]) {
     CROW_ROUTE(app, "/api/search").methods("GET"_method)
     ([](const crow::request& req) {
         std::string q = req.url_params.get("q") ? req.url_params.get("q") : "";
-        auto to_lower = [](std::string s) {
-            std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return std::tolower(c); });
-            return s;
-        };
-        std::string query = to_lower(q);
         
         json results = json::array();
-        if (query.empty()) return json_ok(results);
+        if (trim(q).empty()) return json_ok(results);
 
         auto meta = load_meta();
         for (const auto& inv : meta) {
@@ -303,21 +481,10 @@ int main(int argc, char* argv[]) {
             auto db = load_inv(inv_id);
             if (!db.contains("components") || !db["components"].is_array()) continue;
             
+            json settings = db.value("settings", json::object());
+
             for (const auto& comp : db["components"]) {
-                bool match = false;
-                std::string cname = to_lower(comp.value("name", ""));
-                std::string cdesc = to_lower(comp.value("description", ""));
-                
-                if (cname.find(query) != std::string::npos || cdesc.find(query) != std::string::npos) {
-                    match = true;
-                } else if (comp.contains("tags") && comp["tags"].is_array()) {
-                    for (const auto& t : comp["tags"]) {
-                        std::string tstr = to_lower(t.get<std::string>());
-                        if (tstr.find(query) != std::string::npos) { match = true; break; }
-                    }
-                }
-                
-                if (match) {
+                if (matches_query(comp, q, settings)) {
                     json res_item;
                     res_item["inventoryId"] = inv_id;
                     res_item["inventoryName"] = inv_name;
@@ -397,6 +564,89 @@ int main(int argc, char* argv[]) {
         if (cs.size() == prev) return json_err("Non trovato", 404);
         auto ts = save_inv(inv, db);
         return json_ok_ts({{"deleted", id}}, ts);
+    });
+
+    CROW_ROUTE(app, "/api/inventories/<string>/components/<string>/move").methods("POST"_method)
+    ([](const crow::request& req, const std::string& source_inv, const std::string& id) {
+        if (!valid_id(source_inv)) return json_err("ID inventario non valido");
+        try {
+            auto body = json::parse(req.body);
+            if (!body.contains("targetInventoryId")) return json_err("Destinazione mancante");
+            std::string target_inv = body["targetInventoryId"].get<std::string>();
+            if (!valid_id(target_inv)) return json_err("ID destinazione non valido");
+            if (source_inv == target_inv) return json_err("Sorgente e destinazione uguali");
+
+            auto source_db = load_inv(source_inv);
+            auto target_db = load_inv(target_inv);
+
+            auto& source_comps = source_db["components"];
+            auto comp_it = std::find_if(source_comps.begin(), source_comps.end(), [&](const json& c) {
+                return c.value("id", "") == id;
+            });
+
+            if (comp_it == source_comps.end()) {
+                return json_err("Componente non trovato", 404);
+            }
+
+            json comp = *comp_it;
+
+            // Sposta i file degli allegati fisici sul server
+            std::string source_attach_dir = DATA_DIR + "/attachments/" + source_inv;
+            std::string target_attach_dir = DATA_DIR + "/attachments/" + target_inv;
+
+            auto move_file = [&](const std::string& filename) {
+                if (filename.empty()) return;
+                if (filename.find("..") != std::string::npos || filename.find('/') != std::string::npos) return;
+
+                fs::path source_path = fs::path(source_attach_dir) / filename;
+                fs::path target_path = fs::path(target_attach_dir) / filename;
+
+                if (fs::exists(source_path)) {
+                    fs::create_directories(target_attach_dir);
+                    try {
+                        fs::rename(source_path, target_path);
+                    } catch (...) {
+                        try {
+                            fs::copy(source_path, target_path);
+                            fs::remove(source_path);
+                        } catch (...) {}
+                    }
+                }
+            };
+
+            if (comp.contains("images") && comp["images"].is_array()) {
+                for (const auto& img_val : comp["images"]) {
+                    if (img_val.is_string()) {
+                        std::string img_path = img_val.get<std::string>();
+                        if (img_path.find("http://") != 0 && img_path.find("https://") != 0 && img_path.find('/') == std::string::npos) {
+                            move_file(img_path);
+                        }
+                    }
+                }
+            }
+
+            if (comp.contains("attachments") && comp["attachments"].is_array()) {
+                for (const auto& att_val : comp["attachments"]) {
+                    if (att_val.is_object() && att_val.contains("path") && att_val.contains("isLink")) {
+                        bool is_link = att_val.value("isLink", false);
+                        std::string path = att_val.value("path", "");
+                        if (!is_link && path.find('/') == std::string::npos) {
+                            move_file(path);
+                        }
+                    }
+                }
+            }
+
+            // Rimuovi da sorgente e aggiungi a destinazione
+            source_comps.erase(comp_it);
+            target_db["components"].push_back(comp);
+
+            // Salva entrambi
+            auto ts_source = save_inv(source_inv, source_db);
+            save_inv(target_inv, target_db);
+
+            return json_ok_ts({{"moved", true}}, ts_source);
+        } catch (const std::exception& e) { return json_err(e.what()); }
     });
 
     // ── Attachments ──

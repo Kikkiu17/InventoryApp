@@ -33,6 +33,13 @@ class ComponentViewDialog extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(child: Text(currentComp.name)),
+          if (ds.isRemote && ds.inventories.length > 1)
+            IconButton(
+              icon: const Icon(Icons.drive_file_move_outlined),
+              tooltip: 'Sposta in un altro inventario',
+              color: cs.secondary,
+              onPressed: () => _showMoveDialog(context, ds, currentComp),
+            ),
           IconButton(
             icon: const Icon(Icons.edit_outlined),
             tooltip: 'Modifica',
@@ -262,6 +269,84 @@ class ComponentViewDialog extends StatelessWidget {
           fit: BoxFit.cover,
           errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image),
         );
+      }
+    }
+  }
+
+  Future<void> _showMoveDialog(BuildContext context, DataService ds, Component component) async {
+    final otherInventories = ds.inventories.where((inv) => inv.id != ds.currentInventoryId).toList();
+    if (otherInventories.isEmpty) return;
+
+    InventoryMeta? selectedInventory = otherInventories.first;
+
+    final targetInv = await showDialog<InventoryMeta>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Sposta componente'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Seleziona l\'inventario di destinazione per "${component.name}":'),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<InventoryMeta>(
+                  initialValue: selectedInventory,
+                  decoration: const InputDecoration(
+                    labelText: 'Inventario',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: otherInventories.map((inv) => DropdownMenuItem<InventoryMeta>(
+                    value: inv,
+                    child: Text(inv.name),
+                  )).toList(),
+                  onChanged: (val) {
+                    setState(() {
+                      selectedInventory = val;
+                    });
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Annulla'),
+              ),
+              FilledButton(
+                onPressed: selectedInventory != null ? () => Navigator.pop(ctx, selectedInventory) : null,
+                child: const Text('Sposta'),
+              ),
+            ],
+          );
+        }
+      ),
+    );
+
+    if (targetInv == null) return;
+
+    try {
+      // Close the view dialog
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
+
+      await ds.moveComponent(component.id, targetInv.id);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Componente spostato in "${targetInv.name}"'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Theme.of(context).colorScheme.primary,
+        ));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Errore durante lo spostamento: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ));
       }
     }
   }
