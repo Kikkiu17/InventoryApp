@@ -38,7 +38,7 @@ class _BufferScreenState extends State<BufferScreen> {
   }
 
   void _editComponent(BuildContext context, Component component, DataService ds) async {
-    final comp = await showDialog<Component>(
+    final result = await showDialog<dynamic>(
       context: context,
       builder: (ctx) => ComponentDialog(
         existing: component,
@@ -46,8 +46,10 @@ class _BufferScreenState extends State<BufferScreen> {
         isBuffer: true,
       ),
     );
-    if (comp != null) {
-      await ds.updateBufferComponent(comp);
+    if (result is Component) {
+      await ds.updateBufferComponent(result);
+    } else if (result == 'DELETE') {
+      await ds.deleteBufferComponent(component.id);
     }
   }
 
@@ -133,7 +135,6 @@ class _BufferScreenState extends State<BufferScreen> {
         component: component,
         settings: ds.settings,
         onEdit: () {
-          Navigator.pop(ctx);
           _editComponent(context, component, ds);
         },
       ),
@@ -210,28 +211,39 @@ class _BufferScreenState extends State<BufferScreen> {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                  child: SearchBar(
-                    controller: _searchCtrl,
-                    hintText: 'Cerca per nome, tag, descrizione o nota...',
-                    leading: const Icon(Icons.search),
-                    trailing: _query.isNotEmpty
-                        ? [
-                            IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                setState(() {
-                                  _searchCtrl.clear();
-                                  _query = '';
-                                });
-                              },
-                            )
-                          ]
-                        : null,
-                    onChanged: (val) {
-                      setState(() {
-                        _query = val.trim();
-                      });
-                    },
+                  child: SizedBox(
+                    height: 40,
+                    child: SearchBar(
+                      controller: _searchCtrl,
+                      hintText: 'Cerca per nome, tag, descrizione o nota...',
+                      leading: const Icon(Icons.search, size: 18),
+                      trailing: _query.isNotEmpty
+                          ? [
+                              IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
+                                onPressed: () {
+                                  setState(() {
+                                    _searchCtrl.clear();
+                                    _query = '';
+                                  });
+                                },
+                              )
+                            ]
+                          : null,
+                      onChanged: (val) {
+                        setState(() {
+                          _query = val.trim();
+                        });
+                      },
+                      elevation: const WidgetStatePropertyAll(0),
+                      shape: WidgetStatePropertyAll(
+                        RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                        ),
+                      ),
+                      padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 10)),
+                    ),
                   ),
                 ),
                 Expanded(
@@ -265,7 +277,7 @@ class _BufferScreenState extends State<BufferScreen> {
                           ),
                         )
                       : ListView.builder(
-                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                          padding: const EdgeInsets.fromLTRB(4, 8, 4, 88),
                           itemCount: filteredItems.length,
                           itemBuilder: (ctx, idx) {
                             final comp = filteredItems[idx];
@@ -276,7 +288,7 @@ class _BufferScreenState extends State<BufferScreen> {
                             return Card(
                               margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(12),
                                 side: BorderSide(
                                   color: hasTarget 
                                       ? cs.outlineVariant.withOpacity(0.4)
@@ -284,15 +296,44 @@ class _BufferScreenState extends State<BufferScreen> {
                                   width: 1,
                                 ),
                               ),
-                              elevation: 2,
                               child: Padding(
-                                padding: const EdgeInsets.all(16),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
+                                    // Row 1: Status Badge, Name/Description, Actions
                                     Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment: CrossAxisAlignment.center,
                                       children: [
+                                        // Status Badge
+                                        Tooltip(
+                                          message: hasTarget 
+                                              ? 'Destinazione assegnata: $targetName'
+                                              : 'Destinazione non specificata',
+                                          child: Container(
+                                            width: 52,
+                                            height: 52,
+                                            decoration: BoxDecoration(
+                                              color: hasTarget
+                                                  ? cs.primaryContainer
+                                                  : cs.errorContainer,
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Center(
+                                              child: Icon(
+                                                hasTarget
+                                                    ? Icons.inventory_2_outlined
+                                                    : Icons.location_off_outlined,
+                                                size: 20,
+                                                color: hasTarget
+                                                    ? cs.onPrimaryContainer
+                                                    : cs.onErrorContainer,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        // Name and Description
                                         Expanded(
                                           child: InkWell(
                                             onTap: () => _viewComponent(context, comp, ds),
@@ -301,14 +342,18 @@ class _BufferScreenState extends State<BufferScreen> {
                                               children: [
                                                 Text(
                                                   comp.name,
-                                                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                                                  style: theme.textTheme.titleMedium?.copyWith(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 16.0,
+                                                  ),
                                                 ),
                                                 if (comp.description.isNotEmpty) ...[
-                                                  const SizedBox(height: 4),
+                                                  const SizedBox(height: 2),
                                                   Text(
                                                     comp.description,
                                                     style: theme.textTheme.bodyMedium?.copyWith(
                                                       color: cs.onSurfaceVariant,
+                                                      fontSize: 13.0,
                                                     ),
                                                   ),
                                                 ],
@@ -316,165 +361,170 @@ class _BufferScreenState extends State<BufferScreen> {
                                             ),
                                           ),
                                         ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                          decoration: BoxDecoration(
-                                            color: cs.primaryContainer,
-                                            borderRadius: BorderRadius.circular(12),
+                                        // Edit and Delete Actions
+                                        IconButton(
+                                          icon: const Icon(Icons.edit_outlined, size: 20),
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(),
+                                          style: IconButton.styleFrom(
+                                            visualDensity: VisualDensity.compact,
                                           ),
-                                          child: Text(
-                                            'Qt: ${comp.quantity}',
-                                            style: theme.textTheme.labelLarge?.copyWith(
-                                              color: cs.onPrimaryContainer,
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                                          onPressed: () => _editComponent(context, comp, ds),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        IconButton(
+                                          icon: Icon(Icons.delete_outline, size: 20, color: cs.error),
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(),
+                                          style: IconButton.styleFrom(
+                                            visualDensity: VisualDensity.compact,
                                           ),
+                                          onPressed: () => _deleteComponent(context, comp, ds),
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 10),
-                                    
-                                    // Target Inventory Display
-                                    Row(
+                                    const SizedBox(height: 6),
+                                    // Row 2: Details (Target / Note / Tags), Actions (Qty / Place)
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Icon(
-                                          Icons.inventory_2_outlined,
-                                          size: 16,
-                                          color: hasTarget ? cs.primary : cs.error,
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Expanded(
-                                          child: Text(
-                                            hasTarget 
-                                                ? 'Destinazione: $targetName'
-                                                : 'Destinazione non specificata',
-                                            style: theme.textTheme.bodyMedium?.copyWith(
-                                              color: hasTarget ? cs.onSurface : cs.error,
-                                              fontWeight: hasTarget ? FontWeight.normal : FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-
-                                    // Note Display
-                                    if (comp.note.isNotEmpty) ...[
-                                      const SizedBox(height: 10),
-                                      Container(
-                                        width: double.infinity,
-                                        padding: const EdgeInsets.all(10),
-                                        decoration: BoxDecoration(
-                                          color: cs.secondaryContainer.withOpacity(0.3),
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(
-                                            color: cs.secondaryContainer.withOpacity(0.6),
-                                          ),
-                                        ),
-                                        child: Row(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                        // Destination display
+                                        Row(
                                           children: [
                                             Icon(
-                                              Icons.edit_note_outlined,
-                                              size: 18,
-                                              color: cs.onSecondaryContainer,
+                                              Icons.subdirectory_arrow_right,
+                                              size: 14,
+                                              color: hasTarget ? cs.primary : cs.error,
                                             ),
-                                            const SizedBox(width: 8),
+                                            const SizedBox(width: 4),
                                             Expanded(
                                               child: Text(
-                                                comp.note,
+                                                hasTarget ? targetName : 'Senza destinazione',
                                                 style: theme.textTheme.bodyMedium?.copyWith(
-                                                  color: cs.onSecondaryContainer,
-                                                  fontStyle: FontStyle.italic,
+                                                  color: hasTarget ? cs.onSurface : cs.error,
+                                                  fontWeight: hasTarget ? FontWeight.bold : FontWeight.bold,
+                                                  fontSize: 13.0,
                                                 ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
                                           ],
                                         ),
-                                      ),
-                                    ],
-
-                                    if (comp.tags.isNotEmpty) ...[
-                                      const SizedBox(height: 10),
-                                      Wrap(
-                                        spacing: 6,
-                                        runSpacing: 6,
-                                        children: comp.tags
-                                            .map((t) => Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                  decoration: BoxDecoration(
-                                                    color: cs.surfaceContainerHighest,
-                                                    borderRadius: BorderRadius.circular(8),
+                                        // Note display
+                                        if (comp.note.isNotEmpty) ...[
+                                          const SizedBox(height: 3),
+                                          Row(
+                                            children: [
+                                              Icon(Icons.edit_note_outlined, size: 13, color: cs.secondary),
+                                              const SizedBox(width: 4),
+                                              Expanded(
+                                                child: Text(
+                                                  comp.note,
+                                                  style: theme.textTheme.bodySmall?.copyWith(
+                                                    color: cs.onSurfaceVariant,
+                                                    fontStyle: FontStyle.italic,
+                                                    fontSize: 11.5,
                                                   ),
-                                                  child: Text(
-                                                    t,
-                                                    style: theme.textTheme.bodySmall,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                        // Tags Wrap
+                                        if (comp.tags.isNotEmpty) ...[
+                                          const SizedBox(height: 5),
+                                          Wrap(
+                                            spacing: 4,
+                                            runSpacing: 4,
+                                            children: comp.tags
+                                                .map((t) => Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                      decoration: BoxDecoration(
+                                                        color: cs.surfaceContainerHighest,
+                                                        borderRadius: BorderRadius.circular(4),
+                                                      ),
+                                                      child: Text(
+                                                        t,
+                                                        style: theme.textTheme.bodySmall?.copyWith(fontSize: 10.0),
+                                                      ),
+                                                    ))
+                                                .toList(),
+                                          ),
+                                        ],
+                                        const SizedBox(height: 10),
+                                        // Actions Row (Quantity & Place button)
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            // Quantity control
+                                            Container(
+                                              decoration: BoxDecoration(
+                                                border: Border.all(color: cs.outline.withOpacity(0.3)),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  InkWell(
+                                                    onTap: comp.quantity > 0 
+                                                        ? () => ds.updateBufferQuantity(comp.id, -1) 
+                                                        : null,
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    child: Padding(
+                                                      padding: const EdgeInsets.all(6),
+                                                      child: Icon(
+                                                        Icons.remove, 
+                                                        size: 18, 
+                                                        color: comp.quantity > 0 ? null : theme.disabledColor
+                                                      ),
+                                                    ),
                                                   ),
-                                                ))
-                                            .toList(),
-                                      ),
-                                    ],
-                                    const SizedBox(height: 12),
-                                    const Divider(),
-                                    const SizedBox(height: 8),
-                                    SizedBox(
-                                       width: double.infinity,
-                                       child: Wrap(
-                                         alignment: WrapAlignment.spaceBetween,
-                                         crossAxisAlignment: WrapCrossAlignment.center,
-                                         spacing: 12,
-                                         runSpacing: 8,
-                                         children: [
-                                           Row(
-                                             mainAxisSize: MainAxisSize.min,
-                                             children: [
-                                               IconButton.filledTonal(
-                                                 icon: const Icon(Icons.remove),
-                                                 onPressed: comp.quantity > 0 
-                                                     ? () => ds.updateBufferQuantity(comp.id, -1) 
-                                                     : null,
-                                               ),
-                                               const SizedBox(width: 8),
-                                               IconButton.filledTonal(
-                                                 icon: const Icon(Icons.add),
-                                                 onPressed: () => ds.updateBufferQuantity(comp.id, 1),
-                                               ),
-                                             ],
-                                           ),
-                                           Row(
-                                             mainAxisSize: MainAxisSize.min,
-                                             children: [
-                                               IconButton(
-                                                 icon: const Icon(Icons.edit_outlined),
-                                                 tooltip: 'Modifica',
-                                                 onPressed: () => _editComponent(context, comp, ds),
-                                               ),
-                                               IconButton(
-                                                 icon: Icon(Icons.delete_outline, color: cs.error),
-                                                 tooltip: 'Elimina',
-                                                 onPressed: () => _deleteComponent(context, comp, ds),
-                                               ),
-                                               const SizedBox(width: 8),
-                                               FilledButton.icon(
-                                                 onPressed: isLoadingThis 
-                                                     ? null 
-                                                     : () => _showPlaceItemDialog(context, comp, ds),
-                                                 icon: isLoadingThis
-                                                     ? const SizedBox(
-                                                         width: 16,
-                                                         height: 16,
-                                                         child: CircularProgressIndicator(
-                                                           strokeWidth: 2,
-                                                           color: Colors.white,
-                                                         ),
-                                                       )
-                                                     : const Icon(Icons.inbox),
-                                                 label: const Text('Posiziona'),
-                                               ),
-                                             ],
-                                           ),
-                                         ],
-                                       ),
-                                     ),
+                                                  SizedBox(
+                                                    width: 36,
+                                                    child: Text('${comp.quantity}',
+                                                        textAlign: TextAlign.center,
+                                                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                                  ),
+                                                  InkWell(
+                                                    onTap: () => ds.updateBufferQuantity(comp.id, 1),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    child: const Padding(
+                                                      padding: const EdgeInsets.all(6),
+                                                      child: Icon(Icons.add, size: 18),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            // Place button
+                                            FilledButton.icon(
+                                              style: FilledButton.styleFrom(
+                                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                                minimumSize: Size.zero,
+                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              ),
+                                              onPressed: isLoadingThis 
+                                                  ? null 
+                                                  : () => _showPlaceItemDialog(context, comp, ds),
+                                              icon: isLoadingThis
+                                                  ? const SizedBox(
+                                                      width: 16,
+                                                      height: 16,
+                                                      child: CircularProgressIndicator(
+                                                        strokeWidth: 2.0,
+                                                        color: Colors.white,
+                                                      ),
+                                                    )
+                                                  : const Icon(Icons.inbox, size: 16),
+                                              label: const Text('Posiziona', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
                                   ],
                                 ),
                               ),

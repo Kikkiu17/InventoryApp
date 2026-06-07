@@ -639,7 +639,7 @@ class DataService extends ChangeNotifier {
     List<String> selectedTags,
     SortMode sort,
     Map<String, SpecialFilter> specialTagFilters,
-    [String? sortSpecialTag, int? cabinetFilter, bool unassignedPosition = false] 
+    [String? sortSpecialTag, int? cabinetFilter, bool unassignedPosition = false, bool sortAscending = true] 
   ) {
     var results = _components.where((c) => c.bagName == null).toList();
     
@@ -749,6 +749,9 @@ class DataService extends ChangeNotifier {
         }
         break;
       case SortMode.none: break;
+    }
+    if (!sortAscending) {
+      results = results.reversed.toList();
     }
     return results;
   }
@@ -888,19 +891,19 @@ class DataService extends ChangeNotifier {
     final q = query.toLowerCase().trim();
     if (q.isEmpty) return [];
 
+    List<GlobalSearchResult> matches = [];
+
+    // 1. Search in Inventories (Remote or Local)
     if (_mode == StorageMode.remote && _serverConnected && _api != null) {
       try {
         final results = await _api!.searchAll(q);
-        return results.map((e) => GlobalSearchResult.fromJson(e as Map<String, dynamic>)).toList();
+        matches = results.map((e) => GlobalSearchResult.fromJson(e as Map<String, dynamic>)).toList();
       } catch (e) {
         debugPrint('Remote search failed, falling back or error: $e');
-        // fallthrough to empty list
       }
     } else {
       // Local search
       final prefs = await SharedPreferences.getInstance();
-      List<GlobalSearchResult> matches = [];
-
       for (var inv in _inventories) {
         final cj = prefs.getString('components_${inv.id}');
         if (cj == null) continue;
@@ -919,9 +922,20 @@ class DataService extends ChangeNotifier {
           }
         }
       }
-      return matches;
     }
-    return [];
+
+    // 2. Search in Buffer Components
+    for (var c in _bufferComponents) {
+      if (matchesQuery(c, query, _settings)) {
+        matches.add(GlobalSearchResult(
+          inventoryId: '_buffer_',
+          inventoryName: 'Buffer',
+          component: c,
+        ));
+      }
+    }
+
+    return matches;
   }
 
   // ── Shared Buffer Operations ───────────────────────────────────────────────

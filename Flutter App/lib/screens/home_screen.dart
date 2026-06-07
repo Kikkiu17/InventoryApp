@@ -29,6 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<String> _selectedTags = [];
   SortMode _sortMode = SortMode.name;
   String? _sortSpecialTag; 
+  bool _sortAscending = true;
   Map<String, SpecialFilter> _specialFilters = {};
   int? _cabinetFilter; 
   bool _unassignedPosition = false;
@@ -184,14 +185,41 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     }
 
-    final results = ds.search(_query, _selectedTags, _sortMode, _specialFilters, _sortSpecialTag, _cabinetFilter, _unassignedPosition);
+    final results = ds.search(_query, _selectedTags, _sortMode, _specialFilters, _sortSpecialTag, _cabinetFilter, _unassignedPosition, _sortAscending);
     final hasFilter = _query.isNotEmpty || _selectedTags.isNotEmpty || _specialFilters.isNotEmpty || _cabinetFilter != null || _unassignedPosition;
+
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
-        title: Consumer<DataService>(
-          builder: (_, ds, __) => Text(
-            ds.currentInventory?.name ?? 'Inventario Componenti',
+        titleSpacing: 0,
+        centerTitle: false,
+        title: Padding(
+          padding: const EdgeInsets.only(left: 8),
+          child: SegmentedButton<String>(
+            segments: const [
+              ButtonSegment<String>(
+                value: 'list',
+                icon: Icon(Icons.list, size: 20),
+                tooltip: 'Lista',
+              ),
+              ButtonSegment<String>(
+                value: 'map',
+                icon: Icon(Icons.grid_view, size: 20),
+                tooltip: 'Mappa',
+              ),
+            ],
+            selected: {_viewMode},
+            onSelectionChanged: (newSelection) {
+              setState(() {
+                _viewMode = newSelection.first;
+              });
+            },
+            style: const ButtonStyle(
+              visualDensity: VisualDensity.compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
           ),
         ),
         actions: [
@@ -215,7 +243,9 @@ class _HomeScreenState extends State<HomeScreen> {
             tooltip: 'Ordina',
             onSelected: (val) {
               setState(() {
-                if (val.startsWith('sp_')) {
+                if (val == 'toggle_direction') {
+                  _sortAscending = !_sortAscending;
+                } else if (val.startsWith('sp_')) {
                   _sortMode = SortMode.specialTag;
                   _sortSpecialTag = val.substring(3);
                 } else {
@@ -233,6 +263,17 @@ class _HomeScreenState extends State<HomeScreen> {
               if (ds.settings.specialTags.any((st) => !st.isString)) const PopupMenuDivider(),
               ...ds.settings.specialTags.where((st) => !st.isString).map((st) => 
                 _sortItem('sp_${st.name}', 'Per ${st.name}', Icons.tune, _sortMode == SortMode.specialTag && _sortSpecialTag == st.name)
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                value: 'toggle_direction',
+                child: Row(
+                  children: [
+                    Icon(_sortAscending ? Icons.arrow_upward : Icons.arrow_downward, size: 20),
+                    const SizedBox(width: 8),
+                    Text(_sortAscending ? 'Ordine: Crescente' : 'Ordine: Decrescente'),
+                  ],
+                ),
               ),
             ],
           ),
@@ -304,29 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
 
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
-          child: SegmentedButton<String>(
-            segments: const [
-              ButtonSegment<String>(
-                value: 'list',
-                label: Text('Lista Componenti'),
-                icon: Icon(Icons.list),
-              ),
-              ButtonSegment<String>(
-                value: 'map',
-                label: Text('Mappa Cassetti'),
-                icon: Icon(Icons.grid_view),
-              ),
-            ],
-            selected: {_viewMode},
-            onSelectionChanged: (newSelection) {
-              setState(() {
-                _viewMode = newSelection.first;
-              });
-            },
-          ),
-        ),
+
 
         if (_viewMode == 'map')
           Expanded(
@@ -364,23 +383,33 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
             child: Row(children: [
               Expanded(
-                child: SearchBar(
-                  controller: _searchCtrl,
-                  hintText: 'Cerca per nome, cassetto…',
-                  leading: const Icon(Icons.search),
-                  trailing: _query.isNotEmpty
-                      ? [
-                          IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              _searchCtrl.clear();
-                              setState(() => _query = '');
-                            },
-                          )
-                        ]
-                      : null,
-                  onChanged: (v) => setState(() => _query = v),
-                  padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 16)),
+                child: SizedBox(
+                  height: 40,
+                  child: SearchBar(
+                    controller: _searchCtrl,
+                    hintText: 'Cerca per nome, cassetto…',
+                    leading: const Icon(Icons.search, size: 18),
+                    trailing: _query.isNotEmpty
+                        ? [
+                            IconButton(
+                              icon: const Icon(Icons.clear, size: 18),
+                              onPressed: () {
+                                _searchCtrl.clear();
+                                setState(() => _query = '');
+                              },
+                            )
+                          ]
+                        : null,
+                    onChanged: (v) => setState(() => _query = v),
+                    elevation: const WidgetStatePropertyAll(0),
+                    shape: WidgetStatePropertyAll(
+                      RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                      ),
+                    ),
+                    padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 10)),
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -485,14 +514,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-            child: Row(children: [
-              Text(
-                hasFilter
-                    ? '${results.length} risultati'
-                    : '${results.length} componenti · ${_sortLabel()}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-              ),
-            ]),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (!ds.isRemote) ...[
+                  Expanded(
+                    child: Text(
+                      ds.currentInventory?.name ?? 'Inventario',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: cs.primary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                Text(
+                  hasFilter
+                      ? '${results.length} risultati'
+                      : '${results.length} componenti · ${_sortLabel()}',
+                  style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 4),
 
@@ -586,15 +632,18 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
   String _sortLabel() {
+    String label = '';
     if (_sortMode == SortMode.specialTag && _sortSpecialTag != null) {
-      return 'Per $_sortSpecialTag';
+      label = 'Per $_sortSpecialTag';
+    } else {
+      label = switch (_sortMode) { 
+        SortMode.name => 'Per nome', 
+        SortMode.quantity => 'Per quantità', 
+        SortMode.drawer => 'Per cassetto', 
+        _ => '' 
+      };
     }
-    return switch (_sortMode) { 
-      SortMode.name => 'Per nome', 
-      SortMode.quantity => 'Per quantità', 
-      SortMode.drawer => 'Per cassetto', 
-      _ => '' 
-    };
+    return _sortAscending ? '$label (Cresc.)' : '$label (Decr.)';
   }
 
   Future<void> _addComponent(BuildContext context) async {
@@ -708,31 +757,25 @@ class _ServerBanner extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  isConnected
-                      ? (inventoryName != null
-                          ? '📦 $inventoryName'
-                          : 'Server: \$url')
-                      : error != null
-                          ? 'Offline · usando dati locali'
-                          : 'Server non raggiungibile',
+                  inventoryName ?? (isConnected ? 'Server' : 'Offline'),
                   style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                       color: isConnected
                           ? Colors.green[800]
                           : cs.onErrorContainer),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (isConnected)
-                  Text(url,
-                      style: TextStyle(
-                          fontSize: 10,
-                          color: isConnected
-                              ? Colors.green[700]!.withOpacity(0.8)
-                              : cs.onErrorContainer.withOpacity(0.7)),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
+                if (!isConnected)
+                  Text(
+                    error ?? 'Offline · usando dati locali',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: cs.onErrorContainer.withOpacity(0.7)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
               ],
             ),
           ),
