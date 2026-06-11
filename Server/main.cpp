@@ -13,6 +13,7 @@
 #include <vector>
 #include <regex>
 #include <optional>
+#include <unordered_map>
 
 using json = nlohmann::json;
 namespace fs = std::filesystem;
@@ -23,6 +24,10 @@ std::string META_FILE = "inventories_meta.json";
 std::mutex  g_mutex;
 
 const size_t MAX_BACKUPS = 20;
+
+// ─── Cache ────────────────────────────────────────────────────────────────────
+std::optional<json> g_cached_meta;
+std::unordered_map<std::string, json> g_cached_inventories;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 std::string inv_path(const std::string& id) { return DATA_DIR + "/" + id + ".json"; }
@@ -120,24 +125,22 @@ std::optional<double> parse_special_value(const std::string& text) {
     return std::nullopt;
 }
 
-bool matches_query(const json& comp, const std::string& query, const json& settings) {
-    std::string trimmed_query = trim(query);
-    if (trimmed_query.empty()) return true;
+struct ParsedQueryTerm {
+    std::string term;
+    std::optional<double> parsed_value;
+    // Map of unit to (parsed_term_unit_stripped, term_matches_unit)
+    std::unordered_map<std::string, std::pair<std::optional<double>, bool>> unit_matches;
+};
+
+bool matches_query(const json& comp, 
+                   const std::vector<ParsedQueryTerm>& query_terms, 
+                   const std::unordered_map<std::string, std::pair<bool, std::string>>& special_tags_map) {
+    if (query_terms.empty()) return true;
 
     auto to_lower = [](std::string s) {
         std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return std::tolower(c); });
         return s;
     };
-    std::string query_lower = to_lower(trimmed_query);
-
-    std::vector<std::string> raw_terms;
-    std::stringstream ss(query_lower);
-    std::string temp;
-    while (ss >> temp) {
-        raw_terms.push_back(temp);
-    }
-
-    if (raw_terms.empty()) return true;
 
     std::string cname = to_lower(comp.value("name", ""));
     std::string cdesc = to_lower(comp.value("description", ""));
@@ -160,14 +163,14 @@ bool matches_query(const json& comp, const std::string& query, const json& setti
         }
     }
 
-    auto term_matches = [&](const std::string& term) {
-        if (cname.find(term) != std::string::npos) return true;
-        if (cdrawer.find(term) != std::string::npos) return true;
-        if (ccabinet.find(term) != std::string::npos) return true;
-        if (cdesc.find(term) != std::string::npos) return true;
+    auto term_matches = [&](const ParsedQueryTerm& pt) {
+        if (cname.find(pt.term) != std::string::npos) return true;
+        if (cdrawer.find(pt.term) != std::string::npos) return true;
+        if (ccabinet.find(pt.term) != std::string::npos) return true;
+        if (cdesc.find(pt.term) != std::string::npos) return true;
         
         for (const auto& t : ctags) {
-            if (t.find(term) != std::string::npos) return true;
+            if (t.find(pt.term) != std::string::npos) return true;
         }
 
         if (comp.contains("specialTagValues") && comp["specialTagValues"].is_object()) {
@@ -176,14 +179,11 @@ bool matches_query(const json& comp, const std::string& query, const json& setti
                 std::string key = it.key();
                 bool is_str = false;
                 std::string unit = "";
-                if (settings.contains("specialTags") && settings["specialTags"].is_array()) {
-                    for (const auto& st : settings["specialTags"]) {
-                        if (st.contains("name") && st["name"].is_string() && st["name"].get<std::string>() == key) {
-                            is_str = st.value("isString", false);
-                            unit = to_lower(st.value("unit", ""));
-                            break;
-                        }
-                    }
+                
+                auto it_tag = special_tags_map.find(key);
+                if (it_tag != special_tags_map.end()) {
+                    is_str = it_tag->second.first;
+                    unit = it_tag->second.second;
                 }
 
                 std::string val_str = "";
@@ -201,29 +201,33 @@ bool matches_query(const json& comp, const std::string& query, const json& setti
                 }
 
                 if (is_str) {
-                    if (val_str.find(term) != std::string::npos) return true;
+                    if (val_str.find(pt.term) != std::string::npos) return true;
                 } else {
-                    auto parsed_val = parse_special_value(val_str);
-                    auto parsed_term = parse_special_value(term);
+                    bool sub_match = (val_str.find(pt.term) != std::string::npos);
+                    if (sub_match) return true;
 
-                    std::optional<double> parsed_term_unit_stripped;
+                    std::optional<double> parsed_term_unit_stripped = std::nullopt;
                     bool term_matches_unit = false;
                     if (!unit.empty()) {
-                        if (term.size() >= unit.size() && term.compare(term.size() - unit.size(), unit.size(), unit) == 0) {
-                            std::string stripped = term.substr(0, term.size() - unit.size());
-                            parsed_term_unit_stripped = parse_special_value(stripped);
-                        }
-                        if (unit.find(term) != std::string::npos) {
-                            term_matches_unit = true;
+                        auto it_unit = pt.unit_matches.find(unit);
+                        if (it_unit != pt.unit_matches.end()) {
+                            parsed_term_unit_stripped = it_unit->second.first;
+                            term_matches_unit = it_unit->second.second;
                         }
                     }
 
-                    bool sub_match = (val_str.find(term) != std::string::npos);
-                    bool val_term_eq = (parsed_term.has_value() && parsed_val.has_value() && parsed_val.value() == parsed_term.value());
-                    bool val_stripped_eq = (parsed_term_unit_stripped.has_value() && parsed_val.has_value() && parsed_val.value() == parsed_term_unit_stripped.value());
+                    if (term_matches_unit) return true;
 
-                    if (sub_match || val_term_eq || val_stripped_eq || term_matches_unit) {
-                        return true;
+                    if (pt.parsed_value.has_value() || parsed_term_unit_stripped.has_value()) {
+                        auto parsed_val = parse_special_value(val_str);
+                        if (parsed_val.has_value()) {
+                            if (pt.parsed_value.has_value() && parsed_val.value() == pt.parsed_value.value()) {
+                                return true;
+                            }
+                            if (parsed_term_unit_stripped.has_value() && parsed_val.value() == parsed_term_unit_stripped.value()) {
+                                return true;
+                            }
+                        }
                     }
                 }
             }
@@ -231,8 +235,8 @@ bool matches_query(const json& comp, const std::string& query, const json& setti
         return false;
     };
 
-    for (const auto& term : raw_terms) {
-        if (!term_matches(term)) return false;
+    for (const auto& pt : query_terms) {
+        if (!term_matches(pt)) return false;
     }
     return true;
 }
@@ -255,13 +259,26 @@ crow::response json_err(const std::string& msg, int code = 400) { return json_ok
 // ─── Meta ─────────────────────────────────────────────────────────────────────
 json load_meta() {
     std::lock_guard<std::mutex> lk(g_mutex);
-    if (!fs::exists(META_FILE)) return json::array();
+    if (g_cached_meta.has_value()) {
+        return g_cached_meta.value();
+    }
+    if (!fs::exists(META_FILE)) {
+        g_cached_meta = json::array();
+        return g_cached_meta.value();
+    }
     std::ifstream f(META_FILE);
-    try { return json::parse(f); } catch (...) { return json::array(); }
+    try {
+        g_cached_meta = json::parse(f);
+        return g_cached_meta.value();
+    } catch (...) {
+        g_cached_meta = json::array();
+        return g_cached_meta.value();
+    }
 }
 
 void save_meta(const json& m) {
     std::lock_guard<std::mutex> lk(g_mutex);
+    g_cached_meta = m;
     std::ofstream f(META_FILE);
     f << m.dump(2);
 }
@@ -269,13 +286,29 @@ void save_meta(const json& m) {
 // ─── Inventario & Backup ──────────────────────────────────────────────────────
 json load_inv(const std::string& id) {
     std::lock_guard<std::mutex> lk(g_mutex);
+    auto it = g_cached_inventories.find(id);
+    if (it != g_cached_inventories.end()) {
+        return it->second;
+    }
     const auto p = inv_path(id);
-    if (!fs::exists(p)) return {
-        {"components", json::array()},
-        {"settings", {{"drawerRows",4}, {"drawerColumns",6}, {"availableTags",json::array()}, {"tagTree",json::object()}, {"specialTags",json::array()}}}
-    };
+    if (!fs::exists(p)) {
+        json empty = {
+            {"components", json::array()},
+            {"settings", {{"drawerRows",4}, {"drawerColumns",6}, {"availableTags",json::array()}, {"tagTree",json::object()}, {"specialTags",json::array()}}}
+        };
+        g_cached_inventories[id] = empty;
+        return empty;
+    }
     std::ifstream f(p);
-    try { return json::parse(f); } catch (...) { return {{"components",json::array()},{"settings",json::object()}}; }
+    try {
+        json parsed = json::parse(f);
+        g_cached_inventories[id] = parsed;
+        return parsed;
+    } catch (...) {
+        json fallback = {{"components",json::array()},{"settings",json::object()}};
+        g_cached_inventories[id] = fallback;
+        return fallback;
+    }
 }
 
 void backup_inv(const std::string& id, const json& db) {
@@ -312,6 +345,7 @@ std::string save_inv(const std::string& id, json& db) {
     std::lock_guard<std::mutex> lk(g_mutex);
     std::string ts = now_iso();
     db["lastUpdated"] = ts;
+    g_cached_inventories[id] = db;
     fs::create_directories(DATA_DIR);
     std::ofstream f(inv_path(id));
     f << db.dump(2);
@@ -461,6 +495,12 @@ int main(int argc, char* argv[]) {
         save_meta(meta);
         const auto p = inv_path(id);
         if (fs::exists(p)) fs::remove(p);
+        
+        {
+            std::lock_guard<std::mutex> lk(g_mutex);
+            g_cached_inventories.erase(id);
+        }
+        
         return json_ok({{"deleted", id}});
     });
 
@@ -470,7 +510,32 @@ int main(int argc, char* argv[]) {
         std::string q = req.url_params.get("q") ? req.url_params.get("q") : "";
         
         json results = json::array();
-        if (trim(q).empty()) return json_ok(results);
+        std::string trimmed_query = trim(q);
+        if (trimmed_query.empty()) return json_ok(results);
+
+        auto to_lower = [](std::string s) {
+            std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return std::tolower(c); });
+            return s;
+        };
+
+        std::string query_lower = to_lower(trimmed_query);
+        std::vector<std::string> raw_terms;
+        std::stringstream ss(query_lower);
+        std::string temp;
+        while (ss >> temp) {
+            raw_terms.push_back(temp);
+        }
+
+        if (raw_terms.empty()) return json_ok(results);
+
+        // Pre-parse the query terms
+        std::vector<ParsedQueryTerm> query_terms;
+        for (const auto& term : raw_terms) {
+            ParsedQueryTerm pt;
+            pt.term = term;
+            pt.parsed_value = parse_special_value(term);
+            query_terms.push_back(pt);
+        }
 
         auto meta = load_meta();
         for (const auto& inv : meta) {
@@ -483,8 +548,42 @@ int main(int argc, char* argv[]) {
             
             json settings = db.value("settings", json::object());
 
+            // Pre-process settings["specialTags"]
+            std::unordered_map<std::string, std::pair<bool, std::string>> special_tags_map;
+            if (settings.contains("specialTags") && settings["specialTags"].is_array()) {
+                for (const auto& st : settings["specialTags"]) {
+                    if (st.contains("name") && st["name"].is_string()) {
+                        std::string name = st["name"].get<std::string>();
+                        bool is_str = st.value("isString", false);
+                        std::string unit = to_lower(st.value("unit", ""));
+                        special_tags_map[name] = {is_str, unit};
+                    }
+                }
+            }
+
+            // Populate unit matches for each query term based on active units
+            auto current_query_terms = query_terms;
+            for (auto& pt : current_query_terms) {
+                for (const auto& pair : special_tags_map) {
+                    std::string unit = pair.second.second;
+                    if (unit.empty()) continue;
+                    if (pt.unit_matches.count(unit)) continue;
+                    
+                    std::optional<double> parsed_term_unit_stripped;
+                    bool term_matches_unit = false;
+                    if (pt.term.size() >= unit.size() && pt.term.compare(pt.term.size() - unit.size(), unit.size(), unit) == 0) {
+                        std::string stripped = pt.term.substr(0, pt.term.size() - unit.size());
+                        parsed_term_unit_stripped = parse_special_value(stripped);
+                    }
+                    if (unit.find(pt.term) != std::string::npos) {
+                        term_matches_unit = true;
+                    }
+                    pt.unit_matches[unit] = {parsed_term_unit_stripped, term_matches_unit};
+                }
+            }
+
             for (const auto& comp : db["components"]) {
-                if (matches_query(comp, q, settings)) {
+                if (matches_query(comp, current_query_terms, special_tags_map)) {
                     json res_item;
                     res_item["inventoryId"] = inv_id;
                     res_item["inventoryName"] = inv_name;
