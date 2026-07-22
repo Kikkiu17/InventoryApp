@@ -1,0 +1,9 @@
+#!/usr/bin/env xdg-open
+[Desktop Entry]
+Name=Inventario
+Exec=inventory_app
+Icon=inventario
+Type=Application
+Categories=Utility;
+Comment=App per la gestione dell'inventario dei componenti nei cassetti
+X-AppImage-Version=1.10.0
