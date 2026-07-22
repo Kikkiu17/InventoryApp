@@ -6,4 +6,4 @@ Icon=inventario
 Type=Application
 Categories=Utility;
 Comment=App per la gestione dell'inventario dei componenti nei cassetti
-X-AppImage-Version=1.10.0
+X-AppImage-Version=1.11.0

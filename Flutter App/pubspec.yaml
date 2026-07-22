@@ -2,7 +2,7 @@ name: inventario
 description: App per la gestione dell'inventario dei componenti nei cassetti
 
 publish_to: 'none'
-version: 1.10.0
+version: 1.11.0
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
