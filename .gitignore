@@ -1,0 +1,10 @@
+# AppImage builds
+*.AppImage
+*.appimage
+/AppImage/AppDir/
+
+# APK builds
+*.apk
+
+# Executable (Windows) builds
+*.exe
