@@ -16,6 +16,7 @@ OutputDir=..\..\build_output
 OutputBaseFilename=Inventario-Windows-x64-Setup
 Compression=lzma2/ultra64
 SolidCompression=yes
+SetupIconFile=runner\resources\app_icon.ico
 WizardStyle=modern
 
 [Languages]

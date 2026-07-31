@@ -36,6 +36,9 @@ flutter:
       - assets/fonts/Roboto-Regular.ttf
 
 flutter_launcher_icons:
+  image_path: "assets/icon.png"
   android: true
   linux: true
-  image_path: "assets/icon.png"
+  windows:
+    generate: true
+    image_path: "assets/icon.png"

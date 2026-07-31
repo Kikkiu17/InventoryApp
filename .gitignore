@@ -8,3 +8,10 @@
 
 # Executable (Windows) builds
 *.exe
+
+# Server builds
+/Server/build/
+
+# Editor backups
+*~
+*.swp

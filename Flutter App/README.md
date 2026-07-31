@@ -1,4 +1,4 @@
-# 📦 Inventario Componenti
+# Inventario Componenti
 
 App Flutter per la gestione dell'inventario di viti, rondelle e altri componenti nei cassetti.
 
