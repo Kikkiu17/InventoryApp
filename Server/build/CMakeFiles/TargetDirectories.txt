@@ -1,3 +1,0 @@
-/home/kikkiu/Documents/GitHub/InventoryApp/Server/build/CMakeFiles/inventory_server.dir
-/home/kikkiu/Documents/GitHub/InventoryApp/Server/build/CMakeFiles/edit_cache.dir
-/home/kikkiu/Documents/GitHub/InventoryApp/Server/build/CMakeFiles/rebuild_cache.dir
