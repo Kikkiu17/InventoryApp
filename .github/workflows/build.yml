@@ -1,0 +1,105 @@
+name: Multi-Platform Build (Android, Linux, Windows)
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+        working-directory: './Flutter App'
+
+      - name: Build APK
+        run: flutter build apk --release
+        working-directory: './Flutter App'
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Inventario-Android-APK
+          path: Flutter App/build/app/outputs/flutter-apk/app-release.apk
+
+  build-linux:
+    name: Build Linux AppImage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libcurl4-openssl-dev
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Build AppImage
+        run: bash AppImage/build_appimage.sh
+
+      - name: Upload Linux AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: Inventario-Linux-AppImage
+          path: AppImage/*.AppImage
+
+  build-windows:
+    name: Build Windows Executable
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+        working-directory: './Flutter App'
+
+      - name: Build Windows Executable
+        run: flutter build windows --release
+        working-directory: './Flutter App'
+
+      - name: Compress Windows Build
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "build_output"
+          Compress-Archive -Path "Flutter App/build/windows/x64/runner/Release/*" -DestinationPath "build_output/Inventario-Windows-x64.zip"
+
+      - name: Upload Windows ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: Inventario-Windows-ZIP
+          path: build_output/Inventario-Windows-x64.zip
