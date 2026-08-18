@@ -1,9 +1,6 @@
 name: Multi-Platform Build (Android, Linux, Windows)
 
 on:
-  push:
-    tags:
-      - 'v*'
   release:
     types: [published]
   workflow_dispatch:
@@ -111,9 +108,9 @@ jobs:
           path: build_output/Inventario-Windows-x64-Setup.exe
 
   create-release:
-    name: Create GitHub Release
+    name: Upload Release Assets
     needs: [build-apk, build-linux, build-windows]
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write

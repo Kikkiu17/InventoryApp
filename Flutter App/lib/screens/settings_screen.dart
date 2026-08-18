@@ -21,20 +21,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   int _selectedCabinetPreview = 1;
   late Map<String, int> _drawerDividers;
   final Set<String> _selectedPreviewDrawers = {};
-  
-  final _newTagCtrl         = TextEditingController();
+
+  final _newTagCtrl = TextEditingController();
   final _newSpecialNameCtrl = TextEditingController();
   final _newSpecialUnitCtrl = TextEditingController();
-  final _serverUrlCtrl      = TextEditingController();
-  
+  final _serverUrlCtrl = TextEditingController();
+
   final _manualDrawerCtrl = TextEditingController();
-  
+
   bool _testingServer = false;
   bool? _serverOk;
   bool _newSpecialIsString = false;
-  
+
   final Set<String> _expandedPaths = {};
-  AppSettings? _lastSettingsRef; 
+  AppSettings? _lastSettingsRef;
 
   @override
   void initState() {
@@ -73,14 +73,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       specialTags: _specialTags,
       drawerDividers: _drawerDividers,
     ));
-    _lastSettingsRef = ds.settings; 
-    
+    _lastSettingsRef = ds.settings;
+
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Impostazioni salvate')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Impostazioni salvate')));
     }
   }
-
 
   int _excelColumnToIndex(String colStr) {
     int index = 0;
@@ -94,20 +93,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final clean = input.trim().toUpperCase();
     final match = RegExp(r'^([A-Z]+)(\d+)$').firstMatch(clean);
     if (match == null) return false;
-    
+
     final colStr = match.group(1)!;
     final rowVal = int.tryParse(match.group(2)!) ?? 0;
-    
+
     if (rowVal < 1 || rowVal > maxRows) return false;
-    
+
     final colIdx = _excelColumnToIndex(colStr);
     if (colIdx < 0 || colIdx >= maxCols) return false;
-    
+
     return true;
   }
 
   Future<void> _showAddContainerDialog() async {
-    final nameCtrl = TextEditingController(text: 'Contenitore ${_containers.isEmpty ? 1 : _containers.map((c) => c.id).reduce((a, b) => a > b ? a : b) + 1}');
+    final nameCtrl = TextEditingController(
+        text:
+            'Contenitore ${_containers.isEmpty ? 1 : _containers.map((c) => c.id).reduce((a, b) => a > b ? a : b) + 1}');
     final rowsCtrl = TextEditingController(text: '5');
     final colsCtrl = TextEditingController(text: '13');
     final formKey = GlobalKey<FormState>();
@@ -127,8 +128,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   TextFormField(
                     controller: nameCtrl,
-                    decoration: const InputDecoration(labelText: 'Nome contenitore'),
-                    validator: (v) => v == null || v.trim().isEmpty ? 'Obbligatorio' : null,
+                    decoration:
+                        const InputDecoration(labelText: 'Nome contenitore'),
+                    validator: (v) =>
+                        v == null || v.trim().isEmpty ? 'Obbligatorio' : null,
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -140,7 +143,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           keyboardType: TextInputType.number,
                           validator: (v) {
                             final val = int.tryParse(v ?? '');
-                            if (val == null || val <= 0) return 'Valore non valido';
+                            if (val == null || val <= 0)
+                              return 'Valore non valido';
                             return null;
                           },
                         ),
@@ -149,11 +153,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: colsCtrl,
-                          decoration: const InputDecoration(labelText: 'Colonne'),
+                          decoration:
+                              const InputDecoration(labelText: 'Colonne'),
                           keyboardType: TextInputType.number,
                           validator: (v) {
                             final val = int.tryParse(v ?? '');
-                            if (val == null || val <= 0) return 'Valore non valido';
+                            if (val == null || val <= 0)
+                              return 'Valore non valido';
                             return null;
                           },
                         ),
@@ -163,16 +169,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 12),
                   CheckboxListTile(
                     title: const Text('Inverti righe'),
-                    subtitle: const Text('Ordine numerico dal basso verso l\'alto (es. N...1)'),
+                    subtitle: const Text(
+                        'Ordine numerico dal basso verso l\'alto (es. N...1)'),
                     value: invertRows,
-                    onChanged: (val) => dialogState(() => invertRows = val ?? false),
+                    onChanged: (val) =>
+                        dialogState(() => invertRows = val ?? false),
                     contentPadding: EdgeInsets.zero,
                   ),
                   CheckboxListTile(
                     title: const Text('Inverti colonne'),
-                    subtitle: const Text('Ordine alfabetico da destra a sinistra (es. Z...A)'),
+                    subtitle: const Text(
+                        'Ordine alfabetico da destra a sinistra (es. Z...A)'),
                     value: invertColumns,
-                    onChanged: (val) => dialogState(() => invertColumns = val ?? false),
+                    onChanged: (val) =>
+                        dialogState(() => invertColumns = val ?? false),
                     contentPadding: EdgeInsets.zero,
                   ),
                 ],
@@ -180,7 +190,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annulla')),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Annulla')),
             FilledButton(
               onPressed: () {
                 if (formKey.currentState!.validate()) Navigator.pop(ctx, true);
@@ -194,7 +206,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (result == true) {
       setState(() {
-        final nextId = _containers.isEmpty ? 1 : _containers.map((c) => c.id).reduce((a, b) => a > b ? a : b) + 1;
+        final nextId = _containers.isEmpty
+            ? 1
+            : _containers.map((c) => c.id).reduce((a, b) => a > b ? a : b) + 1;
         _containers.add(ContainerConfig(
           id: nextId,
           name: nameCtrl.text.trim(),
@@ -230,8 +244,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   TextFormField(
                     controller: nameCtrl,
-                    decoration: const InputDecoration(labelText: 'Nome contenitore'),
-                    validator: (v) => v == null || v.trim().isEmpty ? 'Obbligatorio' : null,
+                    decoration:
+                        const InputDecoration(labelText: 'Nome contenitore'),
+                    validator: (v) =>
+                        v == null || v.trim().isEmpty ? 'Obbligatorio' : null,
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -243,7 +259,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           keyboardType: TextInputType.number,
                           validator: (v) {
                             final val = int.tryParse(v ?? '');
-                            if (val == null || val <= 0) return 'Valore non valido';
+                            if (val == null || val <= 0)
+                              return 'Valore non valido';
                             return null;
                           },
                         ),
@@ -252,11 +269,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: colsCtrl,
-                          decoration: const InputDecoration(labelText: 'Colonne'),
+                          decoration:
+                              const InputDecoration(labelText: 'Colonne'),
                           keyboardType: TextInputType.number,
                           validator: (v) {
                             final val = int.tryParse(v ?? '');
-                            if (val == null || val <= 0) return 'Valore non valido';
+                            if (val == null || val <= 0)
+                              return 'Valore non valido';
                             return null;
                           },
                         ),
@@ -266,16 +285,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 12),
                   CheckboxListTile(
                     title: const Text('Inverti righe'),
-                    subtitle: const Text('Ordine numerico dal basso verso l\'alto (es. N...1)'),
+                    subtitle: const Text(
+                        'Ordine numerico dal basso verso l\'alto (es. N...1)'),
                     value: invertRows,
-                    onChanged: (val) => dialogState(() => invertRows = val ?? false),
+                    onChanged: (val) =>
+                        dialogState(() => invertRows = val ?? false),
                     contentPadding: EdgeInsets.zero,
                   ),
                   CheckboxListTile(
                     title: const Text('Inverti colonne'),
-                    subtitle: const Text('Ordine alfabetico da destra a sinistra (es. Z...A)'),
+                    subtitle: const Text(
+                        'Ordine alfabetico da destra a sinistra (es. Z...A)'),
                     value: invertColumns,
-                    onChanged: (val) => dialogState(() => invertColumns = val ?? false),
+                    onChanged: (val) =>
+                        dialogState(() => invertColumns = val ?? false),
                     contentPadding: EdgeInsets.zero,
                   ),
                 ],
@@ -283,7 +306,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annulla')),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Annulla')),
             FilledButton(
               onPressed: () {
                 if (formKey.currentState!.validate()) Navigator.pop(ctx, true);
@@ -302,7 +327,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         container.columns = int.parse(colsCtrl.text);
         container.invertRows = invertRows;
         container.invertColumns = invertColumns;
-        
+
         final updatedDisabled = <String>[];
         for (final d in container.disabledDrawers) {
           final match = RegExp(r'^([A-Z]+)(\d+)$').firstMatch(d);
@@ -314,7 +339,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               colIdx = colIdx * 26 + (colStr.codeUnitAt(i) - 65 + 1);
             }
             colIdx -= 1;
-            if (rowVal >= 1 && rowVal <= container.rows && colIdx >= 0 && colIdx < container.columns) {
+            if (rowVal >= 1 &&
+                rowVal <= container.rows &&
+                colIdx >= 0 &&
+                colIdx < container.columns) {
               updatedDisabled.add(d);
             }
           }
@@ -329,11 +357,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Elimina Contenitore'),
-        content: Text('Sei sicuro di voler eliminare "${container.name.isNotEmpty ? container.name : 'Contenitore ${container.id}'}"?\nI componenti associati a questo contenitore non avranno più una posizione valida.'),
+        content: Text(
+            'Sei sicuro di voler eliminare "${container.name.isNotEmpty ? container.name : 'Contenitore ${container.id}'}"?\nI componenti associati a questo contenitore non avranno più una posizione valida.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annulla')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annulla')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error, foregroundColor: Theme.of(ctx).colorScheme.onError),
+            style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.error,
+                foregroundColor: Theme.of(ctx).colorScheme.onError),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Elimina'),
           ),
@@ -345,7 +378,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {
         _containers.removeWhere((c) => c.id == container.id);
         if (_selectedCabinetPreview == container.id) {
-          _selectedCabinetPreview = _containers.isNotEmpty ? _containers.first.id : 1;
+          _selectedCabinetPreview =
+              _containers.isNotEmpty ? _containers.first.id : 1;
         }
       });
     }
@@ -353,20 +387,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _showBulkActionDialog() async {
     if (_selectedPreviewDrawers.isEmpty) return;
-    
+
     final count = _selectedPreviewDrawers.length;
-    final containerIndex = _containers.indexWhere((c) => c.id == _selectedCabinetPreview);
+    final containerIndex =
+        _containers.indexWhere((c) => c.id == _selectedCabinetPreview);
     if (containerIndex == -1) return;
     final container = _containers[containerIndex];
-    
+
     final action = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Azione di gruppo ($count cassetti)'),
-        content: const Text(
-          'Cosa vuoi fare con i cassetti selezionati?\n'
-          'Puoi disattivarli, riattivarli, impostare le zone o unire/dividere i cassetti selezionati.'
-        ),
+        content: const Text('Cosa vuoi fare con i cassetti selezionati?\n'
+            'Puoi disattivarli, riattivarli, impostare le zone o unire/dividere i cassetti selezionati.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, 'cancel'),
@@ -396,14 +429,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
-    
+
     if (action == null || action == 'cancel') {
       setState(() {
         _selectedPreviewDrawers.clear();
       });
       return;
     }
-    
+
     if (action == 'enable') {
       setState(() {
         for (final label in _selectedPreviewDrawers) {
@@ -451,7 +484,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Seleziona il numero di scomparti (zone) per i cassetti selezionati:'),
+                const Text(
+                    'Seleziona il numero di scomparti (zone) per i cassetti selezionati:'),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<int>(
                   value: selectedZones,
@@ -486,7 +520,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
       );
-      
+
       if (zonesResult != null) {
         setState(() {
           for (final label in _selectedPreviewDrawers) {
@@ -508,29 +542,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _configureDrawer(String label) async {
-    final containerIndex = _containers.indexWhere((c) => c.id == _selectedCabinetPreview);
+    final containerIndex =
+        _containers.indexWhere((c) => c.id == _selectedCabinetPreview);
     if (containerIndex == -1) return;
-    
+
     final container = _containers[containerIndex];
     final key = '${container.id}_$label';
     final currentZones = _drawerDividers[key] ?? 1;
     bool isCurrentlyDisabled = container.disabledDrawers.contains(label);
-    
+
     bool dialogIsActive = !isCurrentlyDisabled;
     int dialogZones = currentZones >= 2 ? currentZones : 2;
     bool isDivided = currentZones >= 2;
-    
+
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, dialogState) => AlertDialog(
-          title: Text('Cassetto $label (${container.name.isNotEmpty ? container.name : 'Contenitore ${container.id}'})'),
+          title: Text(
+              'Cassetto $label (${container.name.isNotEmpty ? container.name : 'Contenitore ${container.id}'})'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               SwitchListTile(
                 title: const Text('Abilitato'),
-                subtitle: const Text('Se disattivato, questo cassetto non esisterà nella cassettiera'),
+                subtitle: const Text(
+                    'Se disattivato, questo cassetto non esisterà nella cassettiera'),
                 value: dialogIsActive,
                 onChanged: (val) => dialogState(() {
                   dialogIsActive = val;
@@ -541,7 +578,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const Divider(),
                 SwitchListTile(
                   title: const Text('Dividi in zone'),
-                  subtitle: const Text('Suddivide in profondità (vicina, in mezzo, lontana)'),
+                  subtitle: const Text(
+                      'Suddivide in profondità (vicina, in mezzo, lontana)'),
                   value: isDivided,
                   onChanged: (val) => dialogState(() => isDivided = val),
                   contentPadding: EdgeInsets.zero,
@@ -553,15 +591,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.remove_circle_outline),
-                        onPressed: dialogZones > 2 ? () => dialogState(() => dialogZones--) : null,
+                        onPressed: dialogZones > 2
+                            ? () => dialogState(() => dialogZones--)
+                            : null,
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text('$dialogZones zone', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        child: Text('$dialogZones zone',
+                            style: const TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold)),
                       ),
                       IconButton(
                         icon: const Icon(Icons.add_circle_outline),
-                        onPressed: dialogZones < 10 ? () => dialogState(() => dialogZones++) : null,
+                        onPressed: dialogZones < 10
+                            ? () => dialogState(() => dialogZones++)
+                            : null,
                       ),
                     ],
                   ),
@@ -586,7 +630,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
-    
+
     if (result != null) {
       setState(() {
         if (result['isActive'] == false) {
@@ -609,48 +653,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _configureManualDrawer() {
     final input = _manualDrawerCtrl.text.trim().toUpperCase();
     if (input.isEmpty) return;
-    
-    final container = _containers.firstWhere((c) => c.id == _selectedCabinetPreview, orElse: () => _containers.first);
+
+    final container = _containers.firstWhere(
+        (c) => c.id == _selectedCabinetPreview,
+        orElse: () => _containers.first);
     if (!_validateDrawerCoordinate(input, container.rows, container.columns)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Coordinate cassetto non valide per le dimensioni attuali della cassettiera'),
+          content: Text(
+              'Coordinate cassetto non valide per le dimensioni attuali della cassettiera'),
           backgroundColor: Colors.red,
         ),
       );
       return;
     }
-    
+
     FocusScope.of(context).unfocus();
     _configureDrawer(input);
   }
 
   @override
   Widget build(BuildContext context) {
-    final ds    = context.watch<DataService>();
+    final ds = context.watch<DataService>();
     final theme = Theme.of(context);
-    final cs    = theme.colorScheme;
-    
+    final cs = theme.colorScheme;
+
     if (_lastSettingsRef != ds.settings) {
       _lastSettingsRef = ds.settings;
       final s = ds.settings;
-      
-      _containers = s.containers.map((c) => ContainerConfig(
-        id: c.id,
-        name: c.name,
-        rows: c.rows,
-        columns: c.columns,
-        disabledDrawers: List<String>.from(c.disabledDrawers),
-        invertRows: c.invertRows,
-        invertColumns: c.invertColumns,
-        mergedDrawers: c.mergedDrawers.map((list) => List<String>.from(list)).toList(),
-      )).toList();
-      
-      _tags        = List.from(s.availableTags);
-      _tagTree     = _deepCopyTree(s.tagTree);
-      _specialTags = s.specialTags.map((t) => SpecialTag(name: t.name, unit: t.unit, isString: t.isString)).toList();
+
+      _containers = s.containers
+          .map((c) => ContainerConfig(
+                id: c.id,
+                name: c.name,
+                rows: c.rows,
+                columns: c.columns,
+                disabledDrawers: List<String>.from(c.disabledDrawers),
+                invertRows: c.invertRows,
+                invertColumns: c.invertColumns,
+                mergedDrawers: c.mergedDrawers
+                    .map((list) => List<String>.from(list))
+                    .toList(),
+              ))
+          .toList();
+
+      _tags = List.from(s.availableTags);
+      _tagTree = _deepCopyTree(s.tagTree);
+      _specialTags = s.specialTags
+          .map((t) =>
+              SpecialTag(name: t.name, unit: t.unit, isString: t.isString))
+          .toList();
       _drawerDividers = Map.from(s.drawerDividers);
-      
+
       _serverUrlCtrl.text = ds.serverUrl;
       _expandedPaths.clear();
     }
@@ -665,67 +719,95 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-
           _SectionHeader(title: 'Server remoto', icon: Icons.cloud_outlined),
-          Card(child: Padding(
+          Card(
+              child: Padding(
             padding: const EdgeInsets.all(16),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Usa server remoto', style: TextStyle(fontWeight: FontWeight.w500)),
+                  const Text('Usa server remoto',
+                      style: TextStyle(fontWeight: FontWeight.w500)),
                   Text(
-                    ds.isRemote ? ds.serverConnected ? '✅ Connesso' : '❌ Non connesso' : 'Archiviazione locale',
-                    style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ds.isRemote
+                        ? ds.serverConnected
+                            ? '✅ Connesso'
+                            : '❌ Non connesso'
+                        : 'Archiviazione locale',
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: cs.onSurfaceVariant),
                   ),
                 ]),
                 Switch(
                   value: ds.isRemote,
                   onChanged: (v) async {
-                    await ds.setStorageMode(v ? StorageMode.remote : StorageMode.local);
+                    await ds.setStorageMode(
+                        v ? StorageMode.remote : StorageMode.local);
                     if (mounted && v && !ds.serverConnected) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ds.lastError ?? 'Errore connessione'), backgroundColor: cs.error));
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text(ds.lastError ?? 'Errore connessione'),
+                          backgroundColor: cs.error));
                     }
                   },
                 ),
               ]),
               const Divider(height: 24),
-              if (ds.isRemote && ds.serverConnected && ds.currentInventory != null)
+              if (ds.isRemote &&
+                  ds.serverConnected &&
+                  ds.currentInventory != null)
                 InkWell(
-                  onTap: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const InventoryListScreen())),
+                  onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const InventoryListScreen())),
                   borderRadius: BorderRadius.circular(8),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     child: Row(children: [
-                      Icon(Icons.inventory_2_outlined, size: 18, color: cs.primary),
+                      Icon(Icons.inventory_2_outlined,
+                          size: 18, color: cs.primary),
                       const SizedBox(width: 10),
-                      Expanded(child: Column(
+                      Expanded(
+                          child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('Inventario attivo',
                               style: theme.textTheme.labelSmall
                                   ?.copyWith(color: cs.onSurfaceVariant)),
                           Text(ds.currentInventory!.name,
-                              style: theme.textTheme.bodyMedium
-                                  ?.copyWith(fontWeight: FontWeight.w600,
-                                             color: cs.primary)),
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: cs.primary)),
                         ],
                       )),
                       Icon(Icons.chevron_right, color: cs.primary, size: 18),
                     ]),
                   ),
                 ),
-              if (ds.isRemote && ds.serverConnected && ds.currentInventory != null)
+              if (ds.isRemote &&
+                  ds.serverConnected &&
+                  ds.currentInventory != null)
                 const Divider(height: 16),
-              Text('Indirizzo server', style: theme.textTheme.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
+              Text('Indirizzo server',
+                  style: theme.textTheme.labelMedium
+                      ?.copyWith(color: cs.onSurfaceVariant)),
               const SizedBox(height: 6),
               Row(children: [
                 Expanded(
                   child: TextField(
                     controller: _serverUrlCtrl,
                     decoration: InputDecoration(
-                      border: const OutlineInputBorder(), hintText: 'http://192.168.1.2:8080', isDense: true,
-                      suffixIcon: _serverOk == null ? null : Icon(_serverOk! ? Icons.check_circle : Icons.error_outline, color: _serverOk! ? Colors.green : cs.error),
+                      border: const OutlineInputBorder(),
+                      hintText: 'http://192.168.1.2:8080',
+                      isDense: true,
+                      suffixIcon: _serverOk == null
+                          ? null
+                          : Icon(
+                              _serverOk!
+                                  ? Icons.check_circle
+                                  : Icons.error_outline,
+                              color: _serverOk! ? Colors.green : cs.error),
                     ),
                     keyboardType: TextInputType.url,
                     onSubmitted: (_) => _applyServer(),
@@ -733,29 +815,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(width: 8),
                 _testingServer
-                    ? const SizedBox(width: 36, height: 36, child: CircularProgressIndicator(strokeWidth: 2))
-                    : FilledButton.tonal(onPressed: _testServer, child: const Text('Test')),
+                    ? const SizedBox(
+                        width: 36,
+                        height: 36,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : FilledButton.tonal(
+                        onPressed: _testServer, child: const Text('Test')),
               ]),
               const SizedBox(height: 12),
-              SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: _applyServer, icon: const Icon(Icons.save_outlined), label: const Text('Salva indirizzo server'))),
+              SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                      onPressed: _applyServer,
+                      icon: const Icon(Icons.save_outlined),
+                      label: const Text('Salva indirizzo server'))),
               if (ds.isRemote) ...[
                 const SizedBox(height: 8),
-                SizedBox(width: double.infinity, child: OutlinedButton.icon(
-                  onPressed: () async {
-                    await ds.refreshFromServer();
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ds.serverConnected ? 'Dati aggiornati' : ds.lastError ?? 'Errore'), backgroundColor: ds.serverConnected ? null : cs.error));
-                    }
-                  },
-                  icon: const Icon(Icons.sync), label: const Text('Sincronizza ora'),
-                )),
+                SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        await ds.refreshFromServer();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text(ds.serverConnected
+                                  ? 'Dati aggiornati'
+                                  : ds.lastError ?? 'Errore'),
+                              backgroundColor:
+                                  ds.serverConnected ? null : cs.error));
+                        }
+                      },
+                      icon: const Icon(Icons.sync),
+                      label: const Text('Sincronizza ora'),
+                    )),
               ],
             ]),
           )),
           const SizedBox(height: 24),
-
           _SectionHeader(title: 'Aspetto', icon: Icons.palette_outlined),
-          Card(child: Padding(
+          Card(
+              child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -806,27 +905,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           )),
           const SizedBox(height: 24),
-
-          _SectionHeader(title: 'Configurazione contenitori (cassetti)', icon: Icons.grid_view),
-          Card(child: Padding(
+          _SectionHeader(
+              title: 'Configurazione contenitori (cassetti)',
+              icon: Icons.grid_view),
+          Card(
+              child: Padding(
             padding: const EdgeInsets.all(16),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Gestisci i contenitori fisici. Ciascun contenitore può avere dimensioni personalizzate e forme ritagliate disattivando cassetti nell\'anteprima.', style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(
+                  'Gestisci i contenitori fisici. Ciascun contenitore può avere dimensioni personalizzate e forme ritagliate disattivando cassetti nell\'anteprima.',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: cs.onSurfaceVariant)),
               const SizedBox(height: 12),
-              
               ..._containers.map((container) {
                 return Card(
                   color: cs.surfaceContainerLow,
                   margin: const EdgeInsets.only(bottom: 8),
                   child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     leading: CircleAvatar(
                       backgroundColor: cs.primary,
                       foregroundColor: cs.onPrimary,
                       child: Text('${container.id}'),
                     ),
                     title: Text(
-                      container.name.isNotEmpty ? container.name : 'Contenitore ${container.id}',
+                      container.name.isNotEmpty
+                          ? container.name
+                          : 'Contenitore ${container.id}',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     subtitle: Text(
@@ -845,14 +952,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           icon: const Icon(Icons.delete_outline),
                           color: cs.error,
                           tooltip: 'Elimina contenitore',
-                          onPressed: _containers.length > 1 ? () => _confirmDeleteContainer(container) : null,
+                          onPressed: _containers.length > 1
+                              ? () => _confirmDeleteContainer(container)
+                              : null,
                         ),
                       ],
                     ),
                   ),
                 );
               }),
-              
               const SizedBox(height: 8),
               SizedBox(
                 width: double.infinity,
@@ -862,26 +970,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   label: const Text('Aggiungi contenitore'),
                 ),
               ),
-              
               const Divider(height: 32),
-              
               if (_containers.isNotEmpty) ...[
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       'Anteprima e forma',
-                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                      style: theme.textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     DropdownButton<int>(
-                      value: _containers.any((c) => c.id == _selectedCabinetPreview)
+                      value: _containers
+                              .any((c) => c.id == _selectedCabinetPreview)
                           ? _selectedCabinetPreview
                           : _containers.first.id,
                       underline: const SizedBox.shrink(),
                       items: _containers.map((c) {
                         return DropdownMenuItem(
                           value: c.id,
-                          child: Text(c.name.isNotEmpty ? c.name : 'Contenitore ${c.id}'),
+                          child: Text(c.name.isNotEmpty
+                              ? c.name
+                              : 'Contenitore ${c.id}'),
                         );
                       }).toList(),
                       onChanged: (val) {
@@ -894,7 +1004,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 12),
                 _DrawerGrid(
-                  container: _containers.firstWhere((c) => c.id == _selectedCabinetPreview, orElse: () => _containers.first),
+                  container: _containers.firstWhere(
+                      (c) => c.id == _selectedCabinetPreview,
+                      orElse: () => _containers.first),
                   drawerDividers: _drawerDividers,
                   selectedDrawers: _selectedPreviewDrawers,
                   onDrawerClick: (label) {
@@ -951,12 +1063,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ]),
           )),
           const SizedBox(height: 24),
-
-          _SectionHeader(title: 'Albero dei Tag', icon: Icons.account_tree_outlined),
-          Card(child: Padding(
+          _SectionHeader(
+              title: 'Albero dei Tag', icon: Icons.account_tree_outlined),
+          Card(
+              child: Padding(
             padding: const EdgeInsets.all(16),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Crea categorie e sottocategorie digitando nel campo apposito e premendo invio.', style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(
+                  'Crea categorie e sottocategorie digitando nel campo apposito e premendo invio.',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: cs.onSurfaceVariant)),
               const SizedBox(height: 16),
               Container(
                 decoration: BoxDecoration(
@@ -968,47 +1085,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ]),
           )),
           const SizedBox(height: 24),
-
-          _SectionHeader(title: 'Tag Generici (Sfusi)', icon: Icons.label_outline),
-          Card(child: Padding(
+          _SectionHeader(
+              title: 'Tag Generici (Sfusi)', icon: Icons.label_outline),
+          Card(
+              child: Padding(
             padding: const EdgeInsets.all(16),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
                 Expanded(
                   child: TextField(
                     controller: _newTagCtrl,
-                    decoration: const InputDecoration(labelText: 'Nuovo tag generico', border: OutlineInputBorder(), isDense: true),
+                    decoration: const InputDecoration(
+                        labelText: 'Nuovo tag generico',
+                        border: OutlineInputBorder(),
+                        isDense: true),
                     onSubmitted: (_) => _addTag(),
                   ),
                 ),
                 const SizedBox(width: 8),
-                FilledButton.icon(onPressed: _addTag, icon: const Icon(Icons.add), label: const Text('Aggiungi')),
+                FilledButton.icon(
+                    onPressed: _addTag,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Aggiungi')),
               ]),
               const SizedBox(height: 16),
               if (_tags.isEmpty)
-                Text('Nessun tag generico.', style: TextStyle(color: cs.onSurfaceVariant))
+                Text('Nessun tag generico.',
+                    style: TextStyle(color: cs.onSurfaceVariant))
               else
                 Wrap(
-                  spacing: 8, runSpacing: 8,
-                  children: sortedTags.map((tag) => Chip(
-                    label: Text(tag), onDeleted: () => _confirmDeleteTag(tag), deleteIcon: const Icon(Icons.close, size: 16),
-                  )).toList(),
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: sortedTags
+                      .map((tag) => Chip(
+                            label: Text(tag),
+                            onDeleted: () => _confirmDeleteTag(tag),
+                            deleteIcon: const Icon(Icons.close, size: 16),
+                          ))
+                      .toList(),
                 ),
             ]),
           )),
           const SizedBox(height: 24),
-
           _SectionHeader(title: 'Proprietà con valore', icon: Icons.tune),
-          Card(child: Padding(
+          Card(
+              child: Padding(
             padding: const EdgeInsets.all(16),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Definisci proprietà numeriche o stringhe. Trascina per riordinarle.', style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(
+                  'Definisci proprietà numeriche o stringhe. Trascina per riordinarle.',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: cs.onSurfaceVariant)),
               const SizedBox(height: 16),
               Row(children: [
-                Expanded(child: TextField(controller: _newSpecialNameCtrl, decoration: const InputDecoration(labelText: 'Nome', border: OutlineInputBorder(), isDense: true), onSubmitted: (_) => _addSpecialTag())),
+                Expanded(
+                    child: TextField(
+                        controller: _newSpecialNameCtrl,
+                        decoration: const InputDecoration(
+                            labelText: 'Nome',
+                            border: OutlineInputBorder(),
+                            isDense: true),
+                        onSubmitted: (_) => _addSpecialTag())),
                 const SizedBox(width: 8),
                 // AUMENTATA LA LARGHEZZA A 90 PIXEL
-                SizedBox(width: 90, child: TextField(controller: _newSpecialUnitCtrl, decoration: const InputDecoration(labelText: 'Unità', border: OutlineInputBorder(), isDense: true), onSubmitted: (_) => _addSpecialTag())),
+                SizedBox(
+                    width: 90,
+                    child: TextField(
+                        controller: _newSpecialUnitCtrl,
+                        decoration: const InputDecoration(
+                            labelText: 'Unità',
+                            border: OutlineInputBorder(),
+                            isDense: true),
+                        onSubmitted: (_) => _addSpecialTag())),
                 const SizedBox(width: 8),
                 FilterChip(
                   label: const Text('Testo'),
@@ -1017,14 +1167,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   visualDensity: VisualDensity.compact,
                 ),
                 const SizedBox(width: 8),
-                IconButton.filled(onPressed: _addSpecialTag, icon: const Icon(Icons.add), tooltip: 'Aggiungi'),
+                IconButton.filled(
+                    onPressed: _addSpecialTag,
+                    icon: const Icon(Icons.add),
+                    tooltip: 'Aggiungi'),
               ]),
               const SizedBox(height: 16),
               if (_specialTags.isEmpty)
-                Text('Nessuna proprietà configurata.', style: TextStyle(color: cs.onSurfaceVariant))
+                Text('Nessuna proprietà configurata.',
+                    style: TextStyle(color: cs.onSurfaceVariant))
               else
                 ReorderableListView.builder(
-                  shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), buildDefaultDragHandles: false,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  buildDefaultDragHandles: false,
                   itemCount: _specialTags.length,
                   onReorder: (oldIndex, newIndex) {
                     setState(() {
@@ -1036,13 +1192,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   itemBuilder: (ctx, i) {
                     final st = _specialTags[i];
                     return ListTile(
-                      key: ValueKey(st.name), contentPadding: EdgeInsets.zero,
-                      leading: Icon(st.isString ? Icons.text_fields : Icons.numbers, color: cs.primary),
-                      title: Text(st.name, style: const TextStyle(fontWeight: FontWeight.w500)),
-                      subtitle: Text((st.unit.isNotEmpty ? 'Unità: ${st.unit}' : 'Nessuna unità') + (st.isString ? ' • Testo' : ' • Valore')),
+                      key: ValueKey(st.name),
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                          st.isString ? Icons.text_fields : Icons.numbers,
+                          color: cs.primary),
+                      title: Text(st.name,
+                          style: const TextStyle(fontWeight: FontWeight.w500)),
+                      subtitle: Text((st.unit.isNotEmpty
+                              ? 'Unità: ${st.unit}'
+                              : 'Nessuna unità') +
+                          (st.isString ? ' • Testo' : ' • Valore')),
                       trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                        IconButton(icon: Icon(Icons.delete_outline, color: cs.error), onPressed: () => _confirmDeleteSpecialTag(st.name)),
-                        ReorderableDragStartListener(index: i, child: const Padding(padding: EdgeInsets.symmetric(horizontal: 8.0), child: Icon(Icons.drag_handle))),
+                        IconButton(
+                            icon: Icon(Icons.delete_outline, color: cs.error),
+                            onPressed: () => _confirmDeleteSpecialTag(st.name)),
+                        ReorderableDragStartListener(
+                            index: i,
+                            child: const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 8.0),
+                                child: Icon(Icons.drag_handle))),
                       ]),
                     );
                   },
@@ -1050,31 +1219,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ]),
           )),
           const SizedBox(height: 24),
-
           _SectionHeader(title: 'Dati', icon: Icons.storage_outlined),
-          Card(child: Column(children: [
-            ListTile(leading: Icon(Icons.upload_file, color: cs.primary), title: const Text('Esporta dati'), onTap: () async => await ds.exportData()),
+          Card(
+              child: Column(children: [
+            ListTile(
+                leading: Icon(Icons.upload_file, color: cs.primary),
+                title: const Text('Esporta dati'),
+                onTap: () async => await ds.exportData()),
             const Divider(height: 1),
-            ListTile(leading: Icon(Icons.download_outlined, color: cs.primary), title: const Text('Importa dati'), onTap: () => _importData(ds)),
+            ListTile(
+                leading: Icon(Icons.download_outlined, color: cs.primary),
+                title: const Text('Importa dati'),
+                onTap: () => _importData(ds)),
             // --- NUOVO BOTTONE PER I BACKUP REMOTI ---
             if (ds.isRemote && ds.serverConnected) ...[
               const Divider(height: 1),
               ListTile(
-                leading: Icon(Icons.restore, color: cs.primary), 
-                title: const Text('Ripristina backup remoto'), 
+                leading: Icon(Icons.restore, color: cs.primary),
+                title: const Text('Ripristina backup remoto'),
                 onTap: () => _showRestoreDialog(context, ds),
               ),
             ],
           ])),
           const SizedBox(height: 24),
-
-          _SectionHeader(title: 'Informazioni e aggiornamenti', icon: Icons.info_outline),
-          Card(child: Column(children: [
+          _SectionHeader(
+              title: 'Informazioni e aggiornamenti', icon: Icons.info_outline),
+          Card(
+              child: Column(children: [
             ListTile(
               leading: Icon(Icons.system_update_alt, color: cs.primary),
               title: const Text('Controlla aggiornamenti'),
-              subtitle: const Text('Verifica e scarica l\'ultima versione da GitHub'),
-              onTap: () => UpdateService.checkAndPromptUpdate(context, showNoUpdateFeedback: true),
+              subtitle:
+                  const Text('Verifica e scarica l\'ultima versione da GitHub'),
+              onTap: () => UpdateService.checkAndPromptUpdate(context,
+                  showNoUpdateFeedback: true),
             ),
             const Divider(height: 1),
             ListTile(
@@ -1098,7 +1276,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildTreeLevel(Map<String, dynamic> node, List<String> path) {
     final keys = node.keys.toList()..sort();
     final pathKey = path.join('|');
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1106,29 +1284,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
           final currentPath = [...path, k];
           final currentPathKey = currentPath.join('|');
           final children = node[k] as Map<String, dynamic>;
-          
+
           return Theme(
             data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
             child: ExpansionTile(
               initiallyExpanded: _expandedPaths.contains(currentPathKey),
               onExpansionChanged: (exp) {
                 setState(() {
-                  if (exp) _expandedPaths.add(currentPathKey);
-                  else _expandedPaths.remove(currentPathKey);
+                  if (exp)
+                    _expandedPaths.add(currentPathKey);
+                  else
+                    _expandedPaths.remove(currentPathKey);
                 });
               },
-              title: Text(k, style: const TextStyle(fontWeight: FontWeight.bold)),
+              title:
+                  Text(k, style: const TextStyle(fontWeight: FontWeight.bold)),
               dense: true,
               trailing: IconButton(
-                icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error), 
-                tooltip: 'Elimina', 
-                onPressed: () => _confirmDeleteNode(currentPath)
-              ),
+                  icon: Icon(Icons.delete_outline,
+                      color: Theme.of(context).colorScheme.error),
+                  tooltip: 'Elimina',
+                  onPressed: () => _confirmDeleteNode(currentPath)),
               children: [
                 Padding(
                   padding: const EdgeInsets.only(left: 16.0),
                   child: Container(
-                    decoration: BoxDecoration(border: Border(left: BorderSide(color: Theme.of(context).colorScheme.outlineVariant))),
+                    decoration: BoxDecoration(
+                        border: Border(
+                            left: BorderSide(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .outlineVariant))),
                     child: _buildTreeLevel(children, currentPath),
                   ),
                 )
@@ -1138,15 +1324,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }),
         Padding(
           padding: EdgeInsets.only(
-            left: path.isEmpty ? 16.0 : 16.0, 
-            top: 4.0, 
-            bottom: 12.0, 
-            right: 16.0
-          ),
+              left: path.isEmpty ? 16.0 : 16.0,
+              top: 4.0,
+              bottom: 12.0,
+              right: 16.0),
           child: TextField(
             key: ValueKey('${pathKey}_${keys.length}'),
             decoration: InputDecoration(
-              hintText: path.isEmpty ? 'Aggiungi principale...' : 'Aggiungi in ${path.last}...',
+              hintText: path.isEmpty
+                  ? 'Aggiungi principale...'
+                  : 'Aggiungi in ${path.last}...',
               isDense: true,
               border: const UnderlineInputBorder(),
               suffixIcon: const Icon(Icons.keyboard_return, size: 16),
@@ -1180,8 +1367,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: const Text('Elimina Tag'),
         content: Text('Vuoi eliminare "${path.last}" e tutti i suoi sottotag?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Annulla')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Elimina')),
+          TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('Annulla')),
+          FilledButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('Elimina')),
         ],
       ),
     );
@@ -1202,10 +1393,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _testServer() async {
-    setState(() { _testingServer = true; _serverOk = null; });
+    setState(() {
+      _testingServer = true;
+      _serverOk = null;
+    });
     final ok = await ApiClient(_serverUrlCtrl.text.trim()).ping();
-    setState(() { _testingServer = false; _serverOk = ok; });
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ok ? 'Raggiungibile! ✅' : 'Errore ❌')));
+    setState(() {
+      _testingServer = false;
+      _serverOk = ok;
+    });
+    if (mounted)
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ok ? 'Raggiungibile! ✅' : 'Errore ❌')));
   }
 
   Future<void> _applyServer() async {
@@ -1226,7 +1425,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final name = _newSpecialNameCtrl.text.trim();
     if (name.isEmpty || _specialTags.any((t) => t.name == name)) return;
     setState(() {
-      _specialTags.add(SpecialTag(name: name, unit: _newSpecialUnitCtrl.text.trim(), isString: _newSpecialIsString));
+      _specialTags.add(SpecialTag(
+          name: name,
+          unit: _newSpecialUnitCtrl.text.trim(),
+          isString: _newSpecialIsString));
       _newSpecialIsString = false;
     });
     _newSpecialNameCtrl.clear();
@@ -1235,9 +1437,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _confirmDeleteTag(String tag) async {
     final confirm = await showDialog<bool>(
-      context: context, builder: (ctx) => AlertDialog(
-        title: const Text('Rimuovi tag'), content: Text('Rimuovere "$tag"?'),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annulla')), FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Rimuovi'))],
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rimuovi tag'),
+        content: Text('Rimuovere "$tag"?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annulla')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Rimuovi'))
+        ],
       ),
     );
     if (confirm == true) setState(() => _tags.remove(tag));
@@ -1245,39 +1456,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _confirmDeleteSpecialTag(String name) async {
     final confirm = await showDialog<bool>(
-      context: context, builder: (ctx) => AlertDialog(
-        title: const Text('Rimuovi proprietà'), content: Text('Rimuovere "$name"?'),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annulla')), FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Rimuovi'))],
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rimuovi proprietà'),
+        content: Text('Rimuovere "$name"?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annulla')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Rimuovi'))
+        ],
       ),
     );
-    if (confirm == true) setState(() => _specialTags.removeWhere((t) => t.name == name));
+    if (confirm == true)
+      setState(() => _specialTags.removeWhere((t) => t.name == name));
   }
 
   Future<void> _importData(DataService ds) async {
     final confirm = await showDialog<bool>(
-      context: context, builder: (ctx) => AlertDialog(
-        title: const Text('Importa dati'), content: const Text('Sovrascrivere tutti i dati?'),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annulla')), FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Importa'))],
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Importa dati'),
+        content: const Text('Sovrascrivere tutti i dati?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annulla')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Importa'))
+        ],
       ),
     );
     if (confirm != true) return;
     final ok = await ds.importData();
     if (ok) {
-      _lastSettingsRef = ds.settings; 
+      _lastSettingsRef = ds.settings;
       setState(() {
-        _containers = ds.settings.containers.map((c) => ContainerConfig(
-          id: c.id,
-          name: c.name,
-          rows: c.rows,
-          columns: c.columns,
-          disabledDrawers: List<String>.from(c.disabledDrawers),
-          invertRows: c.invertRows,
-          invertColumns: c.invertColumns,
-          mergedDrawers: c.mergedDrawers.map((list) => List<String>.from(list)).toList(),
-        )).toList();
-        _tags        = List.from(ds.settings.availableTags);
-        _tagTree     = _deepCopyTree(ds.settings.tagTree);
-        _specialTags = ds.settings.specialTags.map((t) => SpecialTag(name: t.name, unit: t.unit, isString: t.isString)).toList();
+        _containers = ds.settings.containers
+            .map((c) => ContainerConfig(
+                  id: c.id,
+                  name: c.name,
+                  rows: c.rows,
+                  columns: c.columns,
+                  disabledDrawers: List<String>.from(c.disabledDrawers),
+                  invertRows: c.invertRows,
+                  invertColumns: c.invertColumns,
+                  mergedDrawers: c.mergedDrawers
+                      .map((list) => List<String>.from(list))
+                      .toList(),
+                ))
+            .toList();
+        _tags = List.from(ds.settings.availableTags);
+        _tagTree = _deepCopyTree(ds.settings.tagTree);
+        _specialTags = ds.settings.specialTags
+            .map((t) =>
+                SpecialTag(name: t.name, unit: t.unit, isString: t.isString))
+            .toList();
         _drawerDividers = Map.from(ds.settings.drawerDividers);
       });
     }
@@ -1287,48 +1524,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final backups = await ds.getBackups();
     if (!context.mounted) return;
     if (backups.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Nessun backup trovato')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Nessun backup trovato')));
       return;
     }
-    
+
     final choice = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Ripristina backup'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: backups.map((backup) => ListTile(
-                title: Text(_formatBackupName(backup)), 
-                leading: const Icon(Icons.history),
-                onTap: () => Navigator.pop(ctx, backup),
-              )).toList(),
-            ),
-          ),
-        ),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annulla'))],
-      )
-    );
+        context: context,
+        builder: (ctx) => AlertDialog(
+              title: const Text('Ripristina backup'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: backups
+                        .map((backup) => ListTile(
+                              title: Text(_formatBackupName(backup)),
+                              leading: const Icon(Icons.history),
+                              onTap: () => Navigator.pop(ctx, backup),
+                            ))
+                        .toList(),
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Annulla'))
+              ],
+            ));
 
     if (choice != null && context.mounted) {
       final confirm = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Conferma ripristino'),
-          content: const Text('Sovrascrivere i dati attuali? (Verrà creato un backup di sicurezza automatico prima di procedere).'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annulla')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Ripristina'))
-          ]
-        )
-      );
-      
+          context: context,
+          builder: (ctx) => AlertDialog(
+                  title: const Text('Conferma ripristino'),
+                  content: const Text(
+                      'Sovrascrivere i dati attuali? (Verrà creato un backup di sicurezza automatico prima di procedere).'),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Annulla')),
+                    FilledButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Ripristina'))
+                  ]));
+
       if (confirm == true) {
         final ok = await ds.restoreBackup(choice);
         if (ok && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Backup ripristinato con successo')));
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Backup ripristinato con successo')));
         }
       }
     }
@@ -1341,7 +1588,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final d = parts[parts.length - 2]; // YYYYMMDD
         final t = parts[parts.length - 1]; // HHMMSS
         if (d.length == 8 && t.length == 6) {
-          return '${d.substring(6,8)}/${d.substring(4,6)}/${d.substring(0,4)} alle ${t.substring(0,2)}:${t.substring(2,4)}:${t.substring(4,6)}';
+          return '${d.substring(6, 8)}/${d.substring(4, 6)}/${d.substring(0, 4)} alle ${t.substring(0, 2)}:${t.substring(2, 4)}:${t.substring(4, 6)}';
         }
       }
     } catch (_) {}
@@ -1362,7 +1609,11 @@ class _SectionHeader extends StatelessWidget {
       child: Row(children: [
         Icon(icon, size: 18, color: cs.primary),
         const SizedBox(width: 8),
-        Text(title, style: Theme.of(context).textTheme.titleSmall?.copyWith(color: cs.primary, fontWeight: FontWeight.bold)),
+        Text(title,
+            style: Theme.of(context)
+                .textTheme
+                .titleSmall
+                ?.copyWith(color: cs.primary, fontWeight: FontWeight.bold)),
       ]),
     );
   }
@@ -1392,7 +1643,7 @@ class _DrawerGrid extends StatelessWidget {
     if (match == null) return {'col': 0, 'row': 0};
     final colStr = match.group(1)!;
     final rowVal = int.tryParse(match.group(2)!) ?? 1;
-    
+
     int colIdx = 0;
     for (int i = 0; i < colStr.length; i++) {
       colIdx = colIdx * 26 + (colStr.codeUnitAt(i) - 65 + 1);
@@ -1404,14 +1655,19 @@ class _DrawerGrid extends StatelessWidget {
   String? _getLabelFromOffset(Offset offset) {
     final x = offset.dx - 8;
     final y = offset.dy - 8;
-    
+
     final colIdx = (x / 54).floor().clamp(0, container.columns - 1);
     final rowIdx = (y / 38).floor().clamp(0, container.rows - 1);
-    
-    final displayRow = container.invertRows ? (container.rows - 1 - rowIdx) : rowIdx;
-    final displayCol = container.invertColumns ? (container.columns - 1 - colIdx) : colIdx;
-    
-    if (displayCol >= 0 && displayCol < container.columnLabels.length && displayRow >= 0 && displayRow < container.rows) {
+
+    final displayRow =
+        container.invertRows ? (container.rows - 1 - rowIdx) : rowIdx;
+    final displayCol =
+        container.invertColumns ? (container.columns - 1 - colIdx) : colIdx;
+
+    if (displayCol >= 0 &&
+        displayCol < container.columnLabels.length &&
+        displayRow >= 0 &&
+        displayRow < container.rows) {
       return '${container.columnLabels[displayCol]}${displayRow + 1}';
     }
     return null;
@@ -1439,9 +1695,7 @@ class _DrawerGrid extends StatelessWidget {
         final group = mergeGroups[label];
 
         int minCol = c;
-        int maxCol = c;
         int minRow = r;
-        int maxRow = r;
         int minDCol = container.invertColumns ? (cols - 1 - c) : c;
         int maxDCol = minDCol;
         int minDRow = container.invertRows ? (rows - 1 - r) : r;
@@ -1463,15 +1717,19 @@ class _DrawerGrid extends StatelessWidget {
             };
           }).toList();
 
-          minCol = coordsList.map((e) => e['col']!).reduce((a, b) => a < b ? a : b);
-          maxCol = coordsList.map((e) => e['col']!).reduce((a, b) => a > b ? a : b);
-          minRow = coordsList.map((e) => e['row']!).reduce((a, b) => a < b ? a : b);
-          maxRow = coordsList.map((e) => e['row']!).reduce((a, b) => a > b ? a : b);
+          minCol =
+              coordsList.map((e) => e['col']!).reduce((a, b) => a < b ? a : b);
+          minRow =
+              coordsList.map((e) => e['row']!).reduce((a, b) => a < b ? a : b);
 
-          minDCol = coordsList.map((e) => e['dCol']!).reduce((a, b) => a < b ? a : b);
-          maxDCol = coordsList.map((e) => e['dCol']!).reduce((a, b) => a > b ? a : b);
-          minDRow = coordsList.map((e) => e['dRow']!).reduce((a, b) => a < b ? a : b);
-          maxDRow = coordsList.map((e) => e['dRow']!).reduce((a, b) => a > b ? a : b);
+          minDCol =
+              coordsList.map((e) => e['dCol']!).reduce((a, b) => a < b ? a : b);
+          maxDCol =
+              coordsList.map((e) => e['dCol']!).reduce((a, b) => a > b ? a : b);
+          minDRow =
+              coordsList.map((e) => e['dRow']!).reduce((a, b) => a < b ? a : b);
+          maxDRow =
+              coordsList.map((e) => e['dRow']!).reduce((a, b) => a > b ? a : b);
 
           // Skip if this is not the top-left cell of the group in logical coordinates
           if (c != minCol || r != minRow) {
@@ -1480,10 +1738,12 @@ class _DrawerGrid extends StatelessWidget {
         }
 
         final cellLabel = group != null ? group.join('+') : label;
-        final key = '${container.id}_$label'; // Dividers are saved by primary label
+        final key =
+            '${container.id}_$label'; // Dividers are saved by primary label
         final zones = drawerDividers[key] ?? 1;
         final isDisabled = container.disabledDrawers.contains(label);
-        final isSelected = selectedDrawers.contains(label) || (group != null && group.any((l) => selectedDrawers.contains(l)));
+        final isSelected = selectedDrawers.contains(label) ||
+            (group != null && group.any((l) => selectedDrawers.contains(l)));
 
         Widget cellWidget = isDisabled
             ? Container(
@@ -1533,9 +1793,11 @@ class _DrawerGrid extends StatelessWidget {
                               decoration: BoxDecoration(
                                 color: cs.primaryContainer,
                                 borderRadius: i == 0
-                                    ? const BorderRadius.vertical(top: Radius.circular(4))
+                                    ? const BorderRadius.vertical(
+                                        top: Radius.circular(4))
                                     : i == zones - 1
-                                        ? const BorderRadius.vertical(bottom: Radius.circular(4))
+                                        ? const BorderRadius.vertical(
+                                            bottom: Radius.circular(4))
                                         : null,
                                 border: i < zones - 1
                                     ? Border(
@@ -1552,7 +1814,8 @@ class _DrawerGrid extends StatelessWidget {
                       ),
                       IgnorePointer(
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 4, vertical: 2),
                           decoration: BoxDecoration(
                             color: cs.primaryContainer.withOpacity(0.85),
                             borderRadius: BorderRadius.circular(3),
@@ -1611,15 +1874,21 @@ class _DrawerGrid extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Anteprima (clicca per configurare, premi a lungo e trascina per selezionare in blocco)',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+        Text(
+            'Anteprima (clicca per configurare, premi a lungo e trascina per selezionare in blocco)',
+            style: Theme.of(context)
+                .textTheme
+                .labelSmall
+                ?.copyWith(color: cs.onSurfaceVariant)),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
             border: Border.all(color: cs.outlineVariant.withOpacity(0.5)),
             borderRadius: BorderRadius.circular(8),
           ),
-          height: (rows * 38 + 16).toDouble().clamp(100.0, 320.0), // Limite altezza a 320px scrollabile
+          height: (rows * 38 + 16)
+              .toDouble()
+              .clamp(100.0, 320.0), // Limite altezza a 320px scrollabile
           child: SingleChildScrollView(
             scrollDirection: Axis.vertical,
             child: SingleChildScrollView(

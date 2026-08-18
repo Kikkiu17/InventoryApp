@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
-import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,13 +9,12 @@ import '../models/component.dart';
 import '../models/settings.dart';
 import '../models/search_result.dart';
 import 'api_client.dart';
-import 'package:package_info_plus/package_info_plus.dart';
-import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
 export 'api_client.dart' show ApiClient, InventoryMeta;
 
 enum StorageMode { local, remote }
+
 enum SortMode { none, name, quantity, drawer, specialTag }
 
 // Nuova classe per gestire i filtri a range e testuali
@@ -51,52 +49,56 @@ bool matchesQuery(Component c, String query, AppSettings settings) {
   final trimmed = query.trim();
   if (trimmed.isEmpty) return true;
   final rawTerms = trimmed.split(' ').where((s) => s.isNotEmpty).toList();
-  
+
   return rawTerms.every((rawTerm) {
     final parsedTerm = parseSpecialValue(rawTerm);
     final term = rawTerm.toLowerCase();
-    
-    return c.name.toLowerCase().contains(term) ||
-      c.drawer.toLowerCase().contains(term) ||
-      c.cabinet.toString().contains(term) ||
-      c.description.toLowerCase().contains(term) ||
-      c.tags.any((t) => t.toLowerCase().contains(term)) ||
-      c.specialTagValues.entries.any((entry) {
-        final tagDef = settings.specialTags.where((t) => t.name == entry.key).firstOrNull;
-        final isStr = tagDef?.isString ?? false;
-        
-        if (isStr) {
-          return entry.value.toLowerCase().contains(term);
-        } else {
-          final parsedVal = parseSpecialValue(entry.value);
-          
-          double? parsedTermWithUnitStripped;
-          bool termMatchesUnit = false;
-          if (tagDef != null && tagDef.unit.isNotEmpty) {
-            final unitLower = tagDef.unit.toLowerCase();
-            if (term.endsWith(unitLower)) {
-              final stripped = term.substring(0, term.length - unitLower.length).trim();
-              parsedTermWithUnitStripped = parseSpecialValue(stripped);
-            }
-            if (unitLower.contains(term)) {
-              termMatchesUnit = true;
-            }
-          }
 
-          return entry.value.toLowerCase().contains(term) || 
-                 (parsedTerm != null && parsedVal == parsedTerm) ||
-                 (parsedTermWithUnitStripped != null && parsedVal == parsedTermWithUnitStripped) ||
-                 termMatchesUnit;
-        }
-      });
+    return c.name.toLowerCase().contains(term) ||
+        c.drawer.toLowerCase().contains(term) ||
+        c.cabinet.toString().contains(term) ||
+        c.description.toLowerCase().contains(term) ||
+        c.tags.any((t) => t.toLowerCase().contains(term)) ||
+        c.specialTagValues.entries.any((entry) {
+          final tagDef = settings.specialTags
+              .where((t) => t.name == entry.key)
+              .firstOrNull;
+          final isStr = tagDef?.isString ?? false;
+
+          if (isStr) {
+            return entry.value.toLowerCase().contains(term);
+          } else {
+            final parsedVal = parseSpecialValue(entry.value);
+
+            double? parsedTermWithUnitStripped;
+            bool termMatchesUnit = false;
+            if (tagDef != null && tagDef.unit.isNotEmpty) {
+              final unitLower = tagDef.unit.toLowerCase();
+              if (term.endsWith(unitLower)) {
+                final stripped =
+                    term.substring(0, term.length - unitLower.length).trim();
+                parsedTermWithUnitStripped = parseSpecialValue(stripped);
+              }
+              if (unitLower.contains(term)) {
+                termMatchesUnit = true;
+              }
+            }
+
+            return entry.value.toLowerCase().contains(term) ||
+                (parsedTerm != null && parsedVal == parsedTerm) ||
+                (parsedTermWithUnitStripped != null &&
+                    parsedVal == parsedTermWithUnitStripped) ||
+                termMatchesUnit;
+          }
+        });
   });
 }
 
 class DataService extends ChangeNotifier {
-  static const _serverUrlKey      = 'serverUrl';
-  static const _storageModeKey    = 'storageMode';
-  static const _inventoryIdKey    = 'currentInventoryId';
-  static const _themeModeKey      = 'themeMode';
+  static const _serverUrlKey = 'serverUrl';
+  static const _storageModeKey = 'storageMode';
+  static const _inventoryIdKey = 'currentInventoryId';
+  static const _themeModeKey = 'themeMode';
 
   List<Component> _components = [];
   List<Component> _bufferComponents = [];
@@ -116,9 +118,9 @@ class DataService extends ChangeNotifier {
   String? _lastError;
   SyncConflict? _pendingConflict;
 
-  String get _componentsKey       => 'components_$_currentInventoryId';
-  String get _settingsKey         => 'settings_$_currentInventoryId';
-  String get _localTimestampKey   => 'localTimestamp_$_currentInventoryId';
+  String get _componentsKey => 'components_$_currentInventoryId';
+  String get _settingsKey => 'settings_$_currentInventoryId';
+  String get _localTimestampKey => 'localTimestamp_$_currentInventoryId';
   String get _bufferComponentsKey => 'components__buffer_';
 
   List<Component> get components => _components;
@@ -132,6 +134,7 @@ class DataService extends ChangeNotifier {
     }
     return _inventories.where((i) => i.id == _currentInventoryId).firstOrNull;
   }
+
   StorageMode get mode => _mode;
   String get serverUrl => _serverUrl;
   bool get serverConnected => _serverConnected;
@@ -173,7 +176,7 @@ class DataService extends ChangeNotifier {
       await prefs.remove('localTimestamp');
     }
 
-    _serverUrl          = prefs.getString(_serverUrlKey) ?? 'http://192.168.1.2:8080';
+    _serverUrl = prefs.getString(_serverUrlKey) ?? 'http://192.168.1.2:8080';
     _currentInventoryId = prefs.getString(_inventoryIdKey) ?? 'default';
     final modeStr = prefs.getString(_storageModeKey) ?? 'local';
     _mode = modeStr == 'remote' ? StorageMode.remote : StorageMode.local;
@@ -197,7 +200,8 @@ class DataService extends ChangeNotifier {
 
   Future<void> _loadFromLocal(SharedPreferences prefs) async {
     final sj = prefs.getString(_settingsKey);
-    _settings = sj != null ? AppSettings.fromJson(jsonDecode(sj)) : AppSettings();
+    _settings =
+        sj != null ? AppSettings.fromJson(jsonDecode(sj)) : AppSettings();
     final cj = prefs.getString(_componentsKey);
     _components = cj != null
         ? (jsonDecode(cj) as List).map((e) => Component.fromJson(e)).toList()
@@ -218,14 +222,17 @@ class DataService extends ChangeNotifier {
 
       // 1. Fetch Remote Data
       final remoteDb = await _api!.getFullDb();
-      final remoteComponents = (remoteDb['components'] as List).map((e) => Component.fromJson(e)).toList();
+      final remoteComponents = (remoteDb['components'] as List)
+          .map((e) => Component.fromJson(e))
+          .toList();
       final remoteSettings = AppSettings.fromJson(remoteDb['settings']);
       final remoteTs = DateTime.tryParse(remoteDb['lastUpdated'] ?? '');
 
       // 2. Fetch Local Data
       final prefs = await SharedPreferences.getInstance();
-      final localTs = DateTime.tryParse(prefs.getString(_localTimestampKey) ?? '');
-      
+      final localTs =
+          DateTime.tryParse(prefs.getString(_localTimestampKey) ?? '');
+
       if (checkConflict && localTs != null && remoteTs != null) {
         // CASE A: Server is strictly newer -> Auto-update local
         if (remoteTs.isAfter(localTs)) {
@@ -233,12 +240,15 @@ class DataService extends ChangeNotifier {
           _settings = remoteSettings;
           // Use remoteTs so next launch sees equal timestamps → no false conflict
           await _mirrorToLocal(_components, _settings, timestamp: remoteTs);
-        } 
+        }
         // CASE B: Local is newer -> Ask user
         else if (localTs.isAfter(remoteTs)) {
-          final localComponents = (jsonDecode(prefs.getString(_componentsKey)!) as List)
-              .map((e) => Component.fromJson(e)).toList();
-          final localSettings = AppSettings.fromJson(jsonDecode(prefs.getString(_settingsKey)!));
+          final localComponents =
+              (jsonDecode(prefs.getString(_componentsKey)!) as List)
+                  .map((e) => Component.fromJson(e))
+                  .toList();
+          final localSettings =
+              AppSettings.fromJson(jsonDecode(prefs.getString(_settingsKey)!));
 
           _pendingConflict = SyncConflict(
             localComponents: localComponents,
@@ -249,7 +259,7 @@ class DataService extends ChangeNotifier {
             remoteTimestamp: remoteTs,
           );
           // Show server data in background but wait for resolution
-          _components = remoteComponents; 
+          _components = remoteComponents;
           _settings = remoteSettings;
         }
       } else {
@@ -278,36 +288,43 @@ class DataService extends ChangeNotifier {
     _pendingConflict = null;
     if (useLocal) {
       _components = c.localComponents;
-      _settings   = c.localSettings;
+      _settings = c.localSettings;
       try {
         await _api!.uploadFullDb({
           'components': _components.map((x) => x.toJson()).toList(),
-          'settings':   _settings.toJson(),
+          'settings': _settings.toJson(),
         });
         // Use the timestamp the server assigned after the upload
         final ts = DateTime.tryParse(_api!.lastUpdated ?? '');
         await _mirrorToLocal(_components, _settings, timestamp: ts);
-      } catch (e) { _lastError = e.toString(); }
+      } catch (e) {
+        _lastError = e.toString();
+      }
     } else {
       _components = c.remoteComponents;
-      _settings   = c.remoteSettings;
+      _settings = c.remoteSettings;
       // Use the remote timestamp we already fetched — no need to hit the server again
-      await _mirrorToLocal(_components, _settings, timestamp: c.remoteTimestamp);
+      await _mirrorToLocal(_components, _settings,
+          timestamp: c.remoteTimestamp);
     }
     notifyListeners();
   }
 
-  Future<void> _mirrorToLocal(List<Component> comps, AppSettings s, {DateTime? timestamp}) async {
+  Future<void> _mirrorToLocal(List<Component> comps, AppSettings s,
+      {DateTime? timestamp}) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_componentsKey, jsonEncode(comps.map((c) => c.toJson()).toList()));
+    await prefs.setString(
+        _componentsKey, jsonEncode(comps.map((c) => c.toJson()).toList()));
     await prefs.setString(_settingsKey, jsonEncode(s.toJson()));
     // Use provided timestamp (e.g. server's lastUpdated) so comparisons stay stable
-    await prefs.setString(_localTimestampKey, (timestamp ?? DateTime.now()).toIso8601String());
+    await prefs.setString(
+        _localTimestampKey, (timestamp ?? DateTime.now()).toIso8601String());
   }
 
   Future<void> _saveLocal() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_componentsKey, jsonEncode(_components.map((c) => c.toJson()).toList()));
+    await prefs.setString(_componentsKey,
+        jsonEncode(_components.map((c) => c.toJson()).toList()));
     await prefs.setString(_settingsKey, jsonEncode(_settings.toJson()));
     await prefs.setString(_localTimestampKey, DateTime.now().toIso8601String());
   }
@@ -321,7 +338,7 @@ class DataService extends ChangeNotifier {
 
   Future<void> switchInventory(String id) async {
     if (id == _currentInventoryId && _components.isNotEmpty) return;
-    
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_componentsKey);
     await prefs.remove(_settingsKey);
@@ -334,20 +351,24 @@ class DataService extends ChangeNotifier {
     await _loadFromServer(checkConflict: false);
   }
 
-  Future<InventoryMeta> createInventory(String name, {String description = ''}) async {
+  Future<InventoryMeta> createInventory(String name,
+      {String description = ''}) async {
     final meta = await _api!.createInventory(name, description: description);
     _inventories = await _api!.listInventories();
     notifyListeners();
     return meta;
   }
 
-  Future<void> renameCurrentInventory(String name, {String description = ''}) async {
-    await _api!.renameInventory(_currentInventoryId, name, description: description);
+  Future<void> renameCurrentInventory(String name,
+      {String description = ''}) async {
+    await _api!
+        .renameInventory(_currentInventoryId, name, description: description);
     _inventories = await _api!.listInventories();
     notifyListeners();
   }
 
-  Future<void> renameInventory(String id, String name, {String description = ''}) async {
+  Future<void> renameInventory(String id, String name,
+      {String description = ''}) async {
     await _api!.renameInventory(id, name, description: description);
     _inventories = await _api!.listInventories();
     notifyListeners();
@@ -360,7 +381,7 @@ class DataService extends ChangeNotifier {
       await switchInventory(_inventories.first.id);
     } else if (_inventories.isEmpty) {
       _components = [];
-      _settings   = AppSettings();
+      _settings = AppSettings();
       notifyListeners();
     }
   }
@@ -388,7 +409,8 @@ class DataService extends ChangeNotifier {
   Future<void> setStorageMode(StorageMode mode) async {
     _mode = mode;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_storageModeKey, mode == StorageMode.remote ? 'remote' : 'local');
+    await prefs.setString(
+        _storageModeKey, mode == StorageMode.remote ? 'remote' : 'local');
     if (mode == StorageMode.remote) {
       _api = ApiClient(_serverUrl, inventoryId: _currentInventoryId);
       await _loadFromServer(checkConflict: true);
@@ -416,7 +438,10 @@ class DataService extends ChangeNotifier {
         _components.add(created);
         final ts = DateTime.tryParse(_api!.lastUpdated ?? '');
         await _mirrorToLocal(_components, _settings, timestamp: ts);
-      } catch (e) { _lastError = e.toString(); rethrow; }
+      } catch (e) {
+        _lastError = e.toString();
+        rethrow;
+      }
     } else {
       _components.add(c);
       await _saveLocal();
@@ -432,7 +457,10 @@ class DataService extends ChangeNotifier {
         if (idx != -1) _components[idx] = updated;
         final ts = DateTime.tryParse(_api!.lastUpdated ?? '');
         await _mirrorToLocal(_components, _settings, timestamp: ts);
-      } catch (e) { _lastError = e.toString(); rethrow; }
+      } catch (e) {
+        _lastError = e.toString();
+        rethrow;
+      }
     } else {
       final idx = _components.indexWhere((e) => e.id == c.id);
       if (idx != -1) _components[idx] = c;
@@ -448,7 +476,10 @@ class DataService extends ChangeNotifier {
         _components.removeWhere((e) => e.id == id);
         final ts = DateTime.tryParse(_api!.lastUpdated ?? '');
         await _mirrorToLocal(_components, _settings, timestamp: ts);
-      } catch (e) { _lastError = e.toString(); rethrow; }
+      } catch (e) {
+        _lastError = e.toString();
+        rethrow;
+      }
     } else {
       _components.removeWhere((e) => e.id == id);
       await _saveLocal();
@@ -456,7 +487,8 @@ class DataService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> moveComponent(String componentId, String targetInventoryId) async {
+  Future<void> moveComponent(
+      String componentId, String targetInventoryId) async {
     if (_mode == StorageMode.remote && _serverConnected) {
       try {
         await _api!.moveComponent(componentId, targetInventoryId);
@@ -473,7 +505,8 @@ class DataService extends ChangeNotifier {
         rethrow;
       }
     } else {
-      throw Exception('Lo spostamento è supportato solo in modalità remota con server connesso');
+      throw Exception(
+          'Lo spostamento è supportato solo in modalità remota con server connesso');
     }
     notifyListeners();
   }
@@ -488,7 +521,9 @@ class DataService extends ChangeNotifier {
         await _mirrorToLocal(_components, _settings, timestamp: ts);
         notifyListeners();
         return;
-      } catch (e) { _lastError = e.toString(); }
+      } catch (e) {
+        _lastError = e.toString();
+      }
     }
     final idx = _components.indexWhere((e) => e.id == id);
     if (idx != -1) {
@@ -506,7 +541,9 @@ class DataService extends ChangeNotifier {
         await _api!.updateSettings(s);
         final ts = DateTime.tryParse(_api!.lastUpdated ?? '');
         await _mirrorToLocal(_components, _settings, timestamp: ts);
-      } catch (e) { _lastError = e.toString(); }
+      } catch (e) {
+        _lastError = e.toString();
+      }
     } else {
       await _saveLocal();
     }
@@ -538,20 +575,20 @@ class DataService extends ChangeNotifier {
   Future<void> renameBag(String oldName, String newName) async {
     final trimmedNew = newName.trim();
     if (trimmedNew.isEmpty || trimmedNew == oldName) return;
-    
+
     final idx = _settings.bufferBags.indexOf(oldName);
     if (idx != -1) {
       _settings.bufferBags[idx] = trimmedNew;
     } else if (!_settings.bufferBags.contains(trimmedNew)) {
       _settings.bufferBags.add(trimmedNew);
     }
-    
+
     for (var c in _components) {
       if (c.bagName == oldName) {
         c.bagName = trimmedNew;
       }
     }
-    
+
     if (_mode == StorageMode.remote && _serverConnected) {
       try {
         await _api!.uploadFullDb({
@@ -571,7 +608,7 @@ class DataService extends ChangeNotifier {
 
   Future<void> deleteBag(String name, {bool deleteComponents = true}) async {
     _settings.bufferBags.remove(name);
-    
+
     if (deleteComponents) {
       _components.removeWhere((c) => c.bagName == name);
     } else {
@@ -581,7 +618,7 @@ class DataService extends ChangeNotifier {
         }
       }
     }
-    
+
     if (_mode == StorageMode.remote && _serverConnected) {
       try {
         await _api!.uploadFullDb({
@@ -605,22 +642,25 @@ class DataService extends ChangeNotifier {
       'settings': _settings.toJson(),
       'exportedAt': DateTime.now().toIso8601String(),
     });
-    final dir  = await getTemporaryDirectory();
+    final dir = await getTemporaryDirectory();
     final file = File('${dir.path}/inventario_componenti.json');
     await file.writeAsString(data);
-    await SharePlus.instance.share(ShareParams(files: [XFile(file.path)], text: 'Inventario componenti'));
+    await SharePlus.instance.share(
+        ShareParams(files: [XFile(file.path)], text: 'Inventario componenti'));
   }
 
   Future<bool> importData() async {
-    final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom, allowedExtensions: ['json']);
+    final result = await FilePicker.platform
+        .pickFiles(type: FileType.custom, allowedExtensions: ['json']);
     if (result == null || result.files.single.path == null) return false;
     try {
-      final data = jsonDecode(
-          await File(result.files.single.path!).readAsString()) as Map<String, dynamic>;
+      final data =
+          jsonDecode(await File(result.files.single.path!).readAsString())
+              as Map<String, dynamic>;
       if (data.containsKey('components')) {
         _components = (data['components'] as List)
-            .map((e) => Component.fromJson(e)).toList();
+            .map((e) => Component.fromJson(e))
+            .toList();
       }
       if (data.containsKey('settings')) {
         _settings = AppSettings.fromJson(data['settings']);
@@ -631,18 +671,20 @@ class DataService extends ChangeNotifier {
       await _saveLocal();
       notifyListeners();
       return true;
-    } catch (e) { _lastError = e.toString(); return false; }
+    } catch (e) {
+      _lastError = e.toString();
+      return false;
+    }
   }
 
-  List<Component> search(
-    String query,
-    List<String> selectedTags,
-    SortMode sort,
-    Map<String, SpecialFilter> specialTagFilters,
-    [String? sortSpecialTag, int? cabinetFilter, bool unassignedPosition = false, bool sortAscending = true] 
-  ) {
+  List<Component> search(String query, List<String> selectedTags, SortMode sort,
+      Map<String, SpecialFilter> specialTagFilters,
+      [String? sortSpecialTag,
+      int? cabinetFilter,
+      bool unassignedPosition = false,
+      bool sortAscending = true]) {
     var results = _components.where((c) => c.bagName == null).toList();
-    
+
     if (unassignedPosition) {
       results = results.where((c) => c.drawer.isEmpty).toList();
     }
@@ -650,24 +692,27 @@ class DataService extends ChangeNotifier {
     if (cabinetFilter != null) {
       results = results.where((c) => c.cabinet == cabinetFilter).toList();
     }
-    
+
     if (query.isNotEmpty) {
-      results = results.where((c) => matchesQuery(c, query, _settings)).toList();
+      results =
+          results.where((c) => matchesQuery(c, query, _settings)).toList();
     }
-    
+
     if (selectedTags.isNotEmpty) {
       results = results
-          .where((c) => selectedTags.every((t) => c.tags.contains(t))).toList();
+          .where((c) => selectedTags.every((t) => c.tags.contains(t)))
+          .toList();
     }
-    
+
     specialTagFilters.forEach((tagName, filter) {
-      final tagDef = _settings.specialTags.where((t) => t.name == tagName).firstOrNull;
+      final tagDef =
+          _settings.specialTags.where((t) => t.name == tagName).firstOrNull;
       final isStr = tagDef?.isString ?? false;
 
       results = results.where((c) {
         final valStr = c.specialTagValues[tagName];
         if (valStr == null) return false;
-        
+
         if (isStr) {
           // Ricerca esatta testuale o inclusione (case insensitive)
           if (filter.exact.isNotEmpty) {
@@ -695,52 +740,56 @@ class DataService extends ChangeNotifier {
         }
       }).toList();
     });
-    
+
     switch (sort) {
-      case SortMode.name:     
-        results.sort((a, b) => a.name.compareTo(b.name)); 
+      case SortMode.name:
+        results.sort((a, b) => a.name.compareTo(b.name));
         break;
-      case SortMode.quantity: 
-        results.sort((a, b) => b.quantity.compareTo(a.quantity)); 
+      case SortMode.quantity:
+        results.sort((a, b) => b.quantity.compareTo(a.quantity));
         break;
-      case SortMode.drawer:   
+      case SortMode.drawer:
         results.sort((a, b) {
           // Se sono vuoti (non assegnati), vanno in fondo
-          if (a.drawer.isEmpty && b.drawer.isEmpty) return a.name.compareTo(b.name);
+          if (a.drawer.isEmpty && b.drawer.isEmpty)
+            return a.name.compareTo(b.name);
           if (a.drawer.isEmpty) return 1;
           if (b.drawer.isEmpty) return -1;
 
           final cab = a.cabinet.compareTo(b.cabinet);
           if (cab != 0) return cab;
-          
+
           final drawerComp = a.drawer.compareTo(b.drawer);
           if (drawerComp != 0) return drawerComp;
-          
+
           final zoneA = a.drawerZone ?? 1;
           final zoneB = b.drawerZone ?? 1;
           final zoneComp = zoneA.compareTo(zoneB);
           if (zoneComp != 0) return zoneComp;
 
           return a.name.compareTo(b.name);
-        }); 
+        });
         break;
       case SortMode.specialTag:
         if (sortSpecialTag != null) {
           results.sort((a, b) {
             final valStrA = a.specialTagValues[sortSpecialTag];
             final valStrB = b.specialTagValues[sortSpecialTag];
-            if (valStrA == null && valStrB == null) return a.name.compareTo(b.name);
+            if (valStrA == null && valStrB == null)
+              return a.name.compareTo(b.name);
             if (valStrA == null) return 1;
             if (valStrB == null) return -1;
-            
-            final tagDef = _settings.specialTags.where((t) => t.name == sortSpecialTag).firstOrNull;
+
+            final tagDef = _settings.specialTags
+                .where((t) => t.name == sortSpecialTag)
+                .firstOrNull;
             if (tagDef?.isString == true) {
               return valStrA.compareTo(valStrB);
             }
-            
+
             final numA = parseSpecialValue(valStrA);
             final numB = parseSpecialValue(valStrB);
-            
+
             if (numA != null && numB != null) {
               return numA.compareTo(numB);
             }
@@ -748,7 +797,8 @@ class DataService extends ChangeNotifier {
           });
         }
         break;
-      case SortMode.none: break;
+      case SortMode.none:
+        break;
     }
     if (!sortAscending) {
       results = results.reversed.toList();
@@ -761,10 +811,10 @@ class DataService extends ChangeNotifier {
     if (_mode != StorageMode.remote || !_serverConnected) return [];
     try {
       return await _api!.getBackups();
-    } catch (e) { 
-      print('ERRORE BACKUP: $e'); 
-      _lastError = e.toString(); 
-      return []; 
+    } catch (e) {
+      print('ERRORE BACKUP: $e');
+      _lastError = e.toString();
+      return [];
     }
   }
 
@@ -772,15 +822,13 @@ class DataService extends ChangeNotifier {
     if (_mode != StorageMode.remote || !_serverConnected) return false;
     try {
       await _api!.restoreBackup(filename);
-      await refreshFromServer(); 
+      await refreshFromServer();
       return true;
-    } catch (e) { 
-      _lastError = e.toString(); 
-      return false; 
+    } catch (e) {
+      _lastError = e.toString();
+      return false;
     }
   }
-
-
 
   Future<void> createBackup() async {
     if (_mode != StorageMode.remote || !_serverConnected) return;
@@ -804,14 +852,15 @@ class DataService extends ChangeNotifier {
     } else {
       try {
         final dir = await getApplicationDocumentsDirectory();
-        final attachDir = Directory('${dir.path}/attachments/$_currentInventoryId');
+        final attachDir =
+            Directory('${dir.path}/attachments/$_currentInventoryId');
         if (!await attachDir.exists()) {
           await attachDir.create(recursive: true);
         }
         final safeName = '${const Uuid().v4()}_$filename';
         final newPath = '${attachDir.path}/$safeName';
         await File(filePath).copy(newPath);
-        return safeName; 
+        return safeName;
       } catch (e) {
         _lastError = e.toString();
         notifyListeners();
@@ -871,7 +920,9 @@ class DataService extends ChangeNotifier {
     if (_mode == StorageMode.remote && _serverConnected && _api != null) {
       try {
         final results = await _api!.searchAll(q);
-        matches = results.map((e) => GlobalSearchResult.fromJson(e as Map<String, dynamic>)).toList();
+        matches = results
+            .map((e) => GlobalSearchResult.fromJson(e as Map<String, dynamic>))
+            .toList();
       } catch (e) {
         debugPrint('Remote search failed, falling back or error: $e');
       }
@@ -881,11 +932,13 @@ class DataService extends ChangeNotifier {
       for (var inv in _inventories) {
         final cj = prefs.getString('components_${inv.id}');
         if (cj == null) continue;
-        
+
         final sj = prefs.getString('settings_${inv.id}');
-        final settings = sj != null ? AppSettings.fromJson(jsonDecode(sj)) : AppSettings();
-        
-        final comps = (jsonDecode(cj) as List).map((e) => Component.fromJson(e)).toList();
+        final settings =
+            sj != null ? AppSettings.fromJson(jsonDecode(sj)) : AppSettings();
+
+        final comps =
+            (jsonDecode(cj) as List).map((e) => Component.fromJson(e)).toList();
         for (var c in comps) {
           if (matchesQuery(c, query, settings)) {
             matches.add(GlobalSearchResult(
@@ -922,17 +975,22 @@ class DataService extends ChangeNotifier {
 
   Future<void> _saveBufferLocal() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_bufferComponentsKey, jsonEncode(_bufferComponents.map((c) => c.toJson()).toList()));
+    await prefs.setString(_bufferComponentsKey,
+        jsonEncode(_bufferComponents.map((c) => c.toJson()).toList()));
   }
 
   Future<void> _loadBufferFromServer() async {
-    if (_mode != StorageMode.remote || !_serverConnected || _api == null) return;
+    if (_mode != StorageMode.remote || !_serverConnected || _api == null)
+      return;
     try {
       final bufferApi = _api!.withInventory('_buffer_');
       final remoteDb = await bufferApi.getFullDb();
-      _bufferComponents = (remoteDb['components'] as List).map((e) => Component.fromJson(e)).toList();
+      _bufferComponents = (remoteDb['components'] as List)
+          .map((e) => Component.fromJson(e))
+          .toList();
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_bufferComponentsKey, jsonEncode(_bufferComponents.map((c) => c.toJson()).toList()));
+      await prefs.setString(_bufferComponentsKey,
+          jsonEncode(_bufferComponents.map((c) => c.toJson()).toList()));
     } catch (e) {
       debugPrint('Error loading buffer from server: $e');
       final prefs = await SharedPreferences.getInstance();
@@ -941,7 +999,8 @@ class DataService extends ChangeNotifier {
   }
 
   Future<void> _saveBufferServer() async {
-    if (_mode != StorageMode.remote || !_serverConnected || _api == null) return;
+    if (_mode != StorageMode.remote || !_serverConnected || _api == null)
+      return;
     try {
       final bufferApi = _api!.withInventory('_buffer_');
       await bufferApi.uploadFullDb({
@@ -998,7 +1057,8 @@ class DataService extends ChangeNotifier {
     }
   }
 
-  Future<void> placeComponent(Component c, String targetInventoryId, int cabinet, String drawer, int? zone) async {
+  Future<void> placeComponent(Component c, String targetInventoryId,
+      int cabinet, String drawer, int? zone) async {
     _bufferComponents.removeWhere((e) => e.id == c.id);
     if (_mode == StorageMode.remote && _serverConnected) {
       await _saveBufferServer();
@@ -1039,8 +1099,10 @@ class DataService extends ChangeNotifier {
         ? (jsonDecode(cj) as List).map((e) => Component.fromJson(e)).toList()
         : [];
     targetComps.add(c);
-    await prefs.setString(targetKey, jsonEncode(targetComps.map((x) => x.toJson()).toList()));
-    await prefs.setString('localTimestamp_$targetInventoryId', DateTime.now().toIso8601String());
+    await prefs.setString(
+        targetKey, jsonEncode(targetComps.map((x) => x.toJson()).toList()));
+    await prefs.setString(
+        'localTimestamp_$targetInventoryId', DateTime.now().toIso8601String());
   }
 
   Future<AppSettings> getSettingsForInventory(String inventoryId) async {
