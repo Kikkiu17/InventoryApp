@@ -381,36 +381,6 @@ int main(int argc, char* argv[]) {
     CROW_ROUTE(app, "/api/status").methods("GET"_method)
     ([]() { return json_ok({{"status","ok"},{"server","inventory-multi"},{"version","2.0"}}); });
 
-    // ── Updates ──
-    CROW_ROUTE(app, "/api/update/version").methods("GET"_method)
-    ([]() {
-        std::ifstream f("version.txt");
-        std::string v; if (f) f >> v; else v = "1.0.0";
-        return json_ok({{"version", v}});
-    });
-
-    CROW_ROUTE(app, "/api/update/download").methods("GET"_method)
-    ([](crow::response& res) {
-        std::string apk_file = "";
-        
-        // Cerca il primo file .apk nella directory corrente
-        for (const auto& entry : fs::directory_iterator(".")) {
-            if (entry.is_regular_file() && entry.path().extension() == ".apk") {
-                apk_file = entry.path().filename().string();
-                break;
-            }
-        }
-
-        if (!apk_file.empty()) {
-            res.set_static_file_info(apk_file);
-        } else {
-            res.code = 404;
-            res.body = "{\"error\": \"APK non trovato\"}";
-            res.add_header("Content-Type", "application/json");
-        }
-        res.end();
-    });
-
     // ── Backups ──
     CROW_ROUTE(app, "/api/inventories/<string>/backups").methods("GET"_method)
     ([](const std::string& inv) {

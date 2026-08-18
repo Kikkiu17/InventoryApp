@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/settings.dart';
 import '../services/data_service.dart';
+import '../services/update_service.dart';
 import 'inventory_list_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -1064,6 +1066,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ],
           ])),
+          const SizedBox(height: 24),
+
+          _SectionHeader(title: 'Informazioni e aggiornamenti', icon: Icons.info_outline),
+          Card(child: Column(children: [
+            ListTile(
+              leading: Icon(Icons.system_update_alt, color: cs.primary),
+              title: const Text('Controlla aggiornamenti'),
+              subtitle: const Text('Verifica e scarica l\'ultima versione da GitHub'),
+              onTap: () => UpdateService.checkAndPromptUpdate(context, showNoUpdateFeedback: true),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: Icon(Icons.open_in_browser, color: cs.primary),
+              title: const Text('Repository GitHub'),
+              subtitle: const Text('https://github.com/Kikkiu17/InventoryApp'),
+              onTap: () async {
+                final uri = Uri.parse(UpdateService.releasesHtmlUrl);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
+          ])),
+          const SizedBox(height: 32),
         ],
       ),
     );

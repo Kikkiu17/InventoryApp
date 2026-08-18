@@ -9,7 +9,8 @@ class CabinetMapView extends StatefulWidget {
   final DataService dataService;
   final Function(Component) onViewComponent;
   final Function(Component) onEditComponent;
-  final Future<void> Function(int cabinetId, String drawerLabel, int zoneIndex) onAddComponentAt;
+  final Future<void> Function(int cabinetId, String drawerLabel, int zoneIndex)
+      onAddComponentAt;
 
   const CabinetMapView({
     super.key,
@@ -26,13 +27,17 @@ class CabinetMapView extends StatefulWidget {
 
 class _CabinetMapViewState extends State<CabinetMapView> {
   int? _selectedCabinetId;
+  late TransformationController _transformationController;
+  int? _lastCabinetId;
+  double? _lastViewportWidth;
+  double? _lastViewportHeight;
 
   Map<String, int> _parseLabelCoords(String label) {
     final match = RegExp(r'^([A-Z]+)(\d+)$').firstMatch(label);
     if (match == null) return {'col': 0, 'row': 0};
     final colStr = match.group(1)!;
     final rowVal = int.tryParse(match.group(2)!) ?? 1;
-    
+
     int colIdx = 0;
     for (int i = 0; i < colStr.length; i++) {
       colIdx = colIdx * 26 + (colStr.codeUnitAt(i) - 65 + 1);
@@ -44,9 +49,16 @@ class _CabinetMapViewState extends State<CabinetMapView> {
   @override
   void initState() {
     super.initState();
+    _transformationController = TransformationController();
     if (widget.settings.containers.isNotEmpty) {
       _selectedCabinetId = widget.settings.containers.first.id;
     }
+  }
+
+  @override
+  void dispose() {
+    _transformationController.dispose();
+    super.dispose();
   }
 
   @override
@@ -64,11 +76,13 @@ class _CabinetMapViewState extends State<CabinetMapView> {
     }
 
     // Adjust selected cabinet if the list changes or it becomes invalid
-    if (_selectedCabinetId == null || !containers.any((c) => c.id == _selectedCabinetId)) {
+    if (_selectedCabinetId == null ||
+        !containers.any((c) => c.id == _selectedCabinetId)) {
       _selectedCabinetId = containers.first.id;
     }
 
-    final selectedContainer = containers.firstWhere((c) => c.id == _selectedCabinetId);
+    final selectedContainer =
+        containers.firstWhere((c) => c.id == _selectedCabinetId);
     final cs = Theme.of(context).colorScheme;
 
     return Column(
@@ -80,7 +94,10 @@ class _CabinetMapViewState extends State<CabinetMapView> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: Text(
               'Seleziona contenitore',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+              style: Theme.of(context)
+                  .textTheme
+                  .labelSmall
+                  ?.copyWith(color: cs.onSurfaceVariant),
             ),
           ),
           SizedBox(
@@ -95,8 +112,11 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4.0),
                   child: ChoiceChip(
-                    avatar: Icon(Icons.kitchen_outlined, size: 16, color: isSelected ? cs.onPrimary : cs.onSurfaceVariant),
-                    label: Text(c.name.isNotEmpty ? c.name : 'Contenitore ${c.id}'),
+                    avatar: Icon(Icons.kitchen_outlined,
+                        size: 16,
+                        color: isSelected ? cs.onPrimary : cs.onSurfaceVariant),
+                    label: Text(
+                        c.name.isNotEmpty ? c.name : 'Contenitore ${c.id}'),
                     selected: isSelected,
                     onSelected: (val) {
                       if (val) {
@@ -116,8 +136,13 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                 Icon(Icons.kitchen_outlined, size: 20, color: cs.primary),
                 const SizedBox(width: 8),
                 Text(
-                  selectedContainer.name.isNotEmpty ? selectedContainer.name : 'Contenitore ${selectedContainer.id}',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  selectedContainer.name.isNotEmpty
+                      ? selectedContainer.name
+                      : 'Contenitore ${selectedContainer.id}',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -130,13 +155,23 @@ class _CabinetMapViewState extends State<CabinetMapView> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Usa il trascinamento per scorrere la griglia',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant.withOpacity(0.7)),
+              Flexible(
+                child: Text(
+                  'Usa il trascinamento per scorrere la griglia',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: cs.onSurfaceVariant.withOpacity(0.7)),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
+              const SizedBox(width: 8),
               Text(
                 '${selectedContainer.rows * selectedContainer.columns - selectedContainer.disabledDrawers.length} cassetti attivi',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant.withOpacity(0.7)),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: cs.onSurfaceVariant.withOpacity(0.7)),
               ),
             ],
           ),
@@ -154,17 +189,64 @@ class _CabinetMapViewState extends State<CabinetMapView> {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(11),
-              child: InteractiveViewer(
-                constrained: false,
-                scaleEnabled: true,
-                minScale: 0.5,
-                maxScale: 2.0,
-                child: RepaintBoundary(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: _buildGrid(context, selectedContainer, widget.settings, ds),
-                  ),
-                ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final viewportWidth = constraints.maxWidth;
+                  final viewportHeight = constraints.maxHeight;
+
+                  final contentWidth = selectedContainer.columns * 88.0 + 24.0;
+                  final contentHeight = selectedContainer.rows * 68.0 + 24.0;
+
+                  final double scaleX = viewportWidth > 0 && contentWidth > 0 ? viewportWidth / contentWidth : 1.0;
+                  final double scaleY = viewportHeight > 0 && contentHeight > 0 ? viewportHeight / contentHeight : 1.0;
+                  
+                  // Fit scale to ensure the entire cabinet fits in viewport
+                  final double fitScale = scaleX < scaleY ? scaleX : scaleY;
+                  final double initialScale = fitScale > 1.0 ? 1.0 : fitScale;
+                  final double minScale = (fitScale * 0.5).clamp(0.01, 1.0);
+                  final double maxScale = fitScale > 2.0 ? fitScale * 3.0 : 4.0;
+
+                  if (_lastCabinetId != selectedContainer.id ||
+                      _lastViewportWidth != viewportWidth ||
+                      _lastViewportHeight != viewportHeight) {
+                    _lastCabinetId = selectedContainer.id;
+                    _lastViewportWidth = viewportWidth;
+                    _lastViewportHeight = viewportHeight;
+
+                    double dx = 0.0;
+                    double dy = 0.0;
+                    if (contentWidth * initialScale < viewportWidth) {
+                      dx = (viewportWidth - contentWidth * initialScale) / 2.0;
+                    }
+                    if (contentHeight * initialScale < viewportHeight) {
+                      dy = (viewportHeight - contentHeight * initialScale) / 2.0;
+                    }
+
+                    final newMatrix = Matrix4.diagonal3Values(initialScale, initialScale, 1.0)
+                      ..setTranslationRaw(dx, dy, 0.0);
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        _transformationController.value = newMatrix;
+                      }
+                    });
+                  }
+
+                  return InteractiveViewer(
+                    transformationController: _transformationController,
+                    constrained: false,
+                    scaleEnabled: true,
+                    minScale: minScale,
+                    maxScale: maxScale,
+                    boundaryMargin: const EdgeInsets.all(double.infinity),
+                    child: RepaintBoundary(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: _buildGrid(
+                            context, selectedContainer, widget.settings, ds),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -174,12 +256,15 @@ class _CabinetMapViewState extends State<CabinetMapView> {
     );
   }
 
-  Widget _buildGrid(BuildContext context, ContainerConfig container, AppSettings settings, DataService ds) {
+  Widget _buildGrid(BuildContext context, ContainerConfig container,
+      AppSettings settings, DataService ds) {
     final rows = container.rows;
     final cols = container.columns;
 
     // Pre-group components for this container by drawer coordinate to optimize performance to O(N + C)
-    final cabinetComps = ds.components.where((c) => c.cabinet == container.id && c.bagName == null).toList();
+    final cabinetComps = ds.components
+        .where((c) => c.cabinet == container.id && c.bagName == null)
+        .toList();
     final Map<String, List<Component>> compsByDrawer = {};
     for (final comp in cabinetComps) {
       compsByDrawer.putIfAbsent(comp.drawer, () => []).add(comp);
@@ -223,13 +308,19 @@ class _CabinetMapViewState extends State<CabinetMapView> {
             };
           }).toList();
 
-          minCol = coordsList.map((e) => e['col']!).reduce((a, b) => a < b ? a : b);
-          minRow = coordsList.map((e) => e['row']!).reduce((a, b) => a < b ? a : b);
+          minCol =
+              coordsList.map((e) => e['col']!).reduce((a, b) => a < b ? a : b);
+          minRow =
+              coordsList.map((e) => e['row']!).reduce((a, b) => a < b ? a : b);
 
-          minDCol = coordsList.map((e) => e['dCol']!).reduce((a, b) => a < b ? a : b);
-          maxDCol = coordsList.map((e) => e['dCol']!).reduce((a, b) => a > b ? a : b);
-          minDRow = coordsList.map((e) => e['dRow']!).reduce((a, b) => a < b ? a : b);
-          maxDRow = coordsList.map((e) => e['dRow']!).reduce((a, b) => a > b ? a : b);
+          minDCol =
+              coordsList.map((e) => e['dCol']!).reduce((a, b) => a < b ? a : b);
+          maxDCol =
+              coordsList.map((e) => e['dCol']!).reduce((a, b) => a > b ? a : b);
+          minDRow =
+              coordsList.map((e) => e['dRow']!).reduce((a, b) => a < b ? a : b);
+          maxDRow =
+              coordsList.map((e) => e['dRow']!).reduce((a, b) => a > b ? a : b);
 
           // Skip if this is not the top-left cell of the group in logical coordinates
           if (c != minCol || r != minRow) {
@@ -279,7 +370,7 @@ class _CabinetMapViewState extends State<CabinetMapView> {
     final cs = Theme.of(context).colorScheme;
     final isDisabled = container.disabledDrawers.contains(label);
     final displayLabel = group != null ? group.join('+') : label;
-    
+
     if (isDisabled) {
       return Container(
         margin: const EdgeInsets.all(4),
@@ -345,52 +436,60 @@ class _CabinetMapViewState extends State<CabinetMapView> {
         child: Stack(
           children: [
             // Zones rendering
-            if (totalZones <= 1)
-              _buildZoneCell(
-                context,
-                container.id,
-                label,
-                1,
-                1,
-                drawerComps,
-                cs,
-              )
-            else
-              Column(
-                children: List.generate(totalZones, (i) {
-                  final zoneIdx = totalZones - i;
-                  final zoneComps = drawerComps.where((c) => (c.drawerZone ?? 1) == zoneIdx).toList();
-                  return Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        border: i < totalZones - 1
-                            ? Border(bottom: BorderSide(color: cs.outlineVariant.withOpacity(0.4), width: 0.8))
-                            : null,
-                      ),
-                      child: _buildZoneCell(
-                        context,
-                        container.id,
-                        label,
-                        zoneIdx,
-                        totalZones,
-                        zoneComps,
-                        cs,
-                      ),
+            Positioned.fill(
+              child: totalZones <= 1
+                  ? _buildZoneCell(
+                      context,
+                      container.id,
+                      label,
+                      1,
+                      1,
+                      drawerComps,
+                      cs,
+                    )
+                  : Column(
+                      children: List.generate(totalZones, (i) {
+                        final zoneIdx = totalZones - i;
+                        final zoneComps = drawerComps
+                            .where((c) => (c.drawerZone ?? 1) == zoneIdx)
+                            .toList();
+                        return Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              border: i < totalZones - 1
+                                  ? Border(
+                                      bottom: BorderSide(
+                                          color: cs.outlineVariant.withOpacity(0.4),
+                                          width: 0.8))
+                                  : null,
+                            ),
+                            child: _buildZoneCell(
+                              context,
+                              container.id,
+                              label,
+                              zoneIdx,
+                              totalZones,
+                              zoneComps,
+                              cs,
+                            ),
+                          ),
+                        );
+                      }),
                     ),
-                  );
-                }),
-              ),
-            
+            ),
+
             // Drawer central label overlay (IgnorePointer)
             Align(
               alignment: Alignment.center,
               child: IgnorePointer(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                   decoration: BoxDecoration(
                     color: cs.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: cs.outlineVariant.withOpacity(0.5)),
+                    border:
+                        Border.all(color: cs.outlineVariant.withOpacity(0.5)),
                   ),
                   child: Text(
                     displayLabel,
@@ -437,20 +536,29 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                   top: 0,
                   left: 2,
                   child: Text(
-                    zoneIndex == 1 ? 'V' : zoneIndex == totalZones ? 'L' : 'M',
+                    zoneIndex == 1
+                        ? 'V'
+                        : zoneIndex == totalZones
+                            ? 'L'
+                            : 'M',
                     style: TextStyle(
                       fontSize: 7.5,
                       fontWeight: FontWeight.bold,
-                      color: isOccupied ? cs.onPrimaryContainer.withOpacity(0.65) : cs.onSurfaceVariant.withOpacity(0.5),
+                      color: isOccupied
+                          ? cs.onPrimaryContainer.withOpacity(0.65)
+                          : cs.onSurfaceVariant.withOpacity(0.5),
                     ),
                   ),
                 ),
               // Quantity components count badge
               if (isOccupied)
                 Align(
-                  alignment: totalZones > 1 ? Alignment.centerRight : Alignment.bottomRight,
+                  alignment: totalZones > 1
+                      ? Alignment.centerRight
+                      : Alignment.bottomRight,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 4, vertical: 1.5),
                     decoration: BoxDecoration(
                       color: cs.primary,
                       borderRadius: BorderRadius.circular(8),
@@ -472,8 +580,10 @@ class _CabinetMapViewState extends State<CabinetMapView> {
     );
   }
 
-  void _showDrawerDetails(BuildContext context, int cabinetId, String drawerLabel) {
-    final container = widget.settings.containers.firstWhere((c) => c.id == cabinetId);
+  void _showDrawerDetails(
+      BuildContext context, int cabinetId, String drawerLabel) {
+    final container =
+        widget.settings.containers.firstWhere((c) => c.id == cabinetId);
     final mergeGroup = container.mergedDrawers.firstWhere(
       (g) => g.contains(drawerLabel),
       orElse: () => <String>[],
@@ -489,11 +599,14 @@ class _CabinetMapViewState extends State<CabinetMapView> {
       builder: (bSheetCtx) {
         return Consumer<DataService>(
           builder: (context, currentDs, __) {
-            final drawerComps = currentDs.components.where((c) =>
-              c.cabinet == cabinetId &&
-              (mergeGroup.isEmpty ? c.drawer == drawerLabel : mergeGroup.contains(c.drawer)) &&
-              c.bagName == null
-            ).toList();
+            final drawerComps = currentDs.components
+                .where((c) =>
+                    c.cabinet == cabinetId &&
+                    (mergeGroup.isEmpty
+                        ? c.drawer == drawerLabel
+                        : mergeGroup.contains(c.drawer)) &&
+                    c.bagName == null)
+                .toList();
 
             final cs = Theme.of(context).colorScheme;
 
@@ -501,7 +614,8 @@ class _CabinetMapViewState extends State<CabinetMapView> {
               height: MediaQuery.of(context).size.height * 0.75,
               decoration: BoxDecoration(
                 color: cs.surface,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(20)),
               ),
               padding: EdgeInsets.only(
                 left: 16,
@@ -524,7 +638,7 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                       ),
                     ),
                   ),
-                  
+
                   // Bottom sheet Header details
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -536,11 +650,19 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                             mergeGroup.isNotEmpty
                                 ? 'Cassetti Uniti (${mergeGroup.join('+')})'
                                 : 'Cassetto $drawerLabel',
-                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineSmall
+                                ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           Text(
-                            container.name.isNotEmpty ? container.name : 'Contenitore $cabinetId',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                            container.name.isNotEmpty
+                                ? container.name
+                                : 'Contenitore $cabinetId',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(color: cs.onSurfaceVariant),
                           ),
                         ],
                       ),
@@ -551,7 +673,7 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Zone contents
                   Expanded(
                     child: ListView.builder(
@@ -559,7 +681,9 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                       itemBuilder: (ctx2, index) {
                         final zoneIdx = index + 1;
                         final zoneLabel = getZoneLabel(zoneIdx, totalZones);
-                        final zoneComps = drawerComps.where((c) => (c.drawerZone ?? 1) == zoneIdx).toList();
+                        final zoneComps = drawerComps
+                            .where((c) => (c.drawerZone ?? 1) == zoneIdx)
+                            .toList();
 
                         return Card(
                           margin: const EdgeInsets.only(bottom: 16),
@@ -567,7 +691,8 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                           color: cs.surfaceContainerLow,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                            side: BorderSide(
+                                color: cs.outlineVariant.withOpacity(0.5)),
                           ),
                           child: Padding(
                             padding: const EdgeInsets.all(12.0),
@@ -576,20 +701,27 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                               children: [
                                 // Zone header bar with "Aggiungi" button
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     Expanded(
                                       child: Row(
                                         children: [
-                                          Icon(Icons.layers_outlined, size: 18, color: cs.primary),
+                                          Icon(Icons.layers_outlined,
+                                              size: 18, color: cs.primary),
                                           const SizedBox(width: 8),
                                           Expanded(
                                             child: Text(
-                                              totalZones > 1 ? 'Zona $zoneIdx ($zoneLabel)' : 'Contenuto cassetto',
-                                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                                fontWeight: FontWeight.bold,
-                                                color: cs.primary,
-                                              ),
+                                              totalZones > 1
+                                                  ? 'Zona $zoneIdx ($zoneLabel)'
+                                                  : 'Contenuto cassetto',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .titleMedium
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: cs.primary,
+                                                  ),
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
@@ -598,28 +730,37 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                                     ),
                                     TextButton.icon(
                                       icon: const Icon(Icons.add, size: 16),
-                                      label: const Text('Aggiungi', style: TextStyle(fontSize: 12)),
-                                      onPressed: () => _addComponentAtZone(bSheetCtx, cabinetId, primaryLabel, zoneIdx),
+                                      label: const Text('Aggiungi',
+                                          style: TextStyle(fontSize: 12)),
+                                      onPressed: () => _addComponentAtZone(
+                                          bSheetCtx,
+                                          cabinetId,
+                                          primaryLabel,
+                                          zoneIdx),
                                       style: TextButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 4),
                                         minimumSize: Size.zero,
-                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
                                       ),
                                     ),
                                   ],
                                 ),
                                 const Divider(height: 16),
-                                
+
                                 // Zone item contents list
                                 if (zoneComps.isEmpty)
                                   Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 20.0),
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 20.0),
                                     child: Center(
                                       child: Text(
                                         'Nessun componente in questa zona (Vuota)',
                                         style: TextStyle(
                                           fontSize: 13,
-                                          color: cs.onSurfaceVariant.withOpacity(0.7),
+                                          color: cs.onSurfaceVariant
+                                              .withOpacity(0.7),
                                           fontStyle: FontStyle.italic,
                                         ),
                                       ),
@@ -628,7 +769,8 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                                 else
                                   Column(
                                     children: zoneComps.map((comp) {
-                                      return _buildComponentItem(context, comp, currentDs, cs);
+                                      return _buildComponentItem(
+                                          context, comp, currentDs, cs);
                                     }).toList(),
                                   ),
                               ],
@@ -683,17 +825,23 @@ class _CabinetMapViewState extends State<CabinetMapView> {
               Wrap(
                 spacing: 4,
                 runSpacing: 4,
-                children: comp.tags.map((t) => Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                  decoration: BoxDecoration(
-                    color: cs.secondaryContainer.withOpacity(0.6),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    t,
-                    style: TextStyle(fontSize: 9, color: cs.onSecondaryContainer, fontWeight: FontWeight.w500),
-                  ),
-                )).toList(),
+                children: comp.tags
+                    .map((t) => Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: cs.secondaryContainer.withOpacity(0.6),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            t,
+                            style: TextStyle(
+                                fontSize: 9,
+                                color: cs.onSecondaryContainer,
+                                fontWeight: FontWeight.w500),
+                          ),
+                        ))
+                    .toList(),
               ),
             ],
           ],
@@ -752,7 +900,8 @@ class _CabinetMapViewState extends State<CabinetMapView> {
     int zoneIndex,
   ) async {
     final ds = widget.dataService;
-    final hasUnassigned = ds.components.any((c) => c.drawer.isEmpty && c.bagName == null);
+    final hasUnassigned =
+        ds.components.any((c) => c.drawer.isEmpty && c.bagName == null);
 
     showDialog(
       context: context,
@@ -767,7 +916,8 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                   child: Icon(Icons.add),
                 ),
                 title: const Text('Nuovo componente'),
-                subtitle: const Text('Crea da zero ed inserisci in questa posizione'),
+                subtitle:
+                    const Text('Crea da zero ed inserisci in questa posizione'),
                 onTap: () {
                   Navigator.pop(dialogCtx);
                   widget.onAddComponentAt(cabinetId, drawerLabel, zoneIndex);
@@ -778,16 +928,20 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                 enabled: hasUnassigned,
                 leading: CircleAvatar(
                   backgroundColor: hasUnassigned ? null : Colors.grey.shade300,
-                  child: Icon(Icons.drive_file_move_outlined, color: hasUnassigned ? null : Colors.grey),
+                  child: Icon(Icons.drive_file_move_outlined,
+                      color: hasUnassigned ? null : Colors.grey),
                 ),
                 title: const Text('Assegna esistente'),
-                subtitle: Text(hasUnassigned 
-                    ? 'Scegli tra i componenti senza posizione' 
+                subtitle: Text(hasUnassigned
+                    ? 'Scegli tra i componenti senza posizione'
                     : 'Nessun componente senza posizione disponibile'),
-                onTap: hasUnassigned ? () {
-                  Navigator.pop(dialogCtx);
-                  _showUnassignedPicker(context, cabinetId, drawerLabel, zoneIndex);
-                } : null,
+                onTap: hasUnassigned
+                    ? () {
+                        Navigator.pop(dialogCtx);
+                        _showUnassignedPicker(
+                            context, cabinetId, drawerLabel, zoneIndex);
+                      }
+                    : null,
               ),
             ],
           ),
@@ -836,10 +990,12 @@ class _UnassignedComponentPickerDialog extends StatefulWidget {
   });
 
   @override
-  State<_UnassignedComponentPickerDialog> createState() => _UnassignedComponentPickerDialogState();
+  State<_UnassignedComponentPickerDialog> createState() =>
+      _UnassignedComponentPickerDialogState();
 }
 
-class _UnassignedComponentPickerDialogState extends State<_UnassignedComponentPickerDialog> {
+class _UnassignedComponentPickerDialogState
+    extends State<_UnassignedComponentPickerDialog> {
   final _searchCtrl = TextEditingController();
   String _searchQuery = '';
 
@@ -852,14 +1008,15 @@ class _UnassignedComponentPickerDialogState extends State<_UnassignedComponentPi
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final allUnassigned = widget.dataService.components.where((c) =>
-      c.drawer.isEmpty && c.bagName == null
-    ).toList();
+    final allUnassigned = widget.dataService.components
+        .where((c) => c.drawer.isEmpty && c.bagName == null)
+        .toList();
 
-    final filtered = allUnassigned.where((c) =>
-      c.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-      c.description.toLowerCase().contains(_searchQuery.toLowerCase())
-    ).toList();
+    final filtered = allUnassigned
+        .where((c) =>
+            c.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+            c.description.toLowerCase().contains(_searchQuery.toLowerCase()))
+        .toList();
 
     return AlertDialog(
       title: const Text('Assegna componente esistente'),
@@ -876,7 +1033,8 @@ class _UnassignedComponentPickerDialogState extends State<_UnassignedComponentPi
                 border: const OutlineInputBorder(),
                 filled: true,
                 fillColor: cs.surfaceContainerLow,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
               onChanged: (v) => setState(() => _searchQuery = v),
             ),
@@ -904,34 +1062,48 @@ class _UnassignedComponentPickerDialogState extends State<_UnassignedComponentPi
                       color: cs.surfaceContainerLow,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
-                        side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                        side: BorderSide(
+                            color: cs.outlineVariant.withOpacity(0.5)),
                       ),
                       child: ListTile(
-                        title: Text(comp.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        title: Text(comp.name,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             if (comp.description.isNotEmpty)
-                              Text(comp.description, maxLines: 1, overflow: TextOverflow.ellipsis),
+                              Text(comp.description,
+                                  maxLines: 1, overflow: TextOverflow.ellipsis),
                             if (comp.tags.isNotEmpty) ...[
                               const SizedBox(height: 4),
                               Wrap(
                                 spacing: 4,
                                 runSpacing: 4,
-                                children: comp.tags.map((t) => Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                  decoration: BoxDecoration(
-                                    color: cs.secondaryContainer.withOpacity(0.5),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(t, style: TextStyle(fontSize: 8, color: cs.onSecondaryContainer)),
-                                )).toList(),
+                                children: comp.tags
+                                    .map((t) => Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 4, vertical: 1),
+                                          decoration: BoxDecoration(
+                                            color: cs.secondaryContainer
+                                                .withOpacity(0.5),
+                                            borderRadius:
+                                                BorderRadius.circular(4),
+                                          ),
+                                          child: Text(t,
+                                              style: TextStyle(
+                                                  fontSize: 8,
+                                                  color:
+                                                      cs.onSecondaryContainer)),
+                                        ))
+                                    .toList(),
                               ),
                             ],
                           ],
                         ),
                         trailing: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: cs.secondaryContainer,
                             borderRadius: BorderRadius.circular(6),
@@ -956,13 +1128,17 @@ class _UnassignedComponentPickerDialogState extends State<_UnassignedComponentPi
                             if (ctx.mounted) {
                               Navigator.pop(ctx); // Close picker dialog
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Componente "${comp.name}" assegnato con successo.')),
+                                SnackBar(
+                                    content: Text(
+                                        'Componente "${comp.name}" assegnato con successo.')),
                               );
                             }
                           } catch (e) {
                             if (ctx.mounted) {
                               ScaffoldMessenger.of(ctx).showSnackBar(
-                                SnackBar(content: Text('Errore durante l\'assegnazione: $e')),
+                                SnackBar(
+                                    content: Text(
+                                        'Errore durante l\'assegnazione: $e')),
                               );
                             }
                           }

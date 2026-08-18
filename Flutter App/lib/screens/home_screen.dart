@@ -9,6 +9,7 @@ import 'package:open_filex/open_filex.dart';
 import '../models/component.dart';
 import '../models/settings.dart';
 import '../services/data_service.dart';
+import '../services/update_service.dart';
 import '../widgets/component_tile.dart';
 import '../widgets/component_dialog.dart';
 import '../widgets/component_view_dialog.dart';
@@ -24,7 +25,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _isShowingConflict = false;
-  final _searchCtrl = TextEditingController();
+  final TextEditingController _searchCtrl = TextEditingController();
   String _query = '';
   List<String> _selectedTags = [];
   SortMode _sortMode = SortMode.name;
@@ -41,8 +42,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      UpdateService.checkAndPromptUpdate(context);
       final ds = context.read<DataService>();
-      ds.checkForUpdates();
       // Retry loading from server in case the initial load() in main() failed
       // (e.g. network not ready on cold start). Safe: uses checkConflict:false
       // so it never triggers the conflict dialog.
@@ -223,6 +224,25 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         actions: [
+          ValueListenableBuilder<UpdateInfo?>(
+            valueListenable: UpdateService.availableUpdateNotifier,
+            builder: (context, updateInfo, _) {
+              if (updateInfo == null || !updateInfo.hasUpdate) {
+                return const SizedBox.shrink();
+              }
+              return IconButton(
+                icon: Badge(
+                  backgroundColor: cs.primary,
+                  smallSize: 8,
+                  child: Icon(Icons.system_update_alt, color: cs.primary),
+                ),
+                tooltip:
+                    'Aggiornamento disponibile (v${updateInfo.latestVersion})',
+                onPressed: () =>
+                    UpdateService.showUpdateDialog(context, updateInfo),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.picture_as_pdf),
             tooltip: 'Esporta lista in PDF',

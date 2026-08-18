@@ -780,33 +780,7 @@ class DataService extends ChangeNotifier {
     }
   }
 
-  // ── Update APK ───────────────────────────────────────────────────────────────
-  Future<void> checkForUpdates() async {
-    if (_mode != StorageMode.remote || !_serverConnected) return;
-    try {
-      final info = await PackageInfo.fromPlatform();
-      final currentVersion = info.version;
 
-      final res = await http.get(Uri.parse('$_serverUrl/api/update/version'))
-          .timeout(const Duration(seconds: 5));
-      
-      if (res.statusCode == 200) {
-        final serverVersion = jsonDecode(res.body)['version'];
-        
-        if (serverVersion != currentVersion) {
-          final apkRes = await http.get(Uri.parse('$_serverUrl/api/update/download'));
-          
-          final dir = await getExternalStorageDirectory(); 
-          final file = File('${dir!.path}/update.apk');
-          await file.writeAsBytes(apkRes.bodyBytes);
-          
-          await OpenFilex.open(file.path);
-        }
-      }
-    } catch (e) {
-      print("Errore aggiornamento: $e");
-    }
-  }
 
   Future<void> createBackup() async {
     if (_mode != StorageMode.remote || !_serverConnected) return;
