@@ -89,7 +89,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Creazione ed esportazione del file PDF
-  Future<void> _exportToPdf(List<Component> items, AppSettings settings) async {
+  Future<void> _exportToPdf(List<Component> items, AppSettings settings, [String? title]) async {
+    final effectiveTitle = (title != null && title.trim().isNotEmpty)
+        ? title.trim()
+        : 'Inventario Componenti';
     final fontData = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
     final ttf = pw.Font.ttf(fontData);
 
@@ -105,7 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
         build: (context) => [
           pw.Header(
             level: 0,
-            child: pw.Text("Inventario Componenti", style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+            child: pw.Text(effectiveTitle, style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
           ),
           pw.SizedBox(height: 10),
           pw.TableHelper.fromTextArray(
@@ -246,7 +249,11 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.picture_as_pdf),
             tooltip: 'Esporta lista in PDF',
-            onPressed: () => _exportToPdf(results, ds.settings),
+            onPressed: () => _exportToPdf(
+              results,
+              ds.settings,
+              ds.currentInventory?.name,
+            ),
           ),
           if (ds.isRemote)
             ds.syncing

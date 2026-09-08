@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../models/search_result.dart';
 import '../services/data_service.dart';
@@ -79,7 +80,12 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
                   ),
                 ),
               ),
-              ...inventoryResults.map((res) => _buildResultTile(context, res)),
+              ...inventoryResults.map((res) => GlobalSearchResultTile(
+                    res: res,
+                    query: query,
+                    ds: ds,
+                    onBeforeNavigate: () => close(context, null),
+                  )),
             ],
             if (inventoryResults.isNotEmpty && bufferResults.isNotEmpty) ...[
               const Padding(
@@ -100,7 +106,12 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
                   ),
                 ),
               ),
-              ...bufferResults.map((res) => _buildResultTile(context, res)),
+              ...bufferResults.map((res) => GlobalSearchResultTile(
+                    res: res,
+                    query: query,
+                    ds: ds,
+                    onBeforeNavigate: () => close(context, null),
+                  )),
             ],
           ],
         );
@@ -108,15 +119,42 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
     );
   }
 
-  Widget _buildResultTile(BuildContext context, GlobalSearchResult res) {
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    if (query.trim().isEmpty) {
+      return const Center(
+        child: Text('Cerca componenti in tutti gli inventari.'),
+      );
+    }
+    return buildResults(context);
+  }
+}
+
+class GlobalSearchResultTile extends StatelessWidget {
+  final GlobalSearchResult res;
+  final String query;
+  final DataService? ds;
+  final VoidCallback? onBeforeNavigate;
+
+  const GlobalSearchResultTile({
+    super.key,
+    required this.res,
+    required this.query,
+    this.ds,
+    this.onBeforeNavigate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveDs = ds ?? context.read<DataService>();
     final c = res.component;
     final isBuffer = res.inventoryId == '_buffer_';
+    final cs = Theme.of(context).colorScheme;
+
     return ListTile(
       leading: Icon(
         isBuffer ? Icons.inbox : Icons.memory,
-        color: isBuffer
-            ? Theme.of(context).colorScheme.secondary
-            : Theme.of(context).colorScheme.primary,
+        color: isBuffer ? cs.secondary : cs.primary,
       ),
       title: Text(c.name, style: const TextStyle(fontWeight: FontWeight.bold)),
       subtitle: Column(
@@ -137,14 +175,14 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
               children: c.tags.map((t) => Container(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.5),
+                  color: cs.secondaryContainer.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   t,
                   style: TextStyle(
                     fontSize: 9,
-                    color: Theme.of(context).colorScheme.onSecondaryContainer,
+                    color: cs.onSecondaryContainer,
                   ),
                 ),
               )).toList(),
@@ -152,23 +190,45 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
           ],
         ],
       ),
-      trailing: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: isBuffer
-              ? Theme.of(context).colorScheme.secondaryContainer
-              : Theme.of(context).colorScheme.primaryContainer,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          res.inventoryName,
-          style: TextStyle(
-            fontSize: 10,
-            color: isBuffer
-                ? Theme.of(context).colorScheme.onSecondaryContainer
-                : Theme.of(context).colorScheme.onPrimaryContainer,
+      trailing: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: isBuffer ? cs.secondaryContainer : cs.primaryContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              res.inventoryName,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+                color: isBuffer ? cs.onSecondaryContainer : cs.onPrimaryContainer,
+              ),
+            ),
           ),
-        ),
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: c.quantity == 0
+                  ? cs.errorContainer.withValues(alpha: 0.6)
+                  : cs.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              'Q.tà: ${c.quantity}',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: c.quantity == 0 ? cs.error : cs.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
       ),
       onTap: () async {
         try {
@@ -179,7 +239,7 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
                 content: Text('Passato al Buffer'),
                 behavior: SnackBarBehavior.floating,
               ));
-              close(context, null); // chiude la ricerca
+              onBeforeNavigate?.call();
               
               // Passa alla tab Buffer (indice 1)
               globalMainShellKey.currentState?.switchTab(1);
@@ -189,7 +249,7 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
                 context: mainContext,
                 builder: (ctx) => ComponentViewDialog(
                   component: c,
-                  settings: ds.settings,
+                  settings: effectiveDs.settings,
                   onEdit: () {
                     ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
                       content: Text('Modifica il componente direttamente dalla lista.'),
@@ -199,14 +259,14 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
               );
             }
           } else {
-            await ds.switchInventory(res.inventoryId);
-            ds.setGlobalSearchQuery(query);
+            await effectiveDs.switchInventory(res.inventoryId);
+            effectiveDs.setGlobalSearchQuery(query);
             if (context.mounted && mainContext != null) {
               ScaffoldMessenger.of(mainContext).showSnackBar(SnackBar(
                 content: Text('Passato all\'inventario "${res.inventoryName}"'),
                 behavior: SnackBarBehavior.floating,
               ));
-              close(context, null); // chiude la ricerca
+              onBeforeNavigate?.call();
               
               // Passa alla tab Home
               globalMainShellKey.currentState?.switchTab(0);
@@ -216,7 +276,7 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
                 context: mainContext,
                 builder: (ctx) => ComponentViewDialog(
                   component: c,
-                  settings: ds.settings,
+                  settings: effectiveDs.settings,
                   onEdit: () {
                     ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
                       content: Text('Modifica il componente direttamente dalla lista.'),
@@ -232,13 +292,6 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
           }
         }
       },
-    );
-  }
-
-  @override
-  Widget buildSuggestions(BuildContext context) {
-    return const Center(
-      child: Text('Cerca componenti in tutti gli inventari.'),
     );
   }
 }

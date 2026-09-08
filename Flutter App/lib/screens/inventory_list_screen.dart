@@ -1,72 +1,79 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/search_result.dart';
 import '../services/data_service.dart';
 import '../widgets/global_search_delegate.dart';
 
 /// Schermata per visualizzare, selezionare, creare, rinominare ed eliminare
-/// gli inventari presenti sul server.
-class InventoryListScreen extends StatelessWidget {
+/// gli inventari presenti sul server, con barra di ricerca globale in tempo reale.
+class InventoryListScreen extends StatefulWidget {
   const InventoryListScreen({super.key});
+
+  @override
+  State<InventoryListScreen> createState() => _InventoryListScreenState();
+}
+
+class _InventoryListScreenState extends State<InventoryListScreen> {
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _query = '';
+  Timer? _debounceTimer;
+  bool _isSearching = false;
+  List<GlobalSearchResult>? _searchResults;
+  Object? _searchError;
+  int _searchVersion = 0;
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onQueryChanged(String val) {
+    final trimmed = val.trim();
+    if (trimmed == _query && _searchResults != null) return;
+
+    _debounceTimer?.cancel();
+    setState(() {
+      _query = trimmed;
+      if (_query.isEmpty) {
+        _isSearching = false;
+        _searchResults = null;
+        _searchError = null;
+      } else {
+        _isSearching = true;
+      }
+    });
+
+    if (trimmed.isEmpty) return;
+
+    final currentVersion = ++_searchVersion;
+    _debounceTimer = Timer(const Duration(milliseconds: 250), () async {
+      final ds = context.read<DataService>();
+      try {
+        final results = await ds.globalSearch(trimmed);
+        if (!mounted || currentVersion != _searchVersion) return;
+        setState(() {
+          _searchResults = results;
+          _isSearching = false;
+          _searchError = null;
+        });
+      } catch (e) {
+        if (!mounted || currentVersion != _searchVersion) return;
+        setState(() {
+          _searchError = e;
+          _isSearching = false;
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final ds    = context.watch<DataService>();
     final theme = Theme.of(context);
     final cs    = theme.colorScheme;
-
-    Widget body;
-
-    if (!ds.isRemote) {
-      body = _Placeholder(
-        icon: Icons.cloud_off_outlined,
-        title: 'Modalità locale',
-        subtitle: 'Attiva il server remoto nelle Impostazioni per gestire più inventari.',
-        cs: cs,
-      );
-    } else if (ds.syncing && ds.inventories.isEmpty) {
-      body = const Center(child: CircularProgressIndicator());
-    } else if (!ds.serverConnected && ds.inventories.isEmpty) {
-      body = _Placeholder(
-        icon: Icons.wifi_off_rounded,
-        title: 'Server non raggiungibile',
-        subtitle: 'Controlla la connessione e l\'indirizzo del server.',
-        cs: cs,
-        action: FilledButton.icon(
-          onPressed: () => ds.refreshFromServer(),
-          icon: const Icon(Icons.refresh),
-          label: const Text('Riprova'),
-        ),
-      );
-    } else if (ds.inventories.isEmpty) {
-      body = _Placeholder(
-        icon: Icons.inventory_2_outlined,
-        title: 'Nessun inventario',
-        subtitle: 'Crea il primo inventario per iniziare.',
-        cs: cs,
-        action: FilledButton.icon(
-          onPressed: () => _showCreateDialog(context, ds),
-          icon: const Icon(Icons.add),
-          label: const Text('Crea inventario'),
-        ),
-      );
-    } else {
-      body = ListView.builder(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 100),
-        itemCount: ds.inventories.length,
-        itemBuilder: (ctx, i) {
-          final inv       = ds.inventories[i];
-          final isCurrent = inv.id == ds.currentInventoryId;
-          return _InventoryCard(
-            inv:       inv,
-            isCurrent: isCurrent,
-            canDelete: ds.inventories.length > 1,
-            onSelect:  () => _selectInventory(context, ds, inv.id),
-            onRename:  () => _showRenameDialog(context, ds, inv),
-            onDelete:  () => _confirmDelete(context, ds, inv),
-          );
-        },
-      );
-    }
 
     return Scaffold(
       appBar: AppBar(
@@ -83,11 +90,6 @@ class InventoryListScreen extends StatelessWidget {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            tooltip: 'Cerca globalmente',
-            onPressed: () => showSearch(context: context, delegate: GlobalSearchDelegate(ds)),
-          ),
           if (ds.isRemote && ds.serverConnected)
             IconButton(
               icon: ds.syncing
@@ -100,8 +102,58 @@ class InventoryListScreen extends StatelessWidget {
             ),
         ],
       ),
-      body: body,
-      floatingActionButton: ds.isRemote && ds.serverConnected
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+            child: SizedBox(
+              height: 40,
+              child: SearchBar(
+                controller: _searchCtrl,
+                hintText: 'Cerca in tutti gli inventari…',
+                leading: const Icon(Icons.search, size: 18),
+                trailing: [
+                  if (_isSearching)
+                    const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  if (_query.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.clear, size: 18),
+                      tooltip: 'Cancella',
+                      onPressed: () {
+                        _searchCtrl.clear();
+                        _onQueryChanged('');
+                      },
+                    ),
+                ],
+                onChanged: _onQueryChanged,
+                elevation: const WidgetStatePropertyAll(0),
+                shape: WidgetStatePropertyAll(
+                  RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+                  ),
+                ),
+                padding: const WidgetStatePropertyAll(
+                  EdgeInsets.symmetric(horizontal: 10),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: _query.isEmpty
+                ? _buildNormalBody(ds, cs)
+                : _buildSearchResults(context, ds, cs, theme),
+          ),
+        ],
+      ),
+      floatingActionButton: _query.isEmpty && ds.isRemote && ds.serverConnected
           ? FloatingActionButton.extended(
               heroTag: 'fab_inventories',
               onPressed: () => _showCreateDialog(context, ds),
@@ -109,6 +161,217 @@ class InventoryListScreen extends StatelessWidget {
               label: const Text('Nuovo inventario'),
             )
           : null,
+    );
+  }
+
+  Widget _buildNormalBody(DataService ds, ColorScheme cs) {
+    if (!ds.isRemote) {
+      return _Placeholder(
+        icon: Icons.cloud_off_outlined,
+        title: 'Modalità locale',
+        subtitle: 'Attiva il server remoto nelle Impostazioni per gestire più inventari.',
+        cs: cs,
+      );
+    } else if (ds.syncing && ds.inventories.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    } else if (!ds.serverConnected && ds.inventories.isEmpty) {
+      return _Placeholder(
+        icon: Icons.wifi_off_rounded,
+        title: 'Server non raggiungibile',
+        subtitle: 'Controlla la connessione e l\'indirizzo del server.',
+        cs: cs,
+        action: FilledButton.icon(
+          onPressed: () => ds.refreshFromServer(),
+          icon: const Icon(Icons.refresh),
+          label: const Text('Riprova'),
+        ),
+      );
+    } else if (ds.inventories.isEmpty) {
+      return _Placeholder(
+        icon: Icons.inventory_2_outlined,
+        title: 'Nessun inventario',
+        subtitle: 'Crea il primo inventario per iniziare.',
+        cs: cs,
+        action: FilledButton.icon(
+          onPressed: () => _showCreateDialog(context, ds),
+          icon: const Icon(Icons.add),
+          label: const Text('Crea inventario'),
+        ),
+      );
+    } else {
+      return ListView.builder(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 100),
+        itemCount: ds.inventories.length,
+        itemBuilder: (ctx, i) {
+          final inv       = ds.inventories[i];
+          final isCurrent = inv.id == ds.currentInventoryId;
+          return _InventoryCard(
+            inv:       inv,
+            isCurrent: isCurrent,
+            canDelete: ds.inventories.length > 1,
+            onSelect:  () => _selectInventory(context, ds, inv.id),
+            onRename:  () => _showRenameDialog(context, ds, inv),
+            onDelete:  () => _confirmDelete(context, ds, inv),
+          );
+        },
+      );
+    }
+  }
+
+  Widget _buildSearchResults(
+      BuildContext context, DataService ds, ColorScheme cs, ThemeData theme) {
+    if (_isSearching && _searchResults == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_searchError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, size: 48, color: cs.error),
+              const SizedBox(height: 12),
+              Text(
+                'Errore durante la ricerca: $_searchError',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: cs.error),
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: () => _onQueryChanged(_searchCtrl.text),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Riprova'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final allResults = _searchResults ?? [];
+    final matchingInventories = ds.inventories
+        .where((inv) =>
+            inv.name.toLowerCase().contains(_query.toLowerCase()) ||
+            inv.description.toLowerCase().contains(_query.toLowerCase()))
+        .toList();
+    final inventoryResults =
+        allResults.where((r) => r.inventoryId != '_buffer_').toList();
+    final bufferResults =
+        allResults.where((r) => r.inventoryId == '_buffer_').toList();
+
+    if (matchingInventories.isEmpty &&
+        inventoryResults.isEmpty &&
+        bufferResults.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.search_off,
+                  size: 64, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+              const SizedBox(height: 16),
+              Text(
+                'Nessun risultato',
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Nessun componente o inventario corrisponde a "$_query".',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: cs.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 100),
+      children: [
+        if (_isSearching) ...[
+          const LinearProgressIndicator(),
+          const SizedBox(height: 8),
+        ],
+        if (matchingInventories.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 8, 4, 6),
+            child: Text(
+              'INVENTARI',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                letterSpacing: 1.2,
+                color: cs.primary,
+              ),
+            ),
+          ),
+          ...matchingInventories.map((inv) {
+            final isCurrent = inv.id == ds.currentInventoryId;
+            return _InventoryCard(
+              inv: inv,
+              isCurrent: isCurrent,
+              canDelete: ds.inventories.length > 1,
+              onSelect: () => _selectInventory(context, ds, inv.id),
+              onRename: () => _showRenameDialog(context, ds, inv),
+              onDelete: () => _confirmDelete(context, ds, inv),
+            );
+          }),
+        ],
+        if (matchingInventories.isNotEmpty &&
+            (inventoryResults.isNotEmpty || bufferResults.isNotEmpty)) ...[
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Divider(height: 1, thickness: 1),
+          ),
+        ],
+        if (inventoryResults.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 8, 4, 6),
+            child: Text(
+              'COMPONENTI INVENTARI',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                letterSpacing: 1.2,
+                color: cs.primary,
+              ),
+            ),
+          ),
+          ...inventoryResults.map((res) => GlobalSearchResultTile(
+                res: res,
+                query: _query,
+              )),
+        ],
+        if (inventoryResults.isNotEmpty && bufferResults.isNotEmpty) ...[
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Divider(height: 1, thickness: 1),
+          ),
+        ],
+        if (bufferResults.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 8, 4, 6),
+            child: Text(
+              'COMPONENTI BUFFER',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                letterSpacing: 1.2,
+                color: cs.secondary,
+              ),
+            ),
+          ),
+          ...bufferResults.map((res) => GlobalSearchResultTile(
+                res: res,
+                query: _query,
+              )),
+        ],
+      ],
     );
   }
 

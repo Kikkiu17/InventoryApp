@@ -11,7 +11,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets(
-      'ComponentDialog switches to map view without semantics or scheduler error',
+      'ComponentDialog renders map button and opens DrawerPickerDialog on tap without tastiera/mappa segmented button',
       (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({});
     final settings = AppSettings(
@@ -50,15 +50,18 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // Find the SegmentedButton segment for 'Mappa'
-    final mappaBtn = find.text('Mappa');
-    expect(mappaBtn, findsOneWidget);
+    // Verify that the SegmentedButton choice 'Tastiera' and 'Mappa' does NOT exist
+    expect(find.text('Tastiera'), findsNothing);
 
-    // Tap on 'Mappa'
-    await tester.tap(mappaBtn);
+    // Verify the map button with tooltip 'Seleziona da mappa' is present
+    final mapBtn = find.byTooltip('Seleziona da mappa');
+    expect(mapBtn, findsOneWidget);
+
+    // Tap the map button to open the map picker dialog
+    await tester.tap(mapBtn);
     await tester.pumpAndSettle();
 
-    // Verify no exception was thrown and map is visible
+    // Verify the map dialog is visible and InteractiveViewer is rendered
     expect(find.byType(InteractiveViewer), findsOneWidget);
   });
 
