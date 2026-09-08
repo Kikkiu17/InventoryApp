@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/search_result.dart';
+import '../models/settings.dart';
 import '../services/data_service.dart';
 import 'component_view_dialog.dart';
 import '../main.dart';
@@ -151,6 +152,23 @@ class GlobalSearchResultTile extends StatelessWidget {
     final isBuffer = res.inventoryId == '_buffer_';
     final cs = Theme.of(context).colorScheme;
 
+    // Resolve property definitions for this component's inventory
+    final availableSpecialTags = res.specialTags ??
+        effectiveDs.getSpecialTagsForInventory(res.inventoryId) ??
+        effectiveDs.settings.specialTags;
+
+    // Filter properties with non-empty value and configured short identifier
+    final shortProperties = <MapEntry<SpecialTag, String>>[];
+    for (final entry in c.specialTagValues.entries) {
+      final val = entry.value.trim();
+      if (val.isEmpty) continue;
+      final st =
+          availableSpecialTags.where((s) => s.name == entry.key).firstOrNull;
+      if (st != null && st.shortId.trim().isNotEmpty) {
+        shortProperties.add(MapEntry(st, val));
+      }
+    }
+
     return ListTile(
       leading: Icon(
         isBuffer ? Icons.inbox : Icons.memory,
@@ -167,25 +185,48 @@ class GlobalSearchResultTile extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          if (c.tags.isNotEmpty) ...[
+          if (c.tags.isNotEmpty || shortProperties.isNotEmpty) ...[
             const SizedBox(height: 4),
             Wrap(
               spacing: 4,
               runSpacing: 4,
-              children: c.tags.map((t) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                decoration: BoxDecoration(
-                  color: cs.secondaryContainer.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  t,
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: cs.onSecondaryContainer,
+              children: [
+                ...c.tags.map((t) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: cs.secondaryContainer.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(4),
                   ),
-                ),
-              )).toList(),
+                  child: Text(
+                    t,
+                    style: TextStyle(
+                      fontSize: 9,
+                      color: cs.onSecondaryContainer,
+                    ),
+                  ),
+                )),
+                ...shortProperties.map((entry) {
+                  final st = entry.key;
+                  final val = entry.value;
+                  final formattedVal = formatValueWithUnit(val, st.unit);
+                  return Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: cs.tertiaryContainer,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      '${st.shortId}: $formattedVal',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.bold,
+                        color: cs.onTertiaryContainer,
+                      ),
+                    ),
+                  );
+                }),
+              ],
             ),
           ],
         ],

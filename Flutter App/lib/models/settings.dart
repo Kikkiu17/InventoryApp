@@ -1,20 +1,65 @@
+/// Helper per formattare "10K" con "Ω" -> "10KΩ" e "10" con "mm" -> "10mm"
+String formatValueWithUnit(String value, String unit) {
+  if (unit.isEmpty) return value;
+  final v = value.trim();
+
+  final regEnd = RegExp(r'^([0-9]+(?:\.[0-9]+)?)([a-zA-Zµ])$');
+  final match = regEnd.firstMatch(v);
+  if (match != null) {
+    return '${match.group(1)}${match.group(2)}$unit';
+  }
+
+  return '$v$unit';
+}
+
 class SpecialTag {
   String name;
   String unit;
   bool isString; // Specifica se è una stringa di testo libero
+  String shortId; // Identificatore breve (es. "L", "W")
 
-  SpecialTag({required this.name, this.unit = '', this.isString = false});
+  SpecialTag({
+    required this.name,
+    this.unit = '',
+    this.isString = false,
+    this.shortId = '',
+  });
 
   Map<String, dynamic> toJson() => {
         'name': name,
         'unit': unit,
         'isString': isString,
+        'shortId': shortId,
       };
 
   factory SpecialTag.fromJson(Map<String, dynamic> json) => SpecialTag(
         name: json['name'] as String,
         unit: json['unit'] as String? ?? '',
         isString: json['isString'] as bool? ?? false,
+        shortId: json['shortId'] as String? ??
+            json['shortName'] as String? ??
+            json['abbreviation'] as String? ??
+            '',
+      );
+
+  SpecialTag clone() => SpecialTag(
+        name: name,
+        unit: unit,
+        isString: isString,
+        shortId: shortId,
+      );
+
+  SpecialTag copyWith({
+    String? name,
+    String? unit,
+    bool? isString,
+    String? shortId,
+  }) =>
+      SpecialTag(
+        name: name ?? this.name,
+        unit: unit ?? this.unit,
+        isString: isString ?? this.isString,
+        shortId: shortId ?? this.shortId,
       );
 }
 

@@ -558,6 +558,9 @@ int main(int argc, char* argv[]) {
                     res_item["inventoryId"] = inv_id;
                     res_item["inventoryName"] = inv_name;
                     res_item["component"] = comp;
+                    if (settings.contains("specialTags")) {
+                        res_item["specialTags"] = settings["specialTags"];
+                    }
                     results.push_back(res_item);
                 }
             }

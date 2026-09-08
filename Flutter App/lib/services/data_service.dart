@@ -945,6 +945,7 @@ class DataService extends ChangeNotifier {
               inventoryId: inv.id,
               inventoryName: inv.name,
               component: c,
+              specialTags: settings.specialTags,
             ));
           }
         }
@@ -958,11 +959,19 @@ class DataService extends ChangeNotifier {
           inventoryId: '_buffer_',
           inventoryName: 'Buffer',
           component: c,
+          specialTags: _settings.specialTags,
         ));
       }
     }
 
     return matches;
+  }
+
+  List<SpecialTag>? getSpecialTagsForInventory(String invId) {
+    if (invId == '_buffer_' || invId == _currentInventoryId) {
+      return _settings.specialTags;
+    }
+    return null;
   }
 
   // ── Shared Buffer Operations ───────────────────────────────────────────────

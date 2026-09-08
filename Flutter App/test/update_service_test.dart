@@ -32,6 +32,30 @@ void main() {
       expect(UpdateService.isNewerVersion('1.10.9', '1.11.0'), isFalse);
       expect(UpdateService.isNewerVersion('1.0.0', '2.0.0'), isFalse);
     });
+
+    test('cleanReleaseNotes deduplicates repeated release notes', () {
+      const duplicatedNotes =
+          '**Full Changelog**: https://github.com/Kikkiu17/InventoryApp/compare/v1.12.2...v1.12.3\n\n'
+          '**Full Changelog**: https://github.com/Kikkiu17/InventoryApp/compare/v1.12.2...v1.12.3';
+      expect(
+        UpdateService.cleanReleaseNotes(duplicatedNotes),
+        '**Full Changelog**: https://github.com/Kikkiu17/InventoryApp/compare/v1.12.2...v1.12.3',
+      );
+
+      const duplicatedMultiBlock =
+          '## What\'s Changed\n* Added search\n\n**Full Changelog**: https://github.com/...\n\n'
+          '## What\'s Changed\n* Added search\n\n**Full Changelog**: https://github.com/...';
+      expect(
+        UpdateService.cleanReleaseNotes(duplicatedMultiBlock),
+        '## What\'s Changed\n* Added search\n\n**Full Changelog**: https://github.com/...',
+      );
+
+      const nonDuplicated = '## What\'s Changed\n* feat: nice\n\n**Full Changelog**: https://...';
+      expect(UpdateService.cleanReleaseNotes(nonDuplicated), nonDuplicated);
+
+      expect(UpdateService.cleanReleaseNotes(''), '');
+      expect(UpdateService.cleanReleaseNotes('   '), '');
+    });
   });
 
   group('UpdateService GitHub API & Dialog', () {

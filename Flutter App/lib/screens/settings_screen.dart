@@ -25,6 +25,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _newTagCtrl = TextEditingController();
   final _newSpecialNameCtrl = TextEditingController();
   final _newSpecialUnitCtrl = TextEditingController();
+  final _newSpecialShortIdCtrl = TextEditingController();
   final _serverUrlCtrl = TextEditingController();
 
   final _manualDrawerCtrl = TextEditingController();
@@ -59,6 +60,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _newTagCtrl.dispose();
     _newSpecialNameCtrl.dispose();
     _newSpecialUnitCtrl.dispose();
+    _newSpecialShortIdCtrl.dispose();
     _serverUrlCtrl.dispose();
     _manualDrawerCtrl.dispose();
     super.dispose();
@@ -699,10 +701,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       _tags = List.from(s.availableTags);
       _tagTree = _deepCopyTree(s.tagTree);
-      _specialTags = s.specialTags
-          .map((t) =>
-              SpecialTag(name: t.name, unit: t.unit, isString: t.isString))
-          .toList();
+      _specialTags = s.specialTags.map((t) => t.clone()).toList();
       _drawerDividers = Map.from(s.drawerDividers);
 
       _serverUrlCtrl.text = ds.serverUrl;
@@ -1149,13 +1148,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             isDense: true),
                         onSubmitted: (_) => _addSpecialTag())),
                 const SizedBox(width: 8),
-                // AUMENTATA LA LARGHEZZA A 90 PIXEL
                 SizedBox(
-                    width: 90,
+                    width: 80,
                     child: TextField(
                         controller: _newSpecialUnitCtrl,
                         decoration: const InputDecoration(
                             labelText: 'Unità',
+                            border: OutlineInputBorder(),
+                            isDense: true),
+                        onSubmitted: (_) => _addSpecialTag())),
+                const SizedBox(width: 8),
+                SizedBox(
+                    width: 70,
+                    child: TextField(
+                        controller: _newSpecialShortIdCtrl,
+                        decoration: const InputDecoration(
+                            labelText: 'Sigla',
+                            hintText: 'es. L',
                             border: OutlineInputBorder(),
                             isDense: true),
                         onSubmitted: (_) => _addSpecialTag())),
@@ -1197,15 +1206,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       leading: Icon(
                           st.isString ? Icons.text_fields : Icons.numbers,
                           color: cs.primary),
-                      title: Text(st.name,
-                          style: const TextStyle(fontWeight: FontWeight.w500)),
+                      title: Row(
+                        children: [
+                          Flexible(
+                            child: Text(st.name,
+                                style: const TextStyle(fontWeight: FontWeight.w500),
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                          if (st.shortId.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: cs.primaryContainer,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                st.shortId,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: cs.onPrimaryContainer,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                       subtitle: Text((st.unit.isNotEmpty
                               ? 'Unità: ${st.unit}'
                               : 'Nessuna unità') +
-                          (st.isString ? ' • Testo' : ' • Valore')),
+                          (st.isString ? ' • Testo' : ' • Valore') +
+                          (st.shortId.isNotEmpty ? ' • Sigla: ${st.shortId}' : '')),
                       trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                         IconButton(
+                            icon: const Icon(Icons.edit_outlined),
+                            tooltip: 'Modifica',
+                            onPressed: () => _editSpecialTag(st)),
+                        IconButton(
                             icon: Icon(Icons.delete_outline, color: cs.error),
+                            tooltip: 'Elimina',
                             onPressed: () => _confirmDeleteSpecialTag(st.name)),
                         ReorderableDragStartListener(
                             index: i,
@@ -1428,11 +1469,111 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _specialTags.add(SpecialTag(
           name: name,
           unit: _newSpecialUnitCtrl.text.trim(),
-          isString: _newSpecialIsString));
+          isString: _newSpecialIsString,
+          shortId: _newSpecialShortIdCtrl.text.trim()));
       _newSpecialIsString = false;
     });
     _newSpecialNameCtrl.clear();
     _newSpecialUnitCtrl.clear();
+    _newSpecialShortIdCtrl.clear();
+  }
+
+  Future<void> _editSpecialTag(SpecialTag st) async {
+    final nameCtrl = TextEditingController(text: st.name);
+    final unitCtrl = TextEditingController(text: st.unit);
+    final shortIdCtrl = TextEditingController(text: st.shortId);
+    bool isString = st.isString;
+
+    final updated = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Modifica proprietà'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Nome',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: TextField(
+                        controller: unitCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Unità',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 2,
+                      child: TextField(
+                        controller: shortIdCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Sigla',
+                          hintText: 'es. L',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    FilterChip(
+                      label: const Text('Testo libero'),
+                      selected: isString,
+                      onSelected: (v) => setDialogState(() => isString = v),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annulla'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final newName = nameCtrl.text.trim();
+                if (newName.isEmpty) return;
+                if (newName != st.name &&
+                    _specialTags.any((t) => t.name == newName)) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(
+                        content: Text('Esiste già una proprietà con questo nome')),
+                  );
+                  return;
+                }
+                Navigator.pop(ctx, true);
+              },
+              child: const Text('Salva'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (updated == true) {
+      setState(() {
+        st.name = nameCtrl.text.trim();
+        st.unit = unitCtrl.text.trim();
+        st.shortId = shortIdCtrl.text.trim();
+        st.isString = isString;
+      });
+    }
   }
 
   Future<void> _confirmDeleteTag(String tag) async {
@@ -1511,10 +1652,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             .toList();
         _tags = List.from(ds.settings.availableTags);
         _tagTree = _deepCopyTree(ds.settings.tagTree);
-        _specialTags = ds.settings.specialTags
-            .map((t) =>
-                SpecialTag(name: t.name, unit: t.unit, isString: t.isString))
-            .toList();
+        _specialTags =
+            ds.settings.specialTags.map((t) => t.clone()).toList();
         _drawerDividers = Map.from(ds.settings.drawerDividers);
       });
     }

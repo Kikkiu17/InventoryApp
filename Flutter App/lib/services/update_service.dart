@@ -102,6 +102,76 @@ class UpdateService {
     return false;
   }
 
+  /// Deduplicates repeated release notes (e.g. when GitHub Actions appends release notes twice)
+  static String cleanReleaseNotes(String notes) {
+    final text = notes.trim();
+    if (text.isEmpty) return text;
+
+    // Split by blank lines into blocks/paragraphs
+    final blocks = text
+        .split(RegExp(r'\r?\n\s*\r?\n'))
+        .map((b) => b.trim())
+        .where((b) => b.isNotEmpty)
+        .toList();
+
+    if (blocks.isNotEmpty) {
+      // Check if the block list consists of identical repeating sub-sequences (e.g. [A, A] or [A, B, A, B])
+      final n = blocks.length;
+      for (int k = 1; k <= n ~/ 2; k++) {
+        if (n % k == 0) {
+          bool allMatch = true;
+          for (int i = k; i < n; i++) {
+            if (blocks[i] != blocks[i % k]) {
+              allMatch = false;
+              break;
+            }
+          }
+          if (allMatch) {
+            return blocks.sublist(0, k).join('\n\n');
+          }
+        }
+      }
+    }
+
+    // Also check if lines are duplicated
+    final lines = text
+        .split(RegExp(r'\r?\n'))
+        .map((l) => l.trimRight())
+        .toList();
+    final numLines = lines.length;
+    if (numLines > 1) {
+      for (int k = 1; k <= numLines ~/ 2; k++) {
+        if (numLines % k == 0) {
+          bool allMatch = true;
+          for (int i = k; i < numLines; i++) {
+            if (lines[i] != lines[i % k]) {
+              allMatch = false;
+              break;
+            }
+          }
+          if (allMatch) {
+            return lines.sublist(0, k).join('\n').trim();
+          }
+        }
+      }
+    }
+
+    // Check if the trimmed raw string itself has two identical halves
+    final half = text.length ~/ 2;
+    for (int offset = -2; offset <= 2; offset++) {
+      final mid = half + offset;
+      if (mid > 0 && mid < text.length) {
+        final part1 = text.substring(0, mid).trim();
+        final part2 = text.substring(mid).trim();
+        if (part1.isNotEmpty && part1 == part2) {
+          return part1;
+        }
+      }
+    }
+
+    return text;
+  }
+
   /// Checks GitHub for the latest release
   static Future<UpdateInfo?> checkUpdate({
     http.Client? client,
@@ -127,7 +197,7 @@ class UpdateService {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final tagName = data['tag_name'] as String? ?? '';
       final releaseName = data['name'] as String? ?? tagName;
-      final releaseNotes = data['body'] as String? ?? '';
+      final releaseNotes = cleanReleaseNotes(data['body'] as String? ?? '');
       final htmlUrl = data['html_url'] as String? ?? releasesHtmlUrl;
       final assets = (data['assets'] as List<dynamic>?) ?? [];
 
@@ -270,7 +340,7 @@ class UpdateService {
                       ],
                     ),
                   ),
-                  if (updateInfo.releaseNotes.trim().isNotEmpty) ...[
+                  if (cleanReleaseNotes(updateInfo.releaseNotes).isNotEmpty) ...[
                     const SizedBox(height: 12),
                     Text('Note di rilascio:',
                         style: Theme.of(context)
@@ -290,7 +360,7 @@ class UpdateService {
                       ),
                       child: SingleChildScrollView(
                         child: Text(
-                          updateInfo.releaseNotes.trim(),
+                          cleanReleaseNotes(updateInfo.releaseNotes),
                           style: const TextStyle(fontSize: 12),
                         ),
                       ),
