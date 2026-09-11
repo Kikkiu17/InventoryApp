@@ -725,19 +725,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Usa server remoto',
-                      style: TextStyle(fontWeight: FontWeight.w500)),
-                  Text(
-                    ds.isRemote
-                        ? ds.serverConnected
-                            ? '✅ Connesso'
-                            : '❌ Non connesso'
-                        : 'Archiviazione locale',
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                ]),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('Usa server remoto',
+                        style: TextStyle(fontWeight: FontWeight.w500)),
+                    Text(
+                      ds.isRemote
+                          ? ds.serverConnected
+                              ? '✅ Connesso'
+                              : '❌ Non connesso'
+                          : 'Archiviazione locale',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ]),
+                ),
                 Switch(
                   value: ds.isRemote,
                   onChanged: (v) async {
@@ -858,7 +860,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Tema dell\'app', style: theme.textTheme.bodyLarge),
+                Expanded(
+                  child: Text('Tema dell\'app', style: theme.textTheme.bodyLarge),
+                ),
                 DropdownButton<ThemeMode>(
                   value: ds.themeMode,
                   underline: const SizedBox.shrink(),
@@ -974,10 +978,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Anteprima e forma',
-                      style: theme.textTheme.titleSmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
+                    Expanded(
+                      child: Text(
+                        'Anteprima e forma',
+                        style: theme.textTheme.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
                     ),
                     DropdownButton<int>(
                       value: _containers
@@ -1138,49 +1144,112 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: theme.textTheme.bodySmall
                       ?.copyWith(color: cs.onSurfaceVariant)),
               const SizedBox(height: 16),
-              Row(children: [
-                Expanded(
-                    child: TextField(
-                        controller: _newSpecialNameCtrl,
-                        decoration: const InputDecoration(
-                            labelText: 'Nome',
-                            border: OutlineInputBorder(),
-                            isDense: true),
-                        onSubmitted: (_) => _addSpecialTag())),
-                const SizedBox(width: 8),
-                SizedBox(
-                    width: 80,
-                    child: TextField(
-                        controller: _newSpecialUnitCtrl,
-                        decoration: const InputDecoration(
-                            labelText: 'Unità',
-                            border: OutlineInputBorder(),
-                            isDense: true),
-                        onSubmitted: (_) => _addSpecialTag())),
-                const SizedBox(width: 8),
-                SizedBox(
-                    width: 70,
-                    child: TextField(
-                        controller: _newSpecialShortIdCtrl,
-                        decoration: const InputDecoration(
-                            labelText: 'Sigla',
-                            hintText: 'es. L',
-                            border: OutlineInputBorder(),
-                            isDense: true),
-                        onSubmitted: (_) => _addSpecialTag())),
-                const SizedBox(width: 8),
-                FilterChip(
-                  label: const Text('Testo'),
-                  selected: _newSpecialIsString,
-                  onSelected: (v) => setState(() => _newSpecialIsString = v),
-                  visualDensity: VisualDensity.compact,
-                ),
-                const SizedBox(width: 8),
-                IconButton.filled(
+              LayoutBuilder(builder: (context, constraints) {
+                final isCompact = constraints.maxWidth < 600;
+
+                Widget buildUnitField({bool expanded = false}) {
+                  final field = TextField(
+                    controller: _newSpecialUnitCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Unità',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    onSubmitted: (_) => _addSpecialTag(),
+                  );
+                  return expanded
+                      ? Expanded(flex: 3, child: field)
+                      : SizedBox(width: 80, child: field);
+                }
+
+                Widget buildShortIdField({bool expanded = false}) {
+                  final field = TextField(
+                    controller: _newSpecialShortIdCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Sigla',
+                      hintText: 'es. L',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    onSubmitted: (_) => _addSpecialTag(),
+                  );
+                  return expanded
+                      ? Expanded(flex: 2, child: field)
+                      : SizedBox(width: 70, child: field);
+                }
+
+                Widget buildTextChip() {
+                  return FilterChip(
+                    label: const Text('Testo'),
+                    selected: _newSpecialIsString,
+                    onSelected: (v) => setState(() => _newSpecialIsString = v),
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  );
+                }
+
+                Widget buildAddButton() {
+                  return IconButton.filled(
                     onPressed: _addSpecialTag,
                     icon: const Icon(Icons.add),
-                    tooltip: 'Aggiungi'),
-              ]),
+                    tooltip: 'Aggiungi',
+                    visualDensity: VisualDensity.compact,
+                  );
+                }
+
+                if (isCompact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextField(
+                        controller: _newSpecialNameCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Nome',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        onSubmitted: (_) => _addSpecialTag(),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          buildUnitField(expanded: true),
+                          const SizedBox(width: 8),
+                          buildShortIdField(expanded: true),
+                          const SizedBox(width: 8),
+                          buildTextChip(),
+                          const SizedBox(width: 8),
+                          buildAddButton(),
+                        ],
+                      ),
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _newSpecialNameCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Nome',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        onSubmitted: (_) => _addSpecialTag(),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    buildUnitField(),
+                    const SizedBox(width: 8),
+                    buildShortIdField(),
+                    const SizedBox(width: 8),
+                    buildTextChip(),
+                    const SizedBox(width: 8),
+                    buildAddButton(),
+                  ],
+                );
+              }),
               const SizedBox(height: 16),
               if (_specialTags.isEmpty)
                 Text('Nessuna proprietà configurata.',
@@ -1748,11 +1817,13 @@ class _SectionHeader extends StatelessWidget {
       child: Row(children: [
         Icon(icon, size: 18, color: cs.primary),
         const SizedBox(width: 8),
-        Text(title,
-            style: Theme.of(context)
-                .textTheme
-                .titleSmall
-                ?.copyWith(color: cs.primary, fontWeight: FontWeight.bold)),
+        Expanded(
+          child: Text(title,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(color: cs.primary, fontWeight: FontWeight.bold)),
+        ),
       ]),
     );
   }
