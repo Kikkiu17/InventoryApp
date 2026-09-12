@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/component.dart';
 import '../models/settings.dart';
 import '../models/search_result.dart';
+import '../l10n/app_localizations.dart';
 import 'api_client.dart';
 import 'package:uuid/uuid.dart';
 
@@ -99,6 +100,7 @@ class DataService extends ChangeNotifier {
   static const _storageModeKey = 'storageMode';
   static const _inventoryIdKey = 'currentInventoryId';
   static const _themeModeKey = 'themeMode';
+  static const _languageKey = 'app_language';
 
   List<Component> _components = [];
   List<Component> _bufferComponents = [];
@@ -111,6 +113,8 @@ class DataService extends ChangeNotifier {
   String? _globalSearchQuery;
   ApiClient? _api;
   ThemeMode _themeMode = ThemeMode.system;
+  String _languageCode = 'en';
+  String? _savedLanguageCode;
   String? _localAppDocDir;
 
   bool _serverConnected = false;
@@ -130,7 +134,7 @@ class DataService extends ChangeNotifier {
   String get currentInventoryId => _currentInventoryId;
   InventoryMeta? get currentInventory {
     if (_mode == StorageMode.local) {
-      return InventoryMeta(id: 'default', name: 'Inventario Locale');
+      return InventoryMeta(id: 'default', name: AppLocalizations.current.localInventory);
     }
     return _inventories.where((i) => i.id == _currentInventoryId).firstOrNull;
   }
@@ -144,6 +148,9 @@ class DataService extends ChangeNotifier {
   SyncConflict? get pendingConflict => _pendingConflict;
   String? get globalSearchQuery => _globalSearchQuery;
   ThemeMode get themeMode => _themeMode;
+  String get languageCode => _languageCode;
+  String? get savedLanguageCode => _savedLanguageCode;
+  Locale get locale => Locale(_languageCode);
 
   void setGlobalSearchQuery(String? query) {
     _globalSearchQuery = query;
@@ -155,6 +162,32 @@ class DataService extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_themeModeKey, mode.name);
     notifyListeners();
+  }
+
+  Future<void> updateLanguage(String? code) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (code == null || code == 'system') {
+      _savedLanguageCode = null;
+      await prefs.remove(_languageKey);
+      _languageCode = _detectSystemLanguage();
+    } else if (AppLocalizations.supportedLanguageCodes.contains(code.toLowerCase())) {
+      _savedLanguageCode = code.toLowerCase();
+      _languageCode = code.toLowerCase();
+      await prefs.setString(_languageKey, _languageCode);
+    }
+    AppLocalizations.current = AppLocalizations.fromLocale(Locale(_languageCode));
+    notifyListeners();
+  }
+
+  static String _detectSystemLanguage() {
+    try {
+      final sysLocale = WidgetsBinding.instance.platformDispatcher.locale;
+      final sysLang = sysLocale.languageCode.toLowerCase();
+      if (AppLocalizations.supportedLanguageCodes.contains(sysLang)) {
+        return sysLang;
+      }
+    } catch (_) {}
+    return 'en';
   }
 
   Future<void> load() async {
@@ -186,6 +219,17 @@ class DataService extends ChangeNotifier {
       (e) => e.name == themeStr,
       orElse: () => ThemeMode.system,
     );
+
+    _savedLanguageCode = prefs.getString(_languageKey);
+    if (_savedLanguageCode != null &&
+        AppLocalizations.supportedLanguageCodes
+            .contains(_savedLanguageCode!.toLowerCase())) {
+      _languageCode = _savedLanguageCode!.toLowerCase();
+    } else {
+      _languageCode = _detectSystemLanguage();
+    }
+    AppLocalizations.current =
+        AppLocalizations.fromLocale(Locale(_languageCode));
 
     if (_mode == StorageMode.remote) {
       _api = ApiClient(_serverUrl, inventoryId: _currentInventoryId);
@@ -646,7 +690,7 @@ class DataService extends ChangeNotifier {
     final file = File('${dir.path}/inventario_componenti.json');
     await file.writeAsString(data);
     await SharePlus.instance.share(
-        ShareParams(files: [XFile(file.path)], text: 'Inventario componenti'));
+        ShareParams(files: [XFile(file.path)], text: AppLocalizations.current.appName));
   }
 
   Future<bool> importData() async {

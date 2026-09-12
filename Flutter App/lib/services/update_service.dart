@@ -7,6 +7,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../l10n/app_localizations.dart';
 
 class UpdateInfo {
   final String latestVersion;
@@ -287,10 +288,11 @@ class UpdateService {
       final currentVer = updateInfo?.currentVersion ??
           (await PackageInfo.fromPlatform()).version;
       if (context.mounted) {
+        final l10n = context.l10n;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'L\'applicazione è aggiornata all\'ultima versione (v$currentVer).',
+              l10n.appUpToDateDesc(currentVer),
             ),
           ),
         );
@@ -303,6 +305,7 @@ class UpdateService {
     BuildContext context,
     UpdateInfo updateInfo,
   ) async {
+    final l10n = context.l10n;
     final cs = Theme.of(context).colorScheme;
     bool dontShowAgain = await isVersionIgnored(updateInfo.latestVersion);
 
@@ -313,7 +316,7 @@ class UpdateService {
         builder: (ctx, setDialogState) {
           return AlertDialog(
             icon: Icon(Icons.system_update_rounded, size: 36, color: cs.primary),
-            title: const Text('Aggiornamento disponibile'),
+            title: Text(l10n.updateAvailableTitle),
             content: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 450),
               child: Column(
@@ -330,11 +333,11 @@ class UpdateService {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Installata: v${updateInfo.currentVersion}',
+                        Text(l10n.installedVersion(updateInfo.currentVersion),
                             style:
                                 const TextStyle(fontWeight: FontWeight.w500)),
                         const Icon(Icons.arrow_forward, size: 16),
-                        Text('Nuova: v${updateInfo.latestVersion}',
+                        Text(l10n.newVersion(updateInfo.latestVersion),
                             style: TextStyle(
                                 fontWeight: FontWeight.bold, color: cs.primary)),
                       ],
@@ -342,7 +345,7 @@ class UpdateService {
                   ),
                   if (cleanReleaseNotes(updateInfo.releaseNotes).isNotEmpty) ...[
                     const SizedBox(height: 12),
-                    Text('Note di rilascio:',
+                    Text('${l10n.releaseNotes}:',
                         style: Theme.of(context)
                             .textTheme
                             .labelMedium
@@ -367,8 +370,8 @@ class UpdateService {
                     ),
                   ],
                   const SizedBox(height: 14),
-                  const Text(
-                    'È disponibile una nuova versione. Vuoi scaricarla e installarla adesso?',
+                  Text(
+                    l10n.updateDialogDesc,
                   ),
                   const SizedBox(height: 8),
                   InkWell(
@@ -396,9 +399,9 @@ class UpdateService {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const Text(
-                            'Non mostrare più all\'avvio',
-                            style: TextStyle(fontSize: 13),
+                          Text(
+                            l10n.dontShowAgain,
+                            style: const TextStyle(fontSize: 13),
                           ),
                         ],
                       ),
@@ -410,11 +413,11 @@ class UpdateService {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogCtx, false),
-                child: const Text('Più tardi'),
+                child: Text(l10n.laterButton),
               ),
               FilledButton.icon(
                 icon: const Icon(Icons.download_rounded, size: 18),
-                label: const Text('Aggiorna ora'),
+                label: Text(l10n.updateNowButton),
                 onPressed: () => Navigator.pop(dialogCtx, true),
               ),
             ],
@@ -436,6 +439,7 @@ class UpdateService {
     BuildContext context,
     UpdateInfo updateInfo,
   ) async {
+    final l10n = context.l10n;
     if (updateInfo.downloadUrl == null) {
       final uri = Uri.parse(updateInfo.htmlUrl);
       if (await canLaunchUrl(uri)) {
@@ -460,7 +464,7 @@ class UpdateService {
             dialogSetState = setState;
             return AlertDialog(
               title: Text(
-                  isDownloading ? 'Download in corso...' : 'Aggiornamento'),
+                  isDownloading ? l10n.downloadingUpdate : l10n.updatingTitle),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -488,8 +492,7 @@ class UpdateService {
                         style: TextStyle(
                             color: Theme.of(context).colorScheme.error)),
                     const SizedBox(height: 12),
-                    const Text(
-                        'Puoi scaricare l\'aggiornamento manualmente da GitHub.'),
+                    Text(l10n.downloadManualGithub),
                   ],
                 ],
               ),
@@ -497,7 +500,7 @@ class UpdateService {
                 if (!isDownloading && errorMessage != null) ...[
                   TextButton(
                     onPressed: () => Navigator.pop(dlgCtx),
-                    child: const Text('Chiudi'),
+                    child: Text(l10n.close),
                   ),
                   FilledButton(
                     onPressed: () async {
@@ -508,7 +511,7 @@ class UpdateService {
                             mode: LaunchMode.externalApplication);
                       }
                     },
-                    child: const Text('Apri su GitHub'),
+                    child: Text(l10n.openOnGithub),
                   ),
                 ],
               ],
@@ -573,7 +576,7 @@ class UpdateService {
         final openRes = await OpenFilex.open(file.path);
         if (openRes.type != ResultType.done && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('File scaricato in: ${file.path}')),
+            SnackBar(content: Text(l10n.fileDownloadedTo(file.path))),
           );
         }
       } else {
@@ -583,7 +586,7 @@ class UpdateService {
       if (context.mounted) {
         dialogSetState?.call(() {
           isDownloading = false;
-          errorMessage = 'Errore durante il download: $e';
+          errorMessage = l10n.downloadError(e.toString());
         });
       }
     }

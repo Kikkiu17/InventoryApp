@@ -188,7 +188,7 @@ class AppSettings {
         legacyNumCabinets,
         (i) => ContainerConfig(
           id: i + 1,
-          name: 'Contenitore ${i + 1}',
+          name: '',
           rows: legacyRows,
           columns: legacyCols,
           disabledDrawers: [],

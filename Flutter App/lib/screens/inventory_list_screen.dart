@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../l10n/app_localizations.dart';
 import '../models/search_result.dart';
 import '../services/data_service.dart';
 import '../widgets/global_search_delegate.dart';
@@ -72,6 +73,7 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
   @override
   Widget build(BuildContext context) {
     final ds    = context.watch<DataService>();
+    final l10n  = context.l10n;
     final theme = Theme.of(context);
     final cs    = theme.colorScheme;
 
@@ -80,7 +82,7 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Inventari'),
+            Text(l10n.inventoriesTitle),
             if (ds.isRemote && ds.serverConnected)
               Text(
                 ds.serverUrl,
@@ -97,7 +99,7 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
                       width: 20, height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.refresh),
-              tooltip: 'Aggiorna lista',
+              tooltip: l10n.refreshList,
               onPressed: ds.syncing ? null : () => ds.refreshInventoryList(),
             ),
         ],
@@ -110,7 +112,7 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
               height: 40,
               child: SearchBar(
                 controller: _searchCtrl,
-                hintText: 'Cerca in tutti gli inventari…',
+                hintText: l10n.searchAllInventoriesPlaceholder,
                 leading: const Icon(Icons.search, size: 18),
                 trailing: [
                   if (_isSearching)
@@ -125,7 +127,7 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
                   if (_query.isNotEmpty)
                     IconButton(
                       icon: const Icon(Icons.clear, size: 18),
-                      tooltip: 'Cancella',
+                      tooltip: l10n.clear,
                       onPressed: () {
                         _searchCtrl.clear();
                         _onQueryChanged('');
@@ -148,8 +150,8 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
           ),
           Expanded(
             child: _query.isEmpty
-                ? _buildNormalBody(ds, cs)
-                : _buildSearchResults(context, ds, cs, theme),
+                ? _buildNormalBody(ds, cs, l10n)
+                : _buildSearchResults(context, ds, cs, theme, l10n),
           ),
         ],
       ),
@@ -158,18 +160,18 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
               heroTag: 'fab_inventories',
               onPressed: () => _showCreateDialog(context, ds),
               icon: const Icon(Icons.add),
-              label: const Text('Nuovo inventario'),
+              label: Text(l10n.newInventory),
             )
           : null,
     );
   }
 
-  Widget _buildNormalBody(DataService ds, ColorScheme cs) {
+  Widget _buildNormalBody(DataService ds, ColorScheme cs, AppLocalizations l10n) {
     if (!ds.isRemote) {
       return _Placeholder(
         icon: Icons.cloud_off_outlined,
-        title: 'Modalità locale',
-        subtitle: 'Attiva il server remoto nelle Impostazioni per gestire più inventari.',
+        title: l10n.localModeTitle,
+        subtitle: l10n.localModeDesc,
         cs: cs,
       );
     } else if (ds.syncing && ds.inventories.isEmpty) {
@@ -177,25 +179,25 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
     } else if (!ds.serverConnected && ds.inventories.isEmpty) {
       return _Placeholder(
         icon: Icons.wifi_off_rounded,
-        title: 'Server non raggiungibile',
-        subtitle: 'Controlla la connessione e l\'indirizzo del server.',
+        title: l10n.serverUnreachableTitle,
+        subtitle: l10n.serverUnreachableDesc,
         cs: cs,
         action: FilledButton.icon(
           onPressed: () => ds.refreshFromServer(),
           icon: const Icon(Icons.refresh),
-          label: const Text('Riprova'),
+          label: Text(l10n.retry),
         ),
       );
     } else if (ds.inventories.isEmpty) {
       return _Placeholder(
         icon: Icons.inventory_2_outlined,
-        title: 'Nessun inventario',
-        subtitle: 'Crea il primo inventario per iniziare.',
+        title: l10n.noInventoriesTitle,
+        subtitle: l10n.noInventoriesDesc,
         cs: cs,
         action: FilledButton.icon(
           onPressed: () => _showCreateDialog(context, ds),
           icon: const Icon(Icons.add),
-          label: const Text('Crea inventario'),
+          label: Text(l10n.createInventory),
         ),
       );
     } else {
@@ -219,7 +221,7 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
   }
 
   Widget _buildSearchResults(
-      BuildContext context, DataService ds, ColorScheme cs, ThemeData theme) {
+      BuildContext context, DataService ds, ColorScheme cs, ThemeData theme, AppLocalizations l10n) {
     if (_isSearching && _searchResults == null) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -234,7 +236,7 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
               Icon(Icons.error_outline, size: 48, color: cs.error),
               const SizedBox(height: 12),
               Text(
-                'Errore durante la ricerca: $_searchError',
+                l10n.searchError('$_searchError'),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: cs.error),
               ),
@@ -242,7 +244,7 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
               FilledButton.icon(
                 onPressed: () => _onQueryChanged(_searchCtrl.text),
                 icon: const Icon(Icons.refresh),
-                label: const Text('Riprova'),
+                label: Text(l10n.retry),
               ),
             ],
           ),
@@ -274,13 +276,13 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
                   size: 64, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
               const SizedBox(height: 16),
               Text(
-                'Nessun risultato',
+                l10n.noComponentsFound,
                 style: theme.textTheme.titleMedium
                     ?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               Text(
-                'Nessun componente o inventario corrisponde a "$_query".',
+                l10n.noMatchesForQuery(_query),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: cs.onSurfaceVariant),
               ),
@@ -357,7 +359,7 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(4, 8, 4, 6),
             child: Text(
-              'COMPONENTI BUFFER',
+              l10n.bufferComponentsSectionHeader,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
@@ -378,9 +380,10 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
   // ── Seleziona ───────────────────────────────────────────────────────────────
   Future<void> _selectInventory(
       BuildContext context, DataService ds, String id) async {
+    final l10n = context.l10n;
     if (id == ds.currentInventoryId) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Inventario già attivo'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(l10n.inventoryAlreadyActive),
           behavior: SnackBarBehavior.floating));
       return;
     }
@@ -389,15 +392,16 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
       if (context.mounted) {
         final name = ds.currentInventory?.name ?? id;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Passato a "$name"'),
+          content: Text(l10n.switchedToInventory(name)),
           behavior: SnackBarBehavior.floating,
           backgroundColor: Theme.of(context).colorScheme.primary,
         ));
       }
     } catch (e) {
       if (context.mounted) {
+        final l10nErr = context.l10n;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Errore: $e'),
+          content: Text('${context.l10n.error}: $e'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
@@ -406,36 +410,37 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
 
   // ── Crea ────────────────────────────────────────────────────────────────────
   Future<void> _showCreateDialog(BuildContext context, DataService ds) async {
+    final l10n = context.l10n;
     final nameCtrl = TextEditingController();
     final descCtrl = TextEditingController();
 
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Nuovo inventario'),
+        title: Text(l10n.newInventory),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
           TextField(
             controller: nameCtrl,
-            decoration: const InputDecoration(
-                labelText: 'Nome *', border: OutlineInputBorder()),
+            decoration: InputDecoration(
+                labelText: l10n.nameRequired, border: const OutlineInputBorder()),
             autofocus: true,
             textCapitalization: TextCapitalization.sentences,
           ),
           const SizedBox(height: 12),
           TextField(
             controller: descCtrl,
-            decoration: const InputDecoration(
-                labelText: 'Descrizione (opzionale)',
-                border: OutlineInputBorder()),
+            decoration: InputDecoration(
+                labelText: l10n.descriptionOptional,
+                border: const OutlineInputBorder()),
           ),
         ]),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Annulla')),
+              child: Text(l10n.cancel)),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Crea')),
+              child: Text(l10n.create)),
         ],
       ),
     );
@@ -449,16 +454,18 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
           description: descCtrl.text.trim());
       await ds.switchInventory(created.id);
       if (context.mounted) {
+        final l10nSuccess = context.l10n;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('"$name" creato e selezionato'),
+          content: Text(l10nSuccess.inventoryCreatedAndSelected(name)),
           behavior: SnackBarBehavior.floating,
           backgroundColor: Theme.of(context).colorScheme.primary,
         ));
       }
     } catch (e) {
       if (context.mounted) {
+        final l10nErr = context.l10n;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Errore: $e'),
+          content: Text('${context.l10n.error}: $e'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
@@ -468,34 +475,35 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
   // ── Rinomina ────────────────────────────────────────────────────────────────
   Future<void> _showRenameDialog(
       BuildContext context, DataService ds, InventoryMeta inv) async {
+    final l10n = context.l10n;
     final nameCtrl = TextEditingController(text: inv.name);
     final descCtrl = TextEditingController(text: inv.description);
 
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Rinomina inventario'),
+        title: Text(l10n.renameInventoryTitle),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
           TextField(
             controller: nameCtrl,
-            decoration: const InputDecoration(
-                labelText: 'Nome', border: OutlineInputBorder()),
+            decoration: InputDecoration(
+                labelText: l10n.nameLabel, border: const OutlineInputBorder()),
             autofocus: true,
           ),
           const SizedBox(height: 12),
           TextField(
             controller: descCtrl,
-            decoration: const InputDecoration(
-                labelText: 'Descrizione', border: OutlineInputBorder()),
+            decoration: InputDecoration(
+                labelText: l10n.descriptionOptional, border: const OutlineInputBorder()),
           ),
         ]),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Annulla')),
+              child: Text(l10n.cancel)),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Salva')),
+              child: Text(l10n.save)),
         ],
       ),
     );
@@ -508,8 +516,9 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
           description: descCtrl.text.trim());
     } catch (e) {
       if (context.mounted) {
+        final l10nErr = context.l10n;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Errore: $e'),
+          content: Text('${context.l10n.error}: $e'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
@@ -519,15 +528,16 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
   // ── Elimina ─────────────────────────────────────────────────────────────────
   Future<void> _confirmDelete(
       BuildContext context, DataService ds, InventoryMeta inv) async {
+    final l10n = context.l10n;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Elimina inventario'),
+        title: Text(l10n.deleteInventoryTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Eliminare "${inv.name}"?'),
+            Text(l10n.deleteInventoryConfirm(inv.name)),
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.all(10),
@@ -542,7 +552,7 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Tutti i componenti verranno eliminati definitivamente.',
+                    l10n.deleteInventoryPermanentWarning,
                     style: TextStyle(
                         fontSize: 12,
                         color: Theme.of(ctx).colorScheme.onErrorContainer),
@@ -555,13 +565,13 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Annulla')),
+              child: Text(l10n.cancel)),
           FilledButton(
             style: FilledButton.styleFrom(
                 backgroundColor: Theme.of(ctx).colorScheme.error,
                 foregroundColor: Theme.of(ctx).colorScheme.onError),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Elimina'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -572,8 +582,9 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
       await ds.deleteInventory(inv.id);
     } catch (e) {
       if (context.mounted) {
+        final l10nErr = context.l10n;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Errore: $e'),
+          content: Text('${context.l10n.error}: $e'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
@@ -603,6 +614,7 @@ class _InventoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs    = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
+    final l10n  = context.l10n;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 5),
@@ -658,7 +670,7 @@ class _InventoryCard extends StatelessWidget {
                           color: cs.primary,
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: Text('Attivo',
+                        child: Text(l10n.activeBadge,
                             style: TextStyle(
                                 color: cs.onPrimary,
                                 fontSize: 11,
@@ -684,18 +696,18 @@ class _InventoryCard extends StatelessWidget {
             // Menu azioni
             PopupMenuButton<String>(
               icon: Icon(Icons.more_vert, color: cs.onSurfaceVariant),
-              tooltip: 'Azioni',
+              tooltip: l10n.actions,
               onSelected: (v) {
                 if (v == 'rename') onRename();
                 if (v == 'delete') onDelete();
               },
               itemBuilder: (_) => [
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'rename',
                   child: Row(children: [
-                    Icon(Icons.edit_outlined, size: 18),
-                    SizedBox(width: 10),
-                    Text('Rinomina'),
+                    const Icon(Icons.edit_outlined, size: 18),
+                    const SizedBox(width: 10),
+                    Text(l10n.renameAction),
                   ]),
                 ),
                 if (canDelete)
@@ -706,7 +718,7 @@ class _InventoryCard extends StatelessWidget {
                           size: 18,
                           color: Theme.of(context).colorScheme.error),
                       const SizedBox(width: 10),
-                      Text('Elimina',
+                      Text(l10n.delete,
                           style: TextStyle(
                               color:
                                   Theme.of(context).colorScheme.error)),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:open_filex/open_filex.dart';
+import '../l10n/app_localizations.dart';
 import '../models/component.dart';
 import '../models/settings.dart';
 import '../services/data_service.dart';
@@ -22,6 +23,7 @@ class ComponentViewDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final cs = Theme.of(context).colorScheme;
     final ds = Provider.of<DataService>(context);
 
@@ -36,13 +38,13 @@ class ComponentViewDialog extends StatelessWidget {
           if (ds.isRemote && ds.inventories.length > 1)
             IconButton(
               icon: const Icon(Icons.drive_file_move_outlined),
-              tooltip: 'Sposta in un altro inventario',
+              tooltip: l10n.moveToAnotherInventory,
               color: cs.secondary,
               onPressed: () => _showMoveDialog(context, ds, currentComp),
             ),
           IconButton(
             icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Modifica',
+            tooltip: l10n.editAction,
             color: cs.primary,
             onPressed: () {
               Navigator.pop(context); // close view
@@ -63,36 +65,36 @@ class ComponentViewDialog extends StatelessWidget {
             // Posizione
             () {
               if (currentComp.drawer.isEmpty) {
-                return const _InfoRow(
+                return _InfoRow(
                   icon: Icons.location_on_outlined, 
-                  label: 'Posizione', 
-                  value: 'Non assegnato'
+                  label: l10n.positionTitle, 
+                  value: l10n.notAssigned,
                 );
               }
               final container = settings.containers.firstWhere(
                 (c) => c.id == currentComp.cabinet,
-                orElse: () => ContainerConfig(id: currentComp.cabinet, name: 'Contenitore ${currentComp.cabinet}', rows: 4, columns: 6),
+                orElse: () => ContainerConfig(id: currentComp.cabinet, name: l10n.containerNumber(currentComp.cabinet), rows: 4, columns: 6),
               );
-              final containerDisplayName = container.name.isNotEmpty ? container.name : 'Contenitore ${container.id}';
+              final containerDisplayName = container.name.isNotEmpty ? container.name : l10n.containerNumber(container.id);
               
               final basePos = settings.numCabinets > 1 
-                  ? '$containerDisplayName, Cassetto ${currentComp.drawer}' 
-                  : 'Cassetto ${currentComp.drawer}';
+                  ? '$containerDisplayName, ${l10n.drawerNumber(currentComp.drawer)}' 
+                  : l10n.drawerNumber(currentComp.drawer);
               
               if (currentComp.drawerZone != null) {
                 final key = '${currentComp.cabinet}_${currentComp.drawer}';
                 final zones = settings.drawerDividers[key] ?? 1;
-                final zoneText = getZoneLabel(currentComp.drawerZone!, zones);
+                final zoneText = getZoneLabel(currentComp.drawerZone!, zones, l10n);
                 return _InfoRow(
                   icon: Icons.location_on_outlined, 
-                  label: 'Posizione', 
-                  value: '$basePos (Zona: $zoneText)'
+                  label: l10n.positionTitle, 
+                  value: '$basePos (${l10n.compZoneLabel}: $zoneText)',
                 );
               }
               return _InfoRow(
                 icon: Icons.location_on_outlined, 
-                label: 'Posizione', 
-                value: basePos
+                label: l10n.positionTitle, 
+                value: basePos,
               );
             }(),
             const SizedBox(height: 16),
@@ -101,7 +103,7 @@ class ComponentViewDialog extends StatelessWidget {
               children: [
                 Icon(Icons.inventory_2_outlined, color: cs.primary, size: 20),
                 const SizedBox(width: 8),
-                const Text('Quantità:', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(l10n.quantityLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
                 const Spacer(),
                 IconButton(icon: const Icon(Icons.remove), onPressed: () => ds.updateQuantity(currentComp.id, -1)),
                 SizedBox(
@@ -114,7 +116,7 @@ class ComponentViewDialog extends StatelessWidget {
             const SizedBox(height: 16),
             // Tags
             if (currentComp.tags.isNotEmpty) ...[
-              const Text('Tag:', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(l10n.tagsLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 6, runSpacing: 6,
@@ -128,7 +130,7 @@ class ComponentViewDialog extends StatelessWidget {
             ],
             // Proprietà (Special Tags)
             if (currentComp.specialTagValues.isNotEmpty) ...[
-              const Text('Proprietà:', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(l10n.propertiesLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               ...currentComp.specialTagValues.entries.map((e) {
                 final st = settings.specialTags.where((s) => s.name == e.key).firstOrNull;
@@ -148,7 +150,7 @@ class ComponentViewDialog extends StatelessWidget {
             ],
             // Immagini
             if (currentComp.images.isNotEmpty) ...[
-              const Text('Immagini:', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(l10n.imagesSectionTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               SizedBox(
                 height: 100,
@@ -190,7 +192,7 @@ class ComponentViewDialog extends StatelessWidget {
             ],
             // Allegati
             if (currentComp.attachments.isNotEmpty) ...[
-              const Text('Allegati:', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(l10n.attachmentsTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               Column(
                 children: currentComp.attachments.map((a) => ListTile(
@@ -205,7 +207,7 @@ class ComponentViewDialog extends StatelessWidget {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Chiudi')),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.close)),
       ],
     );
   }
@@ -274,6 +276,7 @@ class ComponentViewDialog extends StatelessWidget {
   }
 
   Future<void> _showMoveDialog(BuildContext context, DataService ds, Component component) async {
+    final l10n = context.l10n;
     final otherInventories = ds.inventories.where((inv) => inv.id != ds.currentInventoryId).toList();
     if (otherInventories.isEmpty) return;
 
@@ -284,18 +287,18 @@ class ComponentViewDialog extends StatelessWidget {
       builder: (ctx) => StatefulBuilder(
         builder: (context, setState) {
           return AlertDialog(
-            title: const Text('Sposta componente'),
+            title: Text(l10n.moveComponentTitle),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Seleziona l\'inventario di destinazione per "${component.name}":'),
+                Text(l10n.selectDestinationInventoryFor(component.name)),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<InventoryMeta>(
                   initialValue: selectedInventory,
-                  decoration: const InputDecoration(
-                    labelText: 'Inventario',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: l10n.targetInventoryLabel,
+                    border: const OutlineInputBorder(),
                   ),
                   items: otherInventories.map((inv) => DropdownMenuItem<InventoryMeta>(
                     value: inv,
@@ -312,11 +315,11 @@ class ComponentViewDialog extends StatelessWidget {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Annulla'),
+                child: Text(l10n.cancel),
               ),
               FilledButton(
                 onPressed: selectedInventory != null ? () => Navigator.pop(ctx, selectedInventory) : null,
-                child: const Text('Sposta'),
+                child: Text(l10n.moveAction),
               ),
             ],
           );
@@ -336,7 +339,7 @@ class ComponentViewDialog extends StatelessWidget {
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Componente spostato in "${targetInv.name}"'),
+          content: Text(l10n.componentMovedTo(targetInv.name)),
           behavior: SnackBarBehavior.floating,
           backgroundColor: Theme.of(context).colorScheme.primary,
         ));
@@ -344,7 +347,7 @@ class ComponentViewDialog extends StatelessWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Errore durante lo spostamento: $e'),
+          content: Text(l10n.errorDuringMove(e.toString())),
           backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/component.dart';
 import '../models/settings.dart';
 import '../services/data_service.dart';
+import '../l10n/app_localizations.dart';
 
 class CabinetMapView extends StatefulWidget {
   final AppSettings settings;
@@ -66,11 +67,12 @@ class _CabinetMapViewState extends State<CabinetMapView> {
     final ds = context.watch<DataService>();
     final containers = widget.settings.containers;
 
+    final l10n = context.l10n;
     if (containers.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(32.0),
-          child: Text('Nessun contenitore configurato nelle impostazioni.'),
+          padding: const EdgeInsets.all(32.0),
+          child: Text(l10n.noContainersConfigured),
         ),
       );
     }
@@ -93,7 +95,7 @@ class _CabinetMapViewState extends State<CabinetMapView> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: Text(
-              'Seleziona contenitore',
+              l10n.selectContainerPrompt,
               style: Theme.of(context)
                   .textTheme
                   .labelSmall
@@ -116,7 +118,7 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                         size: 16,
                         color: isSelected ? cs.onPrimary : cs.onSurfaceVariant),
                     label: Text(
-                        c.name.isNotEmpty ? c.name : 'Contenitore ${c.id}'),
+                        c.name.isNotEmpty ? c.name : l10n.containerNumber(c.id)),
                     selected: isSelected,
                     onSelected: (val) {
                       if (val) {
@@ -138,7 +140,7 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                 Text(
                   selectedContainer.name.isNotEmpty
                       ? selectedContainer.name
-                      : 'Contenitore ${selectedContainer.id}',
+                      : l10n.containerNumber(selectedContainer.id),
                   style: Theme.of(context)
                       .textTheme
                       .titleMedium
@@ -157,7 +159,7 @@ class _CabinetMapViewState extends State<CabinetMapView> {
             children: [
               Flexible(
                 child: Text(
-                  'Usa il trascinamento per scorrere la griglia',
+                  l10n.dragToScrollGrid,
                   style: Theme.of(context)
                       .textTheme
                       .bodySmall
@@ -167,7 +169,7 @@ class _CabinetMapViewState extends State<CabinetMapView> {
               ),
               const SizedBox(width: 8),
               Text(
-                '${selectedContainer.rows * selectedContainer.columns - selectedContainer.disabledDrawers.length} cassetti attivi',
+                l10n.activeDrawersCount(selectedContainer.rows * selectedContainer.columns - selectedContainer.disabledDrawers.length),
                 style: Theme.of(context)
                     .textTheme
                     .bodySmall
@@ -530,17 +532,16 @@ class _CabinetMapViewState extends State<CabinetMapView> {
           padding: const EdgeInsets.all(2.0),
           child: Stack(
             children: [
-              // Position letter for divided zones (V = Vicina, L = Lontana, M = Mezzo)
+              // Position letter for divided zones
               if (totalZones > 1)
                 Positioned(
                   top: 0,
                   left: 2,
                   child: Text(
-                    zoneIndex == 1
-                        ? 'V'
-                        : zoneIndex == totalZones
-                            ? 'L'
-                            : 'M',
+                    () {
+                      final label = getZoneLabel(zoneIndex, totalZones, context.l10n);
+                      return label.isNotEmpty ? label[0].toUpperCase() : '';
+                    }(),
                     style: TextStyle(
                       fontSize: 7.5,
                       fontWeight: FontWeight.bold,
@@ -599,6 +600,7 @@ class _CabinetMapViewState extends State<CabinetMapView> {
       builder: (bSheetCtx) {
         return Consumer<DataService>(
           builder: (context, currentDs, __) {
+            final l10n = context.l10n;
             final drawerComps = currentDs.components
                 .where((c) =>
                     c.cabinet == cabinetId &&
@@ -648,8 +650,8 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                         children: [
                           Text(
                             mergeGroup.isNotEmpty
-                                ? 'Cassetti Uniti (${mergeGroup.join('+')})'
-                                : 'Cassetto $drawerLabel',
+                                ? l10n.mergedDrawers(mergeGroup.join('+'))
+                                : l10n.drawerNumber(drawerLabel),
                             style: Theme.of(context)
                                 .textTheme
                                 .headlineSmall
@@ -658,7 +660,7 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                           Text(
                             container.name.isNotEmpty
                                 ? container.name
-                                : 'Contenitore $cabinetId',
+                                : l10n.containerNumber(cabinetId),
                             style: Theme.of(context)
                                 .textTheme
                                 .bodyMedium
@@ -680,7 +682,7 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                       itemCount: totalZones,
                       itemBuilder: (ctx2, index) {
                         final zoneIdx = index + 1;
-                        final zoneLabel = getZoneLabel(zoneIdx, totalZones);
+                        final zoneLabel = getZoneLabel(zoneIdx, totalZones, l10n);
                         final zoneComps = drawerComps
                             .where((c) => (c.drawerZone ?? 1) == zoneIdx)
                             .toList();
@@ -713,8 +715,8 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                                           Expanded(
                                             child: Text(
                                               totalZones > 1
-                                                  ? 'Zona $zoneIdx ($zoneLabel)'
-                                                  : 'Contenuto cassetto',
+                                                  ? '${l10n.compZoneLabel} $zoneIdx ($zoneLabel)'
+                                                  : l10n.drawerContent,
                                               style: Theme.of(context)
                                                   .textTheme
                                                   .titleMedium
@@ -730,8 +732,8 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                                     ),
                                     TextButton.icon(
                                       icon: const Icon(Icons.add, size: 16),
-                                      label: const Text('Aggiungi',
-                                          style: TextStyle(fontSize: 12)),
+                                      label: Text(l10n.add,
+                                          style: const TextStyle(fontSize: 12)),
                                       onPressed: () => _addComponentAtZone(
                                           bSheetCtx,
                                           cabinetId,
@@ -756,7 +758,7 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                                         vertical: 20.0),
                                     child: Center(
                                       child: Text(
-                                        'Nessun componente in questa zona (Vuota)',
+                                        l10n.emptyZoneNotice,
                                         style: TextStyle(
                                           fontSize: 13,
                                           color: cs.onSurfaceVariant
@@ -899,6 +901,7 @@ class _CabinetMapViewState extends State<CabinetMapView> {
     String drawerLabel,
     int zoneIndex,
   ) async {
+    final l10n = context.l10n;
     final ds = widget.dataService;
     final hasUnassigned =
         ds.components.any((c) => c.drawer.isEmpty && c.bagName == null);
@@ -907,7 +910,7 @@ class _CabinetMapViewState extends State<CabinetMapView> {
       context: context,
       builder: (dialogCtx) {
         return AlertDialog(
-          title: const Text('Aggiungi componente'),
+          title: Text(l10n.addComponentTitle),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -915,9 +918,9 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                 leading: const CircleAvatar(
                   child: Icon(Icons.add),
                 ),
-                title: const Text('Nuovo componente'),
+                title: Text(l10n.newComponent),
                 subtitle:
-                    const Text('Crea da zero ed inserisci in questa posizione'),
+                    Text(l10n.createFromScratchAndInsert),
                 onTap: () {
                   Navigator.pop(dialogCtx);
                   widget.onAddComponentAt(cabinetId, drawerLabel, zoneIndex);
@@ -931,10 +934,10 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                   child: Icon(Icons.drive_file_move_outlined,
                       color: hasUnassigned ? null : Colors.grey),
                 ),
-                title: const Text('Assegna esistente'),
+                title: Text(l10n.assignExisting),
                 subtitle: Text(hasUnassigned
-                    ? 'Scegli tra i componenti senza posizione'
-                    : 'Nessun componente senza posizione disponibile'),
+                    ? l10n.chooseFromUnassigned
+                    : l10n.noUnassignedAvailable),
                 onTap: hasUnassigned
                     ? () {
                         Navigator.pop(dialogCtx);
@@ -948,7 +951,7 @@ class _CabinetMapViewState extends State<CabinetMapView> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogCtx),
-              child: const Text('Annulla'),
+              child: Text(l10n.cancel),
             ),
           ],
         );
@@ -1007,6 +1010,7 @@ class _UnassignedComponentPickerDialogState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final cs = Theme.of(context).colorScheme;
     final allUnassigned = widget.dataService.components
         .where((c) => c.drawer.isEmpty && c.bagName == null)
@@ -1019,7 +1023,7 @@ class _UnassignedComponentPickerDialogState
         .toList();
 
     return AlertDialog(
-      title: const Text('Assegna componente esistente'),
+      title: Text(l10n.assignExistingComponentTitle),
       content: SizedBox(
         width: double.maxFinite,
         child: Column(
@@ -1028,7 +1032,7 @@ class _UnassignedComponentPickerDialogState
             TextField(
               controller: _searchCtrl,
               decoration: InputDecoration(
-                hintText: 'Cerca per nome...',
+                hintText: l10n.searchByName,
                 prefixIcon: const Icon(Icons.search),
                 border: const OutlineInputBorder(),
                 filled: true,
@@ -1040,12 +1044,12 @@ class _UnassignedComponentPickerDialogState
             ),
             const SizedBox(height: 12),
             if (filtered.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 32.0),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32.0),
                 child: Center(
                   child: Text(
-                    'Nessun componente trovato',
-                    style: TextStyle(fontStyle: FontStyle.italic),
+                    l10n.noComponentsFound,
+                    style: const TextStyle(fontStyle: FontStyle.italic),
                   ),
                 ),
               )
@@ -1109,7 +1113,7 @@ class _UnassignedComponentPickerDialogState
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            'Qta: ${comp.quantity}',
+                            l10n.qtyShort(comp.quantity),
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
@@ -1130,7 +1134,7 @@ class _UnassignedComponentPickerDialogState
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                     content: Text(
-                                        'Componente "${comp.name}" assegnato con successo.')),
+                                        l10n.componentAssignedSuccess(comp.name))),
                               );
                             }
                           } catch (e) {
@@ -1138,7 +1142,7 @@ class _UnassignedComponentPickerDialogState
                               ScaffoldMessenger.of(ctx).showSnackBar(
                                 SnackBar(
                                     content: Text(
-                                        'Errore durante l\'assegnazione: $e')),
+                                        l10n.assignError(e.toString()))),
                               );
                             }
                           }
@@ -1154,7 +1158,7 @@ class _UnassignedComponentPickerDialogState
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Annulla'),
+          child: Text(l10n.cancel),
         ),
       ],
     );

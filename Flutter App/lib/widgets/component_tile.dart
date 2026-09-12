@@ -6,6 +6,7 @@ import 'package:open_filex/open_filex.dart';
 import '../models/component.dart';
 import '../models/settings.dart';
 import '../services/data_service.dart';
+import '../l10n/app_localizations.dart';
 import 'image_viewer.dart';
 
 class ComponentTile extends StatelessWidget {
@@ -60,13 +61,13 @@ class ComponentTile extends StatelessWidget {
                   // Drawer Badge
                   Tooltip(
                     message: isUnassigned
-                        ? 'Posizione non assegnata'
+                        ? context.l10n.unassignedPosition
                         : () {
                             final container = settings.containers.firstWhere(
                               (c) => c.id == component.cabinet,
-                              orElse: () => ContainerConfig(id: component.cabinet, name: 'Contenitore ${component.cabinet}', rows: 4, columns: 6),
+                              orElse: () => ContainerConfig(id: component.cabinet, name: context.l10n.containerNumber(component.cabinet), rows: 4, columns: 6),
                             );
-                            return container.name.isNotEmpty ? container.name : 'Contenitore ${container.id}';
+                            return container.name.isNotEmpty ? container.name : context.l10n.containerNumber(container.id);
                           }(),
                     child: Container(
                       width: 52,

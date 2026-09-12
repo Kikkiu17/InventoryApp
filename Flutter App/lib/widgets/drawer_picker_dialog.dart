@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import '../models/component.dart';
 import '../models/settings.dart';
 import '../services/data_service.dart';
@@ -20,8 +21,8 @@ class DrawerGridPicker extends StatefulWidget {
     required this.settings,
     required this.dataService,
     required this.selectedCabinetId,
-    required this.selectedCol,
-    required this.selectedRow,
+    this.selectedCol = '',
+    this.selectedRow = '',
     this.selectedZone,
     required this.onDrawerSelected,
     this.onCabinetChanged,
@@ -76,13 +77,14 @@ class _DrawerGridPickerState extends State<DrawerGridPicker> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final containers = widget.settings.containers;
     final cs = Theme.of(context).colorScheme;
 
     if (containers.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Text('Nessun contenitore configurato nelle impostazioni.'),
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Text(l10n.noContainersConfigured),
       );
     }
 
@@ -101,7 +103,7 @@ class _DrawerGridPickerState extends State<DrawerGridPicker> {
           Padding(
             padding: const EdgeInsets.only(bottom: 8.0),
             child: Text(
-              'Seleziona contenitore:',
+              l10n.selectContainerPrompt,
               style: Theme.of(context)
                   .textTheme
                   .labelMedium
@@ -123,7 +125,7 @@ class _DrawerGridPickerState extends State<DrawerGridPicker> {
                         size: 14,
                         color: isSel ? cs.onPrimary : cs.onSurfaceVariant),
                     label: Text(
-                        c.name.isNotEmpty ? c.name : 'Contenitore ${c.id}',
+                        c.name.isNotEmpty ? c.name : l10n.containerNumber(c.id),
                         style: const TextStyle(fontSize: 12)),
                     selected: isSel,
                     onSelected: (val) {
@@ -156,9 +158,9 @@ class _DrawerGridPickerState extends State<DrawerGridPicker> {
               Expanded(
                 child: Text(
                   widget.selectedCol.isNotEmpty && widget.selectedRow.isNotEmpty
-                      ? 'Selezionato: Cassetto ${widget.selectedCol.toUpperCase()}${widget.selectedRow}'
-                          '${widget.selectedZone != null ? " (Zona ${widget.selectedZone})" : ""}'
-                      : 'Tocca un cassetto per selezionarlo',
+                      ? '${l10n.selectedDrawerLabel("${widget.selectedCol.toUpperCase()}${widget.selectedRow}")}'
+                          '${widget.selectedZone != null ? " (${l10n.compZoneLabel} ${widget.selectedZone})" : ""}'
+                      : l10n.tapDrawerToSelect,
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -637,17 +639,18 @@ class DrawerPickerDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     int cabinetId = initialCabinetId;
     String col = initialCol;
     String row = initialRow;
     int? zone = initialZone;
 
     return AlertDialog(
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.grid_view),
-          SizedBox(width: 8),
-          Text('Seleziona Cassetto'),
+          const Icon(Icons.grid_view),
+          const SizedBox(width: 8),
+          Text(l10n.selectDrawerTitle),
         ],
       ),
       content: SingleChildScrollView(
@@ -689,7 +692,7 @@ class DrawerPickerDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Annulla'),
+          child: Text(l10n.cancel),
         ),
       ],
     );

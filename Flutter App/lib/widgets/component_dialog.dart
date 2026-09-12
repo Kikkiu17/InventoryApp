@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -345,6 +346,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final ds = Provider.of<DataService>(context);
     final settings = ds.settings;
 
@@ -370,32 +372,32 @@ class _ComponentDialogState extends State<ComponentDialog> {
         children: [
           Expanded(
               child: Text(isEdit
-                  ? 'Modifica componente'
+                  ? l10n.editComponentTitle
                   : (widget.isDuplicate
-                      ? 'Duplica componente'
-                      : 'Nuovo componente'))),
+                      ? l10n.duplicateComponentTitle
+                      : l10n.newComponentTitle))),
           if (isEdit)
             IconButton(
               icon: Icon(Icons.delete_outline,
                   color: Theme.of(context).colorScheme.error),
-              tooltip: 'Elimina componente',
+              tooltip: l10n.deleteComponentTitle,
               onPressed: () async {
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: const Text('Elimina componente'),
+                    title: Text(l10n.deleteComponentTitle),
                     content:
-                        const Text('Vuoi davvero eliminare questo componente?'),
+                        Text(l10n.deleteComponentConfirmMsg),
                     actions: [
                       TextButton(
                           onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('Annulla')),
+                          child: Text(l10n.cancel)),
                       FilledButton(
                         style: FilledButton.styleFrom(
                             backgroundColor: Theme.of(ctx).colorScheme.error,
                             foregroundColor: Theme.of(ctx).colorScheme.onError),
                         onPressed: () => Navigator.pop(ctx, true),
-                        child: const Text('Elimina'),
+                        child: Text(l10n.delete),
                       ),
                     ],
                   ),
@@ -420,7 +422,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                 controller: _nameCtrl,
                 textInputAction: TextInputAction.next,
                 decoration: InputDecoration(
-                  labelText: 'Nome *',
+                  labelText: l10n.nameRequired,
                   border: const OutlineInputBorder(),
                   filled: true,
                   fillColor: cs.primaryContainer.withOpacity(_opacityPrimary),
@@ -432,7 +434,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                           activeSettingsForTags?.tagTree ?? {}, _selectedTags)
                       .join(' ');
                   if (autoName.isNotEmpty) return null;
-                  return 'Obbligatorio';
+                  return l10n.requiredField;
                 },
                 onFieldSubmitted: (_) => _submit(),
               ),
@@ -441,7 +443,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                 controller: _descCtrl,
                 textInputAction: TextInputAction.next,
                 decoration: InputDecoration(
-                  labelText: 'Descrizione',
+                  labelText: l10n.descriptionOptional,
                   border: const OutlineInputBorder(),
                   filled: true,
                   fillColor:
@@ -455,7 +457,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                   controller: _noteCtrl,
                   textInputAction: TextInputAction.next,
                   decoration: InputDecoration(
-                    labelText: 'Nota (promemoria)',
+                    labelText: l10n.noteReminder,
                     border: const OutlineInputBorder(),
                     filled: true,
                     fillColor:
@@ -469,21 +471,21 @@ class _ComponentDialogState extends State<ComponentDialog> {
                       ? ds.inventories
                       : [
                           InventoryMeta(
-                              id: 'default', name: 'Inventario Locale')
+                              id: 'default', name: l10n.localInventory)
                         ];
                   return DropdownButtonFormField<String?>(
                     value: _selectedTargetInventoryId,
                     decoration: InputDecoration(
-                      labelText: 'Inventario di destinazione',
+                      labelText: l10n.targetInventoryLabel,
                       border: const OutlineInputBorder(),
                       filled: true,
                       fillColor:
                           cs.primaryContainer.withOpacity(_opacityPrimary),
                     ),
                     items: [
-                      const DropdownMenuItem<String?>(
+                      DropdownMenuItem<String?>(
                         value: null,
-                        child: Text('Nessuno (Da selezionare)'),
+                        child: Text(l10n.noneToSelect),
                       ),
                       ...availableInventories
                           .map((inv) => DropdownMenuItem<String?>(
@@ -502,7 +504,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                     controller: _qtyCtrl,
                     textInputAction: TextInputAction.next,
                     decoration: InputDecoration(
-                      labelText: 'Quantità',
+                      labelText: l10n.quantityLabel,
                       border: const OutlineInputBorder(),
                       filled: true,
                       fillColor: Colors.green.withOpacity(_opacityGreen),
@@ -512,7 +514,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                     validator: (v) {
                       if (v == null || v.isEmpty) return null;
                       if (int.tryParse(v) == null || int.parse(v) < 0)
-                        return 'Non valido';
+                        return l10n.invalidNumber;
                       return null;
                     },
                   ),
@@ -528,7 +530,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                               ? settings.containers.first.id
                               : 1),
                       decoration: InputDecoration(
-                        labelText: 'Cassettiera',
+                        labelText: l10n.cabinetLabel,
                         border: const OutlineInputBorder(),
                         filled: true,
                         fillColor: Colors.green.withOpacity(_opacityGreen),
@@ -562,7 +564,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Posizione',
+                          l10n.positionTitle,
                           style: Theme.of(context)
                               .textTheme
                               .titleSmall
@@ -577,8 +579,8 @@ class _ComponentDialogState extends State<ComponentDialog> {
                               textCapitalization:
                                   TextCapitalization.characters,
                               decoration: InputDecoration(
-                                labelText: 'Colonna',
-                                hintText: 'Es: A',
+                                labelText: l10n.columnHeader,
+                                hintText: l10n.columnHint,
                                 border: const OutlineInputBorder(),
                                 filled: true,
                                 fillColor:
@@ -587,11 +589,11 @@ class _ComponentDialogState extends State<ComponentDialog> {
                               validator: (v) {
                                 if ((v?.isEmpty ?? true) &&
                                     _rowCtrl.text.trim().isNotEmpty) {
-                                  return 'Manca colonna';
+                                  return l10n.missingColumn;
                                 }
                                 if ((v?.isNotEmpty ?? false) &&
                                     _colCtrl.text.trim().isEmpty) {
-                                  return 'Manca riga';
+                                  return l10n.missingRow;
                                 }
                                 if (v != null && v.trim().isNotEmpty) {
                                   final col =
@@ -606,7 +608,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                                                 settings.containers.first);
                                     if (container.disabledDrawers
                                         .contains(label)) {
-                                      return 'Cassetto disattivato';
+                                      return l10n.drawerDisabled;
                                     }
                                     if (!container.isDrawerValid(label)) {
                                       return 'Max: ${container.columnLabels.last}${container.rows}';
@@ -625,8 +627,8 @@ class _ComponentDialogState extends State<ComponentDialog> {
                               textInputAction: TextInputAction.done,
                               keyboardType: TextInputType.number,
                               decoration: InputDecoration(
-                                labelText: 'Riga',
-                                hintText: 'Es: 3',
+                                labelText: l10n.rowHeader,
+                                hintText: l10n.rowHint,
                                 border: const OutlineInputBorder(),
                                 filled: true,
                                 fillColor:
@@ -635,11 +637,11 @@ class _ComponentDialogState extends State<ComponentDialog> {
                               validator: (v) {
                                 if ((v?.isEmpty ?? true) &&
                                     _colCtrl.text.trim().isNotEmpty) {
-                                  return 'Manca riga';
+                                  return l10n.missingRow;
                                 }
                                 if ((v?.isNotEmpty ?? false) &&
                                     _colCtrl.text.trim().isEmpty) {
-                                  return 'Manca colonna';
+                                  return l10n.missingColumn;
                                 }
                                 if (v != null && v.trim().isNotEmpty) {
                                   final col =
@@ -654,7 +656,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                                                 settings.containers.first);
                                     if (container.disabledDrawers
                                         .contains(label)) {
-                                      return 'Cassetto disattivato';
+                                      return l10n.drawerDisabled;
                                     }
                                     if (!container.isDrawerValid(label)) {
                                       return 'Max: ${container.columnLabels.last}${container.rows}';
@@ -669,7 +671,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                           const SizedBox(width: 8),
                           IconButton.filledTonal(
                             icon: const Icon(Icons.map_outlined),
-                            tooltip: 'Seleziona da mappa',
+                            tooltip: l10n.selectFromMap,
                             onPressed: () async {
                               final res = await DrawerPickerDialog.show(
                                 context,
@@ -710,8 +712,8 @@ class _ComponentDialogState extends State<ComponentDialog> {
                                 child: OutlinedButton.icon(
                                   icon: const Icon(Icons.tune, size: 16),
                                   label: Text(zones >= 2
-                                      ? 'Modifica separatori ($zones zone)'
-                                      : 'Configura separatori (cassetto normale)'),
+                                      ? l10n.changeDrawerSeparators(zones)
+                                      : l10n.configureDrawerSeparators),
                                   onPressed: () =>
                                       _configureDrawerSeparators(drawer),
                                 ),
@@ -725,7 +727,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                                       ? 1
                                       : _selectedZone,
                                   decoration: InputDecoration(
-                                    labelText: 'Zona del cassetto (Separatore)',
+                                    labelText: l10n.zoneSeparatorLabel,
                                     border: const OutlineInputBorder(),
                                     filled: true,
                                     fillColor:
@@ -734,7 +736,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                                   items: List.generate(zones, (i) => i + 1)
                                       .map((z) => DropdownMenuItem(
                                             value: z,
-                                            child: Text(getZoneLabel(z, zones)),
+                                            child: Text(getZoneLabel(z, zones, l10n)),
                                           ))
                                       .toList(),
                                   onChanged: (v) =>
@@ -752,17 +754,17 @@ class _ComponentDialogState extends State<ComponentDialog> {
               const SizedBox(height: 16),
               if (_isLoadingSettings) ...[
                 const SizedBox(height: 16),
-                const Center(
+                Center(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      SizedBox(
+                      const SizedBox(
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       ),
-                      SizedBox(width: 12),
-                      Text('Caricamento tag...'),
+                      const SizedBox(width: 12),
+                      Text(l10n.loadingTags),
                     ],
                   ),
                 ),
@@ -770,16 +772,16 @@ class _ComponentDialogState extends State<ComponentDialog> {
                 const SizedBox(height: 16),
                 Card(
                   color: cs.surfaceContainerHighest.withOpacity(0.5),
-                  child: const Padding(
-                    padding: EdgeInsets.all(12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
                     child: Row(
                       children: [
-                        Icon(Icons.info_outline, size: 20),
-                        SizedBox(width: 10),
+                        const Icon(Icons.info_outline, size: 20),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Seleziona un inventario di destinazione per impostare tag e proprietà.',
-                            style: TextStyle(fontSize: 13),
+                            l10n.selectTargetToConfigureTags,
+                            style: const TextStyle(fontSize: 13),
                           ),
                         ),
                       ],
@@ -788,7 +790,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                 ),
               ] else ...[
                 if (_selectedTags.isNotEmpty) ...[
-                  Text('Tag selezionati',
+                  Text(l10n.selectedTagsLabel,
                       style: Theme.of(context)
                           .textTheme
                           .labelSmall
@@ -822,7 +824,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                   const SizedBox(height: 4),
                 ],
                 if (activeSettingsForTags.tagTree.isNotEmpty) ...[
-                  Text('Naviga nell\'albero dei tag',
+                  Text(l10n.navigateTagTree,
                       style: Theme.of(context).textTheme.labelLarge),
                   const SizedBox(height: 6),
                   Container(
@@ -838,7 +840,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                         runSpacing: 4,
                         children: [
                           ActionChip(
-                            label: const Text('Inizio'),
+                            label: Text(l10n.treeRoot),
                             avatar: const Icon(Icons.home, size: 16),
                             onPressed: () => setState(() => _treePath.clear()),
                           ),
@@ -854,7 +856,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                   ),
                   const SizedBox(height: 12),
                   if (sortedCurrentLevel.isEmpty)
-                    Text('Nessun sottotag disponibile.',
+                    Text(l10n.noSubtags,
                         style: TextStyle(
                             fontStyle: FontStyle.italic,
                             color: cs.onSurfaceVariant))
@@ -897,7 +899,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                   TextButton.icon(
                     icon: Icon(
                         _showLooseTags ? Icons.expand_less : Icons.expand_more),
-                    label: const Text('Mostra tag generici (sfusi)'),
+                    label: Text(l10n.showGenericTags),
                     onPressed: () =>
                         setState(() => _showLooseTags = !_showLooseTags),
                   ),
@@ -923,7 +925,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                   const SizedBox(height: 16),
                 ],
                 if (activeSettingsForTags.specialTags.isNotEmpty) ...[
-                  Text('Proprietà',
+                  Text(l10n.propertiesSectionTitle,
                       style: Theme.of(context).textTheme.labelLarge),
                   const SizedBox(height: 8),
                   ...activeSettingsForTags.specialTags.map((st) => Padding(
@@ -937,8 +939,8 @@ class _ComponentDialogState extends State<ComponentDialog> {
                                 : st.name,
                             border: const OutlineInputBorder(),
                             hintText: st.isString
-                                ? 'Testo libero'
-                                : 'Lascia vuoto o usa K, V, M... (es. 1K2)',
+                                ? l10n.freeTextHint
+                                : l10n.specialTagNumericHint,
                             filled: true,
                             fillColor: cs.tertiaryContainer
                                 .withOpacity(_opacityTertiary),
@@ -948,7 +950,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                           validator: (v) {
                             if (v == null || v.isEmpty) return null;
                             if (!st.isString && parseSpecialValue(v) == null)
-                              return 'Formato numerico non valido';
+                              return l10n.invalidNumberFormat;
                             return null;
                           },
                         ),
@@ -956,7 +958,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                 ],
               ],
               const SizedBox(height: 16),
-              Text('Allegati', style: Theme.of(context).textTheme.labelLarge),
+              Text(l10n.attachmentsTitle, style: Theme.of(context).textTheme.labelLarge),
               const SizedBox(height: 8),
               if (_attachments.isNotEmpty)
                 Column(
@@ -983,34 +985,34 @@ class _ComponentDialogState extends State<ComponentDialog> {
                 children: [
                   TextButton.icon(
                     icon: const Icon(Icons.link),
-                    label: const Text('Link'),
+                    label: Text(l10n.addAttachmentLink),
                     onPressed: () async {
                       final urlCtrl = TextEditingController();
                       final nameCtrl = TextEditingController();
                       final res = await showDialog<bool>(
                         context: context,
                         builder: (ctx) => AlertDialog(
-                          title: const Text('Aggiungi Link'),
+                          title: Text(l10n.addLinkTitle),
                           content: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               TextField(
                                   controller: nameCtrl,
-                                  decoration: const InputDecoration(
-                                      labelText: 'Nome (es. Datasheet)')),
+                                  decoration: InputDecoration(
+                                      labelText: l10n.linkNameHint)),
                               TextField(
                                   controller: urlCtrl,
-                                  decoration: const InputDecoration(
-                                      labelText: 'URL (https://...)')),
+                                  decoration: InputDecoration(
+                                      labelText: l10n.linkUrlHint)),
                             ],
                           ),
                           actions: [
                             TextButton(
                                 onPressed: () => Navigator.pop(ctx, false),
-                                child: const Text('Annulla')),
+                                child: Text(l10n.cancel)),
                             FilledButton(
                                 onPressed: () => Navigator.pop(ctx, true),
-                                child: const Text('Aggiungi')),
+                                child: Text(l10n.add)),
                           ],
                         ),
                       );
@@ -1018,7 +1020,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                         setState(() {
                           _attachments.add(Attachment(
                               name: nameCtrl.text.isEmpty
-                                  ? 'Link'
+                                  ? l10n.link
                                   : nameCtrl.text,
                               path: urlCtrl.text,
                               isLink: true));
@@ -1028,7 +1030,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                   ),
                   TextButton.icon(
                     icon: const Icon(Icons.attach_file),
-                    label: const Text('Carica File'),
+                    label: Text(l10n.addAttachmentFile),
                     onPressed: () async {
                       final result = await FilePicker.platform.pickFiles();
                       if (result != null && result.files.single.path != null) {
@@ -1044,7 +1046,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                   ),
                   TextButton.icon(
                     icon: const Icon(Icons.folder_open),
-                    label: const Text('File Esistente'),
+                    label: Text(l10n.addAttachmentExisting),
                     onPressed: () async {
                       final ds = context.read<DataService>();
                       final existingFiles = ds.components
@@ -1060,8 +1062,8 @@ class _ComponentDialogState extends State<ComponentDialog> {
                       if (existingFiles.isEmpty) {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('Nessun file esistente')));
+                              SnackBar(
+                                  content: Text(l10n.noExistingFiles)));
                         }
                         return;
                       }
@@ -1069,7 +1071,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                       final selected = await showDialog<Attachment>(
                         context: context,
                         builder: (ctx) => AlertDialog(
-                          title: const Text('Scegli file esistente'),
+                          title: Text(l10n.chooseExistingFile),
                           content: SizedBox(
                             width: double.maxFinite,
                             child: SingleChildScrollView(
@@ -1089,7 +1091,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                           actions: [
                             TextButton(
                                 onPressed: () => Navigator.pop(ctx),
-                                child: const Text('Annulla')),
+                                child: Text(l10n.cancel)),
                           ],
                         ),
                       );
@@ -1107,7 +1109,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                 ],
               ),
               const SizedBox(height: 16),
-              Text('Immagini', style: Theme.of(context).textTheme.labelLarge),
+              Text(l10n.imagesSectionTitle, style: Theme.of(context).textTheme.labelLarge),
               const SizedBox(height: 8),
               if (_images.isNotEmpty) ...[
                 SizedBox(
@@ -1181,7 +1183,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
-                                      'Icona',
+                                      l10n.iconBadge,
                                       style: TextStyle(
                                         fontSize: 8,
                                         color: Theme.of(context)
@@ -1212,12 +1214,12 @@ class _ComponentDialogState extends State<ComponentDialog> {
                         children: [
                           ListTile(
                             leading: const Icon(Icons.camera_alt),
-                            title: const Text('Scatta Foto Ora'),
+                            title: Text(l10n.takePhotoNow),
                             onTap: () => Navigator.pop(ctx, ImageSource.camera),
                           ),
                           ListTile(
                             leading: const Icon(Icons.photo_library),
-                            title: const Text('Seleziona dalla Galleria'),
+                            title: Text(l10n.chooseFromGallery),
                             onTap: () =>
                                 Navigator.pop(ctx, ImageSource.gallery),
                           ),
@@ -1255,7 +1257,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                   }
                 },
                 icon: const Icon(Icons.add_a_photo_outlined),
-                label: const Text('Aggiungi Foto'),
+                label: Text(l10n.addPhoto),
               ),
             ],
           ),
@@ -1269,7 +1271,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
               Navigator.pop(context);
             }
           },
-          child: const Text('Annulla'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
             onPressed: _isSaving ? null : _submit,
@@ -1278,7 +1280,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2))
-                : Text(isEdit ? 'Salva' : 'Aggiungi')),
+                : Text(isEdit ? l10n.saveButton : l10n.add)),
       ],
     );
   }
@@ -1317,6 +1319,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
   }
 
   Future<void> _configureDrawerSeparators(String label) async {
+    final l10n = context.l10n;
     final ds = Provider.of<DataService>(context, listen: false);
     final currentSettings = ds.settings;
 
@@ -1329,15 +1332,13 @@ class _ComponentDialogState extends State<ComponentDialog> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, dialogState) => AlertDialog(
-          title: Text(
-              'Configura separatori per $label (Cassettiera $_selectedCabinet)'),
+          title: Text(l10n.configureSeparatorsForDrawer(label, _selectedCabinet)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               SwitchListTile(
-                title: const Text('Dividi cassetto in zone'),
-                subtitle: const Text(
-                    'Suddivide in profondità (vicina, in mezzo, lontana)'),
+                title: Text(l10n.divideDrawerInZones),
+                subtitle: Text(l10n.divideDrawerSubtitle),
                 value: isDivided,
                 onChanged: (val) => dialogState(() => isDivided = val),
                 contentPadding: EdgeInsets.zero,
@@ -1355,7 +1356,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                     ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text('$dialogZones zone',
+                      child: Text(l10n.zonesCount(dialogZones),
                           style: const TextStyle(
                               fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
@@ -1373,14 +1374,14 @@ class _ComponentDialogState extends State<ComponentDialog> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Annulla'),
+              child: Text(l10n.cancel),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, {
                 'isDivided': isDivided,
                 'zones': dialogZones,
               }),
-              child: const Text('Salva'),
+              child: Text(l10n.saveButton),
             ),
           ],
         ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/search_result.dart';
 import '../models/settings.dart';
 import '../services/data_service.dart';
@@ -12,7 +13,11 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
   Future<List<GlobalSearchResult>>? _searchFuture;
   String? _lastQuery;
 
-  GlobalSearchDelegate(this.ds) : super(searchFieldLabel: 'Cerca in tutti gli inventari...');
+  GlobalSearchDelegate(this.ds);
+
+  @override
+  String? get searchFieldLabel =>
+      AppLocalizations.current.searchAllInventoriesPlaceholder;
 
   @override
   List<Widget>? buildActions(BuildContext context) {
@@ -38,6 +43,7 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
 
   @override
   Widget buildResults(BuildContext context) {
+    final l10n = context.l10n;
     if (query.trim().isEmpty) return const SizedBox();
 
     if (_lastQuery != query) {
@@ -52,7 +58,7 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
-          return Center(child: Text('Errore: ${snapshot.error}'));
+          return Center(child: Text('${l10n.error}: ${snapshot.error}'));
         }
 
         final allResults = snapshot.data ?? [];
@@ -60,7 +66,7 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
         final bufferResults = allResults.where((r) => r.inventoryId == '_buffer_').toList();
 
         if (inventoryResults.isEmpty && bufferResults.isEmpty) {
-          return const Center(child: Text('Nessun componente trovato.'));
+          return Center(child: Text(l10n.noComponentsFound));
         }
 
         final theme = Theme.of(context);
@@ -72,7 +78,7 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: Text(
-                  'COMPONENTI INVENTARI',
+                  l10n.inventoryComponentsSectionHeader,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
@@ -98,7 +104,7 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: Text(
-                  'COMPONENTI BUFFER',
+                  l10n.bufferComponentsSectionHeader,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
@@ -123,8 +129,8 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
   @override
   Widget buildSuggestions(BuildContext context) {
     if (query.trim().isEmpty) {
-      return const Center(
-        child: Text('Cerca componenti in tutti gli inventari.'),
+      return Center(
+        child: Text(context.l10n.searchInAllInventories),
       );
     }
     return buildResults(context);
@@ -147,6 +153,7 @@ class GlobalSearchResultTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final effectiveDs = ds ?? context.read<DataService>();
     final c = res.component;
     final isBuffer = res.inventoryId == '_buffer_';
@@ -180,8 +187,8 @@ class GlobalSearchResultTile extends StatelessWidget {
         children: [
           Text(
             isBuffer
-                ? (c.description.isNotEmpty ? c.description : "Nessuna descrizione")
-                : '${c.drawer.isEmpty ? "Non ass." : c.drawer}${c.description.isNotEmpty ? " • ${c.description}" : ""}',
+                ? (c.description.isNotEmpty ? c.description : l10n.noDescription)
+                : '${c.drawer.isEmpty ? l10n.unassignedDrawerShort : c.drawer}${c.description.isNotEmpty ? " • ${c.description}" : ""}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -261,7 +268,7 @@ class GlobalSearchResultTile extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              'Q.tà: ${c.quantity}',
+              l10n.qtyShort(c.quantity),
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
@@ -276,8 +283,8 @@ class GlobalSearchResultTile extends StatelessWidget {
           final mainContext = globalMainShellKey.currentContext;
           if (isBuffer) {
             if (context.mounted && mainContext != null) {
-              ScaffoldMessenger.of(mainContext).showSnackBar(const SnackBar(
-                content: Text('Passato al Buffer'),
+              ScaffoldMessenger.of(mainContext).showSnackBar(SnackBar(
+                content: Text(l10n.passedToBuffer),
                 behavior: SnackBarBehavior.floating,
               ));
               onBeforeNavigate?.call();
@@ -292,8 +299,8 @@ class GlobalSearchResultTile extends StatelessWidget {
                   component: c,
                   settings: effectiveDs.settings,
                   onEdit: () {
-                    ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
-                      content: Text('Modifica il componente direttamente dalla lista.'),
+                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                      content: Text(l10n.editComponentDirectlyFromList),
                     ));
                   },
                 ),
@@ -304,7 +311,7 @@ class GlobalSearchResultTile extends StatelessWidget {
             effectiveDs.setGlobalSearchQuery(query);
             if (context.mounted && mainContext != null) {
               ScaffoldMessenger.of(mainContext).showSnackBar(SnackBar(
-                content: Text('Passato all\'inventario "${res.inventoryName}"'),
+                content: Text(l10n.switchedToInventory(res.inventoryName)),
                 behavior: SnackBarBehavior.floating,
               ));
               onBeforeNavigate?.call();
@@ -319,8 +326,8 @@ class GlobalSearchResultTile extends StatelessWidget {
                   component: c,
                   settings: effectiveDs.settings,
                   onEdit: () {
-                    ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
-                      content: Text('Modifica il componente direttamente dalla lista.'),
+                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                      content: Text(l10n.editComponentDirectlyFromList),
                     ));
                   },
                 ),
@@ -329,7 +336,7 @@ class GlobalSearchResultTile extends StatelessWidget {
           }
         } catch (e) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Errore: $e')));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${l10n.error}: $e')));
           }
         }
       },

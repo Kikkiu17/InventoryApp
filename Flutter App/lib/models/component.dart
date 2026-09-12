@@ -189,7 +189,13 @@ class Component {
       );
 }
 
-String getZoneLabel(int zoneIndex, int totalZones) {
+String getZoneLabel(int zoneIndex, int totalZones, [dynamic l10n]) {
+  if (l10n != null) {
+    if (zoneIndex == 1) return l10n.zoneNearLabel;
+    if (zoneIndex == totalZones) return l10n.zoneFarLabel;
+    if (totalZones == 3) return l10n.zoneMiddleLabel;
+    return l10n.zoneMiddleIndex(zoneIndex);
+  }
   if (zoneIndex == 1) return 'Vicina (davanti)';
   if (zoneIndex == totalZones) return 'Lontana (retro)';
   if (totalZones == 3) return 'In mezzo';

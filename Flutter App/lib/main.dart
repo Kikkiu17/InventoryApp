@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'services/data_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/buffer_screen.dart';
@@ -11,6 +12,7 @@ import 'screens/inventory_list_screen.dart';
 import 'screens/files_screen.dart';
 import 'widgets/component_dialog.dart';
 import 'models/component.dart';
+import 'l10n/app_localizations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,8 +33,16 @@ class InventoryApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final ds = context.watch<DataService>();
     return MaterialApp(
-      title: 'Inventario Componenti',
+      onGenerateTitle: (context) => context.l10n.appName,
       debugShowCheckedModeBanner: false,
+      locale: ds.locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       themeMode: ds.themeMode,
       theme: ThemeData(
         colorSchemeSeed: const Color(0xFF1565C0),
@@ -139,7 +149,7 @@ class MainShellState extends State<MainShell> with WidgetsBindingObserver {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Errore nel salvare: $e')),
+            SnackBar(content: Text(context.l10n.errorSaving(e.toString()))),
           );
         }
       }
@@ -153,7 +163,7 @@ class MainShellState extends State<MainShell> with WidgetsBindingObserver {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Errore nell\'eliminare: $e')),
+            SnackBar(content: Text(context.l10n.errorDeleting(e.toString()))),
           );
         }
       }
@@ -189,6 +199,7 @@ class MainShellState extends State<MainShell> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final ds = context.watch<DataService>();
+    final l10n = context.l10n;
 
     // Le pagine sono ricreate per permettere l'aggiornamento della tab inventari
     final pages = [
@@ -208,15 +219,15 @@ class MainShellState extends State<MainShell> with WidgetsBindingObserver {
         selectedIndex: _currentIndex,
         onDestinationSelected: (i) => setState(() => _currentIndex = i),
         destinations: [
-          const NavigationDestination(
-            icon: Icon(Icons.inventory_2_outlined),
-            selectedIcon: Icon(Icons.inventory_2),
-            label: 'Inventario',
+          NavigationDestination(
+            icon: const Icon(Icons.inventory_2_outlined),
+            selectedIcon: const Icon(Icons.inventory_2),
+            label: l10n.tabInventory,
           ),
-          const NavigationDestination(
-            icon: Icon(Icons.shopping_bag_outlined),
-            selectedIcon: Icon(Icons.shopping_bag),
-            label: 'Buffer',
+          NavigationDestination(
+            icon: const Icon(Icons.shopping_bag_outlined),
+            selectedIcon: const Icon(Icons.shopping_bag),
+            label: l10n.tabBuffer,
           ),
           NavigationDestination(
             icon: Badge(
@@ -230,17 +241,17 @@ class MainShellState extends State<MainShell> with WidgetsBindingObserver {
               label: Text('${ds.inventories.length}'),
               child: const Icon(Icons.folder),
             ),
-            label: 'Inventari',
+            label: l10n.tabInventories,
           ),
-          const NavigationDestination(
-            icon: Icon(Icons.attachment_outlined),
-            selectedIcon: Icon(Icons.attachment),
-            label: 'File',
+          NavigationDestination(
+            icon: const Icon(Icons.attachment_outlined),
+            selectedIcon: const Icon(Icons.attachment),
+            label: l10n.tabFiles,
           ),
-          const NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Impostazioni',
+          NavigationDestination(
+            icon: const Icon(Icons.settings_outlined),
+            selectedIcon: const Icon(Icons.settings),
+            label: l10n.tabSettings,
           ),
         ],
       ),

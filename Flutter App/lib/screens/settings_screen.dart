@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/settings.dart';
 import '../services/data_service.dart';
 import '../services/update_service.dart';
+import '../l10n/app_localizations.dart';
 import 'inventory_list_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -79,7 +80,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (mounted) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Impostazioni salvate')));
+          .showSnackBar(SnackBar(content: Text(context.l10n.settingsSaved)));
     }
   }
 
@@ -108,9 +109,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _showAddContainerDialog() async {
+    final l10n = context.l10n;
+    final nextId = _containers.isEmpty ? 1 : _containers.map((c) => c.id).reduce((a, b) => a > b ? a : b) + 1;
     final nameCtrl = TextEditingController(
-        text:
-            'Contenitore ${_containers.isEmpty ? 1 : _containers.map((c) => c.id).reduce((a, b) => a > b ? a : b) + 1}');
+        text: '${l10n.cabinetContainer} $nextId');
     final rowsCtrl = TextEditingController(text: '5');
     final colsCtrl = TextEditingController(text: '13');
     final formKey = GlobalKey<FormState>();
@@ -121,7 +123,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, dialogState) => AlertDialog(
-          title: const Text('Aggiungi Contenitore'),
+          title: Text(l10n.newContainer),
           content: SingleChildScrollView(
             child: Form(
               key: formKey,
@@ -131,9 +133,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   TextFormField(
                     controller: nameCtrl,
                     decoration:
-                        const InputDecoration(labelText: 'Nome contenitore'),
+                        InputDecoration(labelText: l10n.containerName),
                     validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'Obbligatorio' : null,
+                        v == null || v.trim().isEmpty ? l10n.compNameError : null,
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -141,12 +143,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: rowsCtrl,
-                          decoration: const InputDecoration(labelText: 'Righe'),
+                          decoration: InputDecoration(labelText: l10n.rows),
                           keyboardType: TextInputType.number,
                           validator: (v) {
                             final val = int.tryParse(v ?? '');
                             if (val == null || val <= 0)
-                              return 'Valore non valido';
+                              return l10n.error;
                             return null;
                           },
                         ),
@@ -156,12 +158,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         child: TextFormField(
                           controller: colsCtrl,
                           decoration:
-                              const InputDecoration(labelText: 'Colonne'),
+                              InputDecoration(labelText: l10n.columns),
                           keyboardType: TextInputType.number,
                           validator: (v) {
                             final val = int.tryParse(v ?? '');
                             if (val == null || val <= 0)
-                              return 'Valore non valido';
+                              return l10n.error;
                             return null;
                           },
                         ),
@@ -170,7 +172,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 12),
                   CheckboxListTile(
-                    title: const Text('Inverti righe'),
+                    title: Text(l10n.invertRows),
                     subtitle: const Text(
                         'Ordine numerico dal basso verso l\'alto (es. N...1)'),
                     value: invertRows,
@@ -179,7 +181,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     contentPadding: EdgeInsets.zero,
                   ),
                   CheckboxListTile(
-                    title: const Text('Inverti colonne'),
+                    title: Text(l10n.invertColumns),
                     subtitle: const Text(
                         'Ordine alfabetico da destra a sinistra (es. Z...A)'),
                     value: invertColumns,
@@ -194,12 +196,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Annulla')),
+                child: Text(l10n.cancelButton)),
             FilledButton(
               onPressed: () {
                 if (formKey.currentState!.validate()) Navigator.pop(ctx, true);
               },
-              child: const Text('Aggiungi'),
+              child: Text(l10n.addTag),
             ),
           ],
         ),
@@ -226,6 +228,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _showEditContainerDialog(ContainerConfig container) async {
+    final l10n = context.l10n;
     final nameCtrl = TextEditingController(text: container.name);
     final rowsCtrl = TextEditingController(text: container.rows.toString());
     final colsCtrl = TextEditingController(text: container.columns.toString());
@@ -237,7 +240,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, dialogState) => AlertDialog(
-          title: Text('Modifica Contenitore N° ${container.id}'),
+          title: Text('${l10n.editAction} ${l10n.cabinetContainer} N° ${container.id}'),
           content: SingleChildScrollView(
             child: Form(
               key: formKey,
@@ -247,9 +250,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   TextFormField(
                     controller: nameCtrl,
                     decoration:
-                        const InputDecoration(labelText: 'Nome contenitore'),
+                        InputDecoration(labelText: l10n.containerName),
                     validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'Obbligatorio' : null,
+                        v == null || v.trim().isEmpty ? l10n.compNameError : null,
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -257,12 +260,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: rowsCtrl,
-                          decoration: const InputDecoration(labelText: 'Righe'),
+                          decoration: InputDecoration(labelText: l10n.rows),
                           keyboardType: TextInputType.number,
                           validator: (v) {
                             final val = int.tryParse(v ?? '');
                             if (val == null || val <= 0)
-                              return 'Valore non valido';
+                              return l10n.error;
                             return null;
                           },
                         ),
@@ -272,12 +275,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         child: TextFormField(
                           controller: colsCtrl,
                           decoration:
-                              const InputDecoration(labelText: 'Colonne'),
+                              InputDecoration(labelText: l10n.columns),
                           keyboardType: TextInputType.number,
                           validator: (v) {
                             final val = int.tryParse(v ?? '');
                             if (val == null || val <= 0)
-                              return 'Valore non valido';
+                              return l10n.error;
                             return null;
                           },
                         ),
@@ -286,7 +289,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 12),
                   CheckboxListTile(
-                    title: const Text('Inverti righe'),
+                    title: Text(l10n.invertRows),
                     subtitle: const Text(
                         'Ordine numerico dal basso verso l\'alto (es. N...1)'),
                     value: invertRows,
@@ -295,7 +298,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     contentPadding: EdgeInsets.zero,
                   ),
                   CheckboxListTile(
-                    title: const Text('Inverti colonne'),
+                    title: Text(l10n.invertColumns),
                     subtitle: const Text(
                         'Ordine alfabetico da destra a sinistra (es. Z...A)'),
                     value: invertColumns,
@@ -310,12 +313,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Annulla')),
+                child: Text(l10n.cancelButton)),
             FilledButton(
               onPressed: () {
                 if (formKey.currentState!.validate()) Navigator.pop(ctx, true);
               },
-              child: const Text('Salva'),
+              child: Text(l10n.saveButton),
             ),
           ],
         ),
@@ -355,22 +358,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _confirmDeleteContainer(ContainerConfig container) async {
+    final l10n = context.l10n;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Elimina Contenitore'),
+        title: Text(l10n.deleteContainer),
         content: Text(
-            'Sei sicuro di voler eliminare "${container.name.isNotEmpty ? container.name : 'Contenitore ${container.id}'}"?\nI componenti associati a questo contenitore non avranno più una posizione valida.'),
+            '${l10n.deleteContainer} "${container.name.isNotEmpty ? container.name : '${l10n.cabinetContainer} ${container.id}'}"?'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Annulla')),
+              child: Text(l10n.cancelButton)),
           FilledButton(
             style: FilledButton.styleFrom(
                 backgroundColor: Theme.of(ctx).colorScheme.error,
                 foregroundColor: Theme.of(ctx).colorScheme.onError),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Elimina'),
+            child: Text(l10n.deleteButton),
           ),
         ],
       ),
@@ -388,6 +392,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _showBulkActionDialog() async {
+    final l10n = context.l10n;
     if (_selectedPreviewDrawers.isEmpty) return;
 
     final count = _selectedPreviewDrawers.length;
@@ -399,34 +404,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final action = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Azione di gruppo ($count cassetti)'),
-        content: const Text('Cosa vuoi fare con i cassetti selezionati?\n'
-            'Puoi disattivarli, riattivarli, impostare le zone o unire/dividere i cassetti selezionati.'),
+        title: Text(l10n.bulkDrawerAction(count)),
+        content: Text(l10n.bulkDrawerActionDesc),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, 'cancel'),
-            child: const Text('Annulla'),
+            child: Text(l10n.cancelButton),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, 'enable'),
-            child: const Text('Attiva tutti'),
+            child: Text(l10n.enableAll),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, 'disable'),
-            child: const Text('Disattiva tutti'),
+            child: Text(l10n.disableAll),
           ),
           if (count > 1)
             TextButton(
               onPressed: () => Navigator.pop(ctx, 'merge'),
-              child: const Text('Unisci cassetti'),
+              child: Text(l10n.mergeDrawers),
             ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, 'unmerge'),
-            child: const Text('Dividi cassetti'),
+            child: Text(l10n.splitDrawers),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, 'zones'),
-            child: const Text('Imposta zone...'),
+            child: Text(l10n.setZones),
           ),
         ],
       ),
@@ -481,24 +485,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
         context: context,
         builder: (ctx) => StatefulBuilder(
           builder: (ctx2, dialogState) => AlertDialog(
-            title: Text('Imposta zone per $count cassetti'),
+            title: Text('${l10n.setZones} ($count)'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                    'Seleziona il numero di scomparti (zone) per i cassetti selezionati:'),
+                Text(
+                    l10n.bulkDrawerActionDesc),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<int>(
                   value: selectedZones,
-                  decoration: const InputDecoration(
-                    labelText: 'Numero di zone',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: l10n.zoneLabel,
+                    border: const OutlineInputBorder(),
                   ),
                   items: List.generate(11, (i) => i + 2) // 2 to 12
                       .map((z) => DropdownMenuItem(
                             value: z,
-                            child: Text('$z zone'),
+                            child: Text(l10n.zonesCount(z)),
                           ))
                       .toList(),
                   onChanged: (v) => dialogState(() => selectedZones = v ?? 2),
@@ -508,15 +512,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Annulla'),
+                child: Text(l10n.cancelButton),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(ctx, 1),
-                child: const Text('Nessun divisore (1 zona)'),
+                child: Text(l10n.noDividers),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(ctx, selectedZones),
-                child: const Text('Applica'),
+                child: Text(l10n.apply),
               ),
             ],
           ),
@@ -544,6 +548,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _configureDrawer(String label) async {
+    final l10n = context.l10n;
     final containerIndex =
         _containers.indexWhere((c) => c.id == _selectedCabinetPreview);
     if (containerIndex == -1) return;
@@ -562,14 +567,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, dialogState) => AlertDialog(
           title: Text(
-              'Cassetto $label (${container.name.isNotEmpty ? container.name : 'Contenitore ${container.id}'})'),
+              '${l10n.drawerLabel} $label (${container.name.isNotEmpty ? container.name : '${l10n.cabinetContainer} ${container.id}'})'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               SwitchListTile(
-                title: const Text('Abilitato'),
-                subtitle: const Text(
-                    'Se disattivato, questo cassetto non esisterà nella cassettiera'),
+                title: Text(l10n.enabled),
+                subtitle: Text(
+                    l10n.drawerDisabled),
                 value: dialogIsActive,
                 onChanged: (val) => dialogState(() {
                   dialogIsActive = val;
@@ -579,7 +584,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               if (dialogIsActive) ...[
                 const Divider(),
                 SwitchListTile(
-                  title: const Text('Dividi in zone'),
+                  title: Text(l10n.divideIntoZones),
                   subtitle: const Text(
                       'Suddivide in profondità (vicina, in mezzo, lontana)'),
                   value: isDivided,
@@ -599,7 +604,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text('$dialogZones zone',
+                        child: Text(l10n.zonesCount(dialogZones),
                             style: const TextStyle(
                                 fontSize: 16, fontWeight: FontWeight.bold)),
                       ),
@@ -618,7 +623,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Annulla'),
+              child: Text(l10n.cancelButton),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, {
@@ -626,7 +631,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 'isDivided': isDivided,
                 'zones': dialogZones,
               }),
-              child: const Text('Salva'),
+              child: Text(l10n.saveButton),
             ),
           ],
         ),
@@ -653,6 +658,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _configureManualDrawer() {
+    final l10n = context.l10n;
     final input = _manualDrawerCtrl.text.trim().toUpperCase();
     if (input.isEmpty) return;
 
@@ -661,9 +667,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         orElse: () => _containers.first);
     if (!_validateDrawerCoordinate(input, container.rows, container.columns)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-              'Coordinate cassetto non valide per le dimensioni attuali della cassettiera'),
+              l10n.invalidDrawerCoords),
           backgroundColor: Colors.red,
         ),
       );
@@ -709,16 +715,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     final sortedTags = List<String>.from(_tags)..sort();
+    final l10n = context.l10n;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Impostazioni'),
-        actions: [TextButton(onPressed: _save, child: const Text('Salva'))],
+        title: Text(l10n.settingsTitle),
+        actions: [TextButton(onPressed: _save, child: Text(l10n.saveSettings))],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _SectionHeader(title: 'Server remoto', icon: Icons.cloud_outlined),
+          _SectionHeader(title: l10n.sectionRemoteServer, icon: Icons.cloud_outlined),
           Card(
               child: Padding(
             padding: const EdgeInsets.all(16),
@@ -727,14 +734,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Text('Usa server remoto',
-                        style: TextStyle(fontWeight: FontWeight.w500)),
+                    Text(l10n.useRemoteServer,
+                        style: const TextStyle(fontWeight: FontWeight.w500)),
                     Text(
                       ds.isRemote
                           ? ds.serverConnected
-                              ? '✅ Connesso'
-                              : '❌ Non connesso'
-                          : 'Archiviazione locale',
+                              ? l10n.serverConnectedStatus
+                              : l10n.serverDisconnectedStatus
+                          : l10n.localStorageStatus,
                       style: theme.textTheme.bodySmall
                           ?.copyWith(color: cs.onSurfaceVariant),
                     ),
@@ -747,7 +754,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         v ? StorageMode.remote : StorageMode.local);
                     if (mounted && v && !ds.serverConnected) {
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text(ds.lastError ?? 'Errore connessione'),
+                          content: Text(ds.lastError ?? l10n.connectionFailed),
                           backgroundColor: cs.error));
                     }
                   },
@@ -773,7 +780,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Inventario attivo',
+                          Text(l10n.activeInventory,
                               style: theme.textTheme.labelSmall
                                   ?.copyWith(color: cs.onSurfaceVariant)),
                           Text(ds.currentInventory!.name,
@@ -790,7 +797,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ds.serverConnected &&
                   ds.currentInventory != null)
                 const Divider(height: 16),
-              Text('Indirizzo server',
+              Text(l10n.serverUrl,
                   style: theme.textTheme.labelMedium
                       ?.copyWith(color: cs.onSurfaceVariant)),
               const SizedBox(height: 6),
@@ -821,7 +828,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         height: 36,
                         child: CircularProgressIndicator(strokeWidth: 2))
                     : FilledButton.tonal(
-                        onPressed: _testServer, child: const Text('Test')),
+                        onPressed: _testServer, child: Text(l10n.check)),
               ]),
               const SizedBox(height: 12),
               SizedBox(
@@ -829,7 +836,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: FilledButton.icon(
                       onPressed: _applyServer,
                       icon: const Icon(Icons.save_outlined),
-                      label: const Text('Salva indirizzo server'))),
+                      label: Text(l10n.save))),
               if (ds.isRemote) ...[
                 const SizedBox(height: 8),
                 SizedBox(
@@ -840,68 +847,153 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                               content: Text(ds.serverConnected
-                                  ? 'Dati aggiornati'
-                                  : ds.lastError ?? 'Errore'),
+                                  ? l10n.syncSuccess
+                                  : ds.lastError ?? l10n.error),
                               backgroundColor:
                                   ds.serverConnected ? null : cs.error));
                         }
                       },
                       icon: const Icon(Icons.sync),
-                      label: const Text('Sincronizza ora'),
+                      label: Text(l10n.syncNow),
                     )),
               ],
             ]),
           )),
           const SizedBox(height: 24),
-          _SectionHeader(title: 'Aspetto', icon: Icons.palette_outlined),
+          _SectionHeader(title: l10n.sectionAppearance, icon: Icons.palette_outlined),
           Card(
               child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
               children: [
-                Expanded(
-                  child: Text('Tema dell\'app', style: theme.textTheme.bodyLarge),
-                ),
-                DropdownButton<ThemeMode>(
-                  value: ds.themeMode,
-                  underline: const SizedBox.shrink(),
-                  items: const [
-                    DropdownMenuItem(
-                      value: ThemeMode.system,
-                      child: Row(
-                        children: [
-                          Icon(Icons.brightness_auto, size: 18),
-                          SizedBox(width: 8),
-                          Text('Sistema'),
-                        ],
-                      ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(l10n.themeMode, style: theme.textTheme.bodyLarge),
                     ),
-                    DropdownMenuItem(
-                      value: ThemeMode.light,
-                      child: Row(
-                        children: [
-                          Icon(Icons.light_mode, size: 18),
-                          SizedBox(width: 8),
-                          Text('Chiaro'),
-                        ],
-                      ),
-                    ),
-                    DropdownMenuItem(
-                      value: ThemeMode.dark,
-                      child: Row(
-                        children: [
-                          Icon(Icons.dark_mode, size: 18),
-                          SizedBox(width: 8),
-                          Text('Scuro'),
-                        ],
-                      ),
+                    DropdownButton<ThemeMode>(
+                      value: ds.themeMode,
+                      underline: const SizedBox.shrink(),
+                      items: [
+                        DropdownMenuItem(
+                          value: ThemeMode.system,
+                          child: Row(
+                            children: [
+                              const Icon(Icons.brightness_auto, size: 18),
+                              const SizedBox(width: 8),
+                              Text(l10n.themeSystem),
+                            ],
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: ThemeMode.light,
+                          child: Row(
+                            children: [
+                              const Icon(Icons.light_mode, size: 18),
+                              const SizedBox(width: 8),
+                              Text(l10n.themeLight),
+                            ],
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: ThemeMode.dark,
+                          child: Row(
+                            children: [
+                              const Icon(Icons.dark_mode, size: 18),
+                              const SizedBox(width: 8),
+                              Text(l10n.themeDark),
+                            ],
+                          ),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          ds.updateThemeMode(val);
+                        }
+                      },
                     ),
                   ],
-                  onChanged: (val) {
-                    if (val != null) {
-                      ds.updateThemeMode(val);
+                ),
+                const Divider(height: 16),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isNarrow = constraints.maxWidth < 460;
+                    final languageDropdown = DropdownButton<String>(
+                      value: ds.savedLanguageCode ?? 'system',
+                      underline: const SizedBox.shrink(),
+                      isExpanded: isNarrow,
+                      items: [
+                        DropdownMenuItem(
+                          value: 'system',
+                          child: Text(l10n.languageSystem),
+                        ),
+                        DropdownMenuItem(
+                          value: 'en',
+                          child: Text(l10n.langEn),
+                        ),
+                        DropdownMenuItem(
+                          value: 'it',
+                          child: Text(l10n.langIt),
+                        ),
+                        DropdownMenuItem(
+                          value: 'es',
+                          child: Text(l10n.langEs),
+                        ),
+                        DropdownMenuItem(
+                          value: 'fr',
+                          child: Text(l10n.langFr),
+                        ),
+                        DropdownMenuItem(
+                          value: 'de',
+                          child: Text(l10n.langDe),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          ds.updateLanguage(val);
+                        }
+                      },
+                    );
+
+                    if (isNarrow) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.language, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(l10n.languageLabel,
+                                    style: theme.textTheme.bodyLarge),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          languageDropdown,
+                        ],
+                      );
                     }
+
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Row(
+                            children: [
+                              const Icon(Icons.language, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(l10n.languageLabel,
+                                    style: theme.textTheme.bodyLarge),
+                              ),
+                            ],
+                          ),
+                        ),
+                        languageDropdown,
+                      ],
+                    );
                   },
                 ),
               ],
@@ -909,7 +1001,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           )),
           const SizedBox(height: 24),
           _SectionHeader(
-              title: 'Configurazione contenitori (cassetti)',
+              title: l10n.sectionContainers,
               icon: Icons.grid_view),
           Card(
               child: Padding(
@@ -917,7 +1009,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(
-                  'Gestisci i contenitori fisici. Ciascun contenitore può avere dimensioni personalizzate e forme ritagliate disattivando cassetti nell\'anteprima.',
+                  l10n.containersDesc,
                   style: theme.textTheme.bodySmall
                       ?.copyWith(color: cs.onSurfaceVariant)),
               const SizedBox(height: 12),
@@ -936,11 +1028,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: Text(
                       container.name.isNotEmpty
                           ? container.name
-                          : 'Contenitore ${container.id}',
+                          : '${l10n.cabinetContainer} ${container.id}',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     subtitle: Text(
-                      '${container.rows} righe x ${container.columns} colonne · ${container.rows * container.columns - container.disabledDrawers.length} cassetti attivi (${container.disabledDrawers.length} disattivati)',
+                      '${container.rows} ${l10n.rows.toLowerCase()} x ${container.columns} ${l10n.columns.toLowerCase()} · ${container.rows * container.columns - container.disabledDrawers.length} (${container.disabledDrawers.length})',
                       style: theme.textTheme.bodySmall,
                     ),
                     trailing: Row(
@@ -948,13 +1040,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: [
                         IconButton(
                           icon: const Icon(Icons.edit_outlined),
-                          tooltip: 'Modifica dimensioni e nome',
+                          tooltip: l10n.editAction,
                           onPressed: () => _showEditContainerDialog(container),
                         ),
                         IconButton(
                           icon: const Icon(Icons.delete_outline),
                           color: cs.error,
-                          tooltip: 'Elimina contenitore',
+                          tooltip: l10n.deleteContainer,
                           onPressed: _containers.length > 1
                               ? () => _confirmDeleteContainer(container)
                               : null,
@@ -970,33 +1062,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: OutlinedButton.icon(
                   onPressed: _showAddContainerDialog,
                   icon: const Icon(Icons.add),
-                  label: const Text('Aggiungi contenitore'),
+                  label: Text(l10n.newContainer),
                 ),
               ),
               const Divider(height: 32),
               if (_containers.isNotEmpty) ...[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Anteprima e forma',
-                        style: theme.textTheme.titleSmall
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    DropdownButton<int>(
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isNarrow = constraints.maxWidth < 460;
+                    final previewDropdown = DropdownButton<int>(
                       value: _containers
                               .any((c) => c.id == _selectedCabinetPreview)
                           ? _selectedCabinetPreview
                           : _containers.first.id,
                       underline: const SizedBox.shrink(),
+                      isExpanded: isNarrow,
                       items: _containers.map((c) {
                         return DropdownMenuItem(
                           value: c.id,
                           child: Text(c.name.isNotEmpty
                               ? c.name
-                              : 'Contenitore ${c.id}'),
+                              : '${l10n.cabinetContainer} ${c.id}'),
                         );
                       }).toList(),
                       onChanged: (val) {
@@ -1004,8 +1090,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           setState(() => _selectedCabinetPreview = val);
                         }
                       },
-                    ),
-                  ],
+                    );
+
+                    if (isNarrow) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l10n.previewAndShape,
+                            style: theme.textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 4),
+                          SizedBox(
+                            width: double.infinity,
+                            child: previewDropdown,
+                          ),
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            l10n.previewAndShape,
+                            style: theme.textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        previewDropdown,
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 12),
                 _DrawerGrid(
@@ -1035,7 +1154,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const Divider(),
                 const SizedBox(height: 8),
                 Text(
-                  'Configura cassetto per coordinate (per cassetti non visibili nell\'anteprima)',
+                  l10n.manualDrawerConfigTitle,
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: cs.onSurfaceVariant,
@@ -1047,10 +1166,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Expanded(
                       child: TextField(
                         controller: _manualDrawerCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Codice cassetto',
-                          hintText: 'Es: A20 o K4',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n.manualDrawerCode,
+                          hintText: l10n.manualDrawerHint,
+                          border: const OutlineInputBorder(),
                           isDense: true,
                         ),
                         textCapitalization: TextCapitalization.characters,
@@ -1060,7 +1179,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(width: 8),
                     FilledButton(
                       onPressed: _configureManualDrawer,
-                      child: const Text('Configura'),
+                      child: Text(l10n.configureButton),
                     ),
                   ],
                 ),
@@ -1069,14 +1188,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           )),
           const SizedBox(height: 24),
           _SectionHeader(
-              title: 'Albero dei Tag', icon: Icons.account_tree_outlined),
+              title: l10n.sectionTagTree, icon: Icons.account_tree_outlined),
           Card(
               child: Padding(
             padding: const EdgeInsets.all(16),
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(
-                  'Crea categorie e sottocategorie digitando nel campo apposito e premendo invio.',
+                  l10n.tagTreeDesc,
                   style: theme.textTheme.bodySmall
                       ?.copyWith(color: cs.onSurfaceVariant)),
               const SizedBox(height: 16),
@@ -1091,7 +1210,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           )),
           const SizedBox(height: 24),
           _SectionHeader(
-              title: 'Tag Generici (Sfusi)', icon: Icons.label_outline),
+              title: l10n.sectionGenericTags, icon: Icons.label_outline),
           Card(
               child: Padding(
             padding: const EdgeInsets.all(16),
@@ -1101,9 +1220,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Expanded(
                   child: TextField(
                     controller: _newTagCtrl,
-                    decoration: const InputDecoration(
-                        labelText: 'Nuovo tag generico',
-                        border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                        labelText: l10n.newGenericTag,
+                        border: const OutlineInputBorder(),
                         isDense: true),
                     onSubmitted: (_) => _addTag(),
                   ),
@@ -1112,11 +1231,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 FilledButton.icon(
                     onPressed: _addTag,
                     icon: const Icon(Icons.add),
-                    label: const Text('Aggiungi')),
+                    label: Text(l10n.addTag)),
               ]),
               const SizedBox(height: 16),
               if (_tags.isEmpty)
-                Text('Nessun tag generico.',
+                Text(l10n.noGenericTags,
                     style: TextStyle(color: cs.onSurfaceVariant))
               else
                 Wrap(
@@ -1133,14 +1252,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ]),
           )),
           const SizedBox(height: 24),
-          _SectionHeader(title: 'Proprietà con valore', icon: Icons.tune),
+          _SectionHeader(title: l10n.sectionProperties, icon: Icons.tune),
           Card(
               child: Padding(
             padding: const EdgeInsets.all(16),
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(
-                  'Definisci proprietà numeriche o stringhe. Trascina per riordinarle.',
+                  l10n.propertiesDesc,
                   style: theme.textTheme.bodySmall
                       ?.copyWith(color: cs.onSurfaceVariant)),
               const SizedBox(height: 16),
@@ -1150,9 +1269,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Widget buildUnitField({bool expanded = false}) {
                   final field = TextField(
                     controller: _newSpecialUnitCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Unità',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l10n.propUnit,
+                      border: const OutlineInputBorder(),
                       isDense: true,
                     ),
                     onSubmitted: (_) => _addSpecialTag(),
@@ -1165,10 +1284,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Widget buildShortIdField({bool expanded = false}) {
                   final field = TextField(
                     controller: _newSpecialShortIdCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Sigla',
-                      hintText: 'es. L',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l10n.propSigla,
+                      hintText: l10n.propSiglaHint,
+                      border: const OutlineInputBorder(),
                       isDense: true,
                     ),
                     onSubmitted: (_) => _addSpecialTag(),
@@ -1180,7 +1299,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                 Widget buildTextChip() {
                   return FilterChip(
-                    label: const Text('Testo'),
+                    label: Text(l10n.propText),
                     selected: _newSpecialIsString,
                     onSelected: (v) => setState(() => _newSpecialIsString = v),
                     visualDensity: VisualDensity.compact,
@@ -1192,7 +1311,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   return IconButton.filled(
                     onPressed: _addSpecialTag,
                     icon: const Icon(Icons.add),
-                    tooltip: 'Aggiungi',
+                    tooltip: l10n.addProp,
                     visualDensity: VisualDensity.compact,
                   );
                 }
@@ -1203,9 +1322,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     children: [
                       TextField(
                         controller: _newSpecialNameCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Nome',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n.propName,
+                          border: const OutlineInputBorder(),
                           isDense: true,
                         ),
                         onSubmitted: (_) => _addSpecialTag(),
@@ -1231,9 +1350,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Expanded(
                       child: TextField(
                         controller: _newSpecialNameCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Nome',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n.propName,
+                          border: const OutlineInputBorder(),
                           isDense: true,
                         ),
                         onSubmitted: (_) => _addSpecialTag(),
@@ -1252,7 +1371,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               }),
               const SizedBox(height: 16),
               if (_specialTags.isEmpty)
-                Text('Nessuna proprietà configurata.',
+                Text(l10n.noPropsConfigured,
                     style: TextStyle(color: cs.onSurfaceVariant))
               else
                 ReorderableListView.builder(
@@ -1304,18 +1423,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ],
                       ),
                       subtitle: Text((st.unit.isNotEmpty
-                              ? 'Unità: ${st.unit}'
-                              : 'Nessuna unità') +
-                          (st.isString ? ' • Testo' : ' • Valore') +
-                          (st.shortId.isNotEmpty ? ' • Sigla: ${st.shortId}' : '')),
+                              ? '${l10n.propUnit}: ${st.unit}'
+                              : l10n.notAssigned) +
+                          (st.isString ? ' • ${l10n.propText}' : '') +
+                          (st.shortId.isNotEmpty ? ' • ${l10n.propSigla}: ${st.shortId}' : '')),
                       trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                         IconButton(
                             icon: const Icon(Icons.edit_outlined),
-                            tooltip: 'Modifica',
+                            tooltip: l10n.editAction,
                             onPressed: () => _editSpecialTag(st)),
                         IconButton(
                             icon: Icon(Icons.delete_outline, color: cs.error),
-                            tooltip: 'Elimina',
+                            tooltip: l10n.deleteButton,
                             onPressed: () => _confirmDeleteSpecialTag(st.name)),
                         ReorderableDragStartListener(
                             index: i,
@@ -1329,45 +1448,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ]),
           )),
           const SizedBox(height: 24),
-          _SectionHeader(title: 'Dati', icon: Icons.storage_outlined),
+          _SectionHeader(title: l10n.sectionData, icon: Icons.storage_outlined),
           Card(
               child: Column(children: [
             ListTile(
                 leading: Icon(Icons.upload_file, color: cs.primary),
-                title: const Text('Esporta dati'),
+                title: Text(l10n.exportJson),
                 onTap: () async => await ds.exportData()),
             const Divider(height: 1),
             ListTile(
                 leading: Icon(Icons.download_outlined, color: cs.primary),
-                title: const Text('Importa dati'),
+                title: Text(l10n.importJson),
                 onTap: () => _importData(ds)),
             // --- NUOVO BOTTONE PER I BACKUP REMOTI ---
             if (ds.isRemote && ds.serverConnected) ...[
               const Divider(height: 1),
               ListTile(
                 leading: Icon(Icons.restore, color: cs.primary),
-                title: const Text('Ripristina backup remoto'),
+                title: Text(l10n.restoreRemoteBackup),
                 onTap: () => _showRestoreDialog(context, ds),
               ),
             ],
           ])),
           const SizedBox(height: 24),
           _SectionHeader(
-              title: 'Informazioni e aggiornamenti', icon: Icons.info_outline),
+              title: l10n.sectionAbout, icon: Icons.info_outline),
           Card(
               child: Column(children: [
             ListTile(
               leading: Icon(Icons.system_update_alt, color: cs.primary),
-              title: const Text('Controlla aggiornamenti'),
+              title: Text(l10n.checkUpdates),
               subtitle:
-                  const Text('Verifica e scarica l\'ultima versione da GitHub'),
+                  Text(l10n.checkUpdatesSubtitle),
               onTap: () => UpdateService.checkAndPromptUpdate(context,
                   showNoUpdateFeedback: true),
             ),
             const Divider(height: 1),
             ListTile(
               leading: Icon(Icons.open_in_browser, color: cs.primary),
-              title: const Text('Repository GitHub'),
+              title: Text(l10n.openGitHub),
               subtitle: const Text('https://github.com/Kikkiu17/InventoryApp'),
               onTap: () async {
                 final uri = Uri.parse(UpdateService.releasesHtmlUrl);
@@ -1384,6 +1503,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildTreeLevel(Map<String, dynamic> node, List<String> path) {
+    final l10n = context.l10n;
     final keys = node.keys.toList()..sort();
     final pathKey = path.join('|');
 
@@ -1413,7 +1533,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               trailing: IconButton(
                   icon: Icon(Icons.delete_outline,
                       color: Theme.of(context).colorScheme.error),
-                  tooltip: 'Elimina',
+                  tooltip: l10n.deleteAction,
                   onPressed: () => _confirmDeleteNode(currentPath)),
               children: [
                 Padding(
@@ -1442,8 +1562,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             key: ValueKey('${pathKey}_${keys.length}'),
             decoration: InputDecoration(
               hintText: path.isEmpty
-                  ? 'Aggiungi principale...'
-                  : 'Aggiungi in ${path.last}...',
+                  ? l10n.addMainTag
+                  : l10n.addSubTag(path.last),
               isDense: true,
               border: const UnderlineInputBorder(),
               suffixIcon: const Icon(Icons.keyboard_return, size: 16),
@@ -1471,18 +1591,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _confirmDeleteNode(List<String> path) async {
+    final l10n = context.l10n;
     final res = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Elimina Tag'),
-        content: Text('Vuoi eliminare "${path.last}" e tutti i suoi sottotag?'),
+        title: Text(l10n.deleteButton),
+        content: Text(l10n.deleteTagConfirm(path.last)),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(c, false),
-              child: const Text('Annulla')),
+              child: Text(l10n.cancelButton)),
           FilledButton(
               onPressed: () => Navigator.pop(c, true),
-              child: const Text('Elimina')),
+              child: Text(l10n.deleteButton)),
         ],
       ),
     );
@@ -1503,6 +1624,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _testServer() async {
+    final l10n = context.l10n;
     setState(() {
       _testingServer = true;
       _serverOk = null;
@@ -1514,7 +1636,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
     if (mounted)
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(ok ? 'Raggiungibile! ✅' : 'Errore ❌')));
+          SnackBar(content: Text(ok ? '${l10n.connectionSuccess} ✅' : '${l10n.connectionFailed} ❌')));
   }
 
   Future<void> _applyServer() async {
@@ -1548,6 +1670,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _editSpecialTag(SpecialTag st) async {
+    final l10n = context.l10n;
     final nameCtrl = TextEditingController(text: st.name);
     final unitCtrl = TextEditingController(text: st.unit);
     final shortIdCtrl = TextEditingController(text: st.shortId);
@@ -1557,16 +1680,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Modifica proprietà'),
+          title: Text(l10n.editPropTitle),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
                   controller: nameCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Nome',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: l10n.propName,
+                    border: const OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -1576,9 +1699,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       flex: 3,
                       child: TextField(
                         controller: unitCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Unità',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n.propUnit,
+                          border: const OutlineInputBorder(),
                         ),
                       ),
                     ),
@@ -1587,10 +1710,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       flex: 2,
                       child: TextField(
                         controller: shortIdCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Sigla',
-                          hintText: 'es. L',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n.propSigla,
+                          hintText: l10n.propSiglaHint,
+                          border: const OutlineInputBorder(),
                         ),
                       ),
                     ),
@@ -1600,7 +1723,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Row(
                   children: [
                     FilterChip(
-                      label: const Text('Testo libero'),
+                      label: Text(l10n.propTextFree),
                       selected: isString,
                       onSelected: (v) => setDialogState(() => isString = v),
                     ),
@@ -1612,7 +1735,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Annulla'),
+              child: Text(l10n.cancelButton),
             ),
             FilledButton(
               onPressed: () {
@@ -1628,7 +1751,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 }
                 Navigator.pop(ctx, true);
               },
-              child: const Text('Salva'),
+              child: Text(l10n.saveButton),
             ),
           ],
         ),
@@ -1646,18 +1769,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _confirmDeleteTag(String tag) async {
+    final l10n = context.l10n;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Rimuovi tag'),
-        content: Text('Rimuovere "$tag"?'),
+        title: Text(l10n.deleteButton),
+        content: Text(l10n.deleteTagConfirm(tag)),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Annulla')),
+              child: Text(l10n.cancelButton)),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Rimuovi'))
+              child: Text(l10n.deleteButton))
         ],
       ),
     );
@@ -1665,18 +1789,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _confirmDeleteSpecialTag(String name) async {
+    final l10n = context.l10n;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Rimuovi proprietà'),
-        content: Text('Rimuovere "$name"?'),
+        title: Text(l10n.deleteButton),
+        content: Text(l10n.deletePropConfirm(name)),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Annulla')),
+              child: Text(l10n.cancelButton)),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Rimuovi'))
+              child: Text(l10n.deleteButton))
         ],
       ),
     );
@@ -1685,18 +1810,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _importData(DataService ds) async {
+    final l10n = context.l10n;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Importa dati'),
-        content: const Text('Sovrascrivere tutti i dati?'),
+        title: Text(l10n.importJson),
+        content: Text(l10n.confirmRestoreMsg),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Annulla')),
+              child: Text(l10n.cancelButton)),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Importa'))
+              child: Text(l10n.importJson))
         ],
       ),
     );
@@ -1729,18 +1855,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _showRestoreDialog(BuildContext context, DataService ds) async {
+    final l10n = context.l10n;
     final backups = await ds.getBackups();
     if (!context.mounted) return;
     if (backups.isEmpty) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Nessun backup trovato')));
+          .showSnackBar(SnackBar(content: Text(l10n.noBackupsFound)));
       return;
     }
 
     final choice = await showDialog<String>(
         context: context,
         builder: (ctx) => AlertDialog(
-              title: const Text('Ripristina backup'),
+              title: Text(l10n.restoreBackupTitle),
               content: SizedBox(
                 width: double.maxFinite,
                 child: SingleChildScrollView(
@@ -1759,7 +1886,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               actions: [
                 TextButton(
                     onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Annulla'))
+                    child: Text(l10n.cancelButton))
               ],
             ));
 
@@ -1767,23 +1894,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final confirm = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-                  title: const Text('Conferma ripristino'),
-                  content: const Text(
-                      'Sovrascrivere i dati attuali? (Verrà creato un backup di sicurezza automatico prima di procedere).'),
+                  title: Text(l10n.confirmRestoreTitle),
+                  content: Text(
+                      l10n.confirmRestoreMsg),
                   actions: [
                     TextButton(
                         onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text('Annulla')),
+                        child: Text(l10n.cancelButton)),
                     FilledButton(
                         onPressed: () => Navigator.pop(ctx, true),
-                        child: const Text('Ripristina'))
+                        child: Text(l10n.restoreBackupTitle))
                   ]));
 
       if (confirm == true) {
         final ok = await ds.restoreBackup(choice);
         if (ok && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text('Backup ripristinato con successo')));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(l10n.restoreSuccess)));
         }
       }
     }
@@ -1886,6 +2013,7 @@ class _DrawerGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
     final rows = container.rows;
     final cols = container.columns;
 
@@ -2085,7 +2213,7 @@ class _DrawerGrid extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-            'Anteprima (clicca per configurare, premi a lungo e trascina per selezionare in blocco)',
+            l10n.drawerGridHint,
             style: Theme.of(context)
                 .textTheme
                 .labelSmall

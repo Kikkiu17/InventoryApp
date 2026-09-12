@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:open_filex/open_filex.dart';
+import '../l10n/app_localizations.dart';
 import '../services/data_service.dart';
 import '../models/component.dart';
 import '../widgets/image_viewer.dart';
@@ -61,7 +62,7 @@ class _FilesScreenState extends State<FilesScreen> {
       } catch (_) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Impossibile aprire il link')));
+              SnackBar(content: Text(context.l10n.cannotOpenLink)));
         }
       }
     } else {
@@ -74,7 +75,7 @@ class _FilesScreenState extends State<FilesScreen> {
         } catch (_) {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Impossibile aprire il file')));
+                SnackBar(content: Text(context.l10n.cannotOpenFile)));
           }
         }
       } else {
@@ -83,8 +84,8 @@ class _FilesScreenState extends State<FilesScreen> {
           await OpenFilex.open(localPath);
         } catch (_) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('Impossibile aprire il file locale')));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(context.l10n.cannotOpenLocalFile)));
           }
         }
       }
@@ -98,22 +99,22 @@ class _FilesScreenState extends State<FilesScreen> {
     final newName = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Rinomina file'),
+        title: Text(context.l10n.renameFileTitle),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Nome',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: context.l10n.nameLabel,
+            border: const OutlineInputBorder(),
           ),
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Annulla')),
+              child: Text(context.l10n.cancelButton)),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-              child: const Text('Salva')),
+              child: Text(context.l10n.saveButton)),
         ],
       ),
     );
@@ -133,7 +134,7 @@ class _FilesScreenState extends State<FilesScreen> {
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text('Errore: $e')));
+              .showSnackBar(SnackBar(content: Text('${context.l10n.error}: $e')));
         }
       }
     }
@@ -143,21 +144,23 @@ class _FilesScreenState extends State<FilesScreen> {
       BuildContext context, FilesScreenItem item) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(item.isImage ? 'Elimina immagine' : 'Elimina file'),
-        content: Text('Vuoi eliminare definitivamente "${item.name}"?'),
+      builder: (ctx) {
+        final l10n = context.l10n;
+        return AlertDialog(
+        title: Text(item.isImage ? l10n.deleteImageTitle : l10n.deleteFileTitle),
+        content: Text(l10n.deleteAttachmentConfirm(item.name)),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Annulla')),
+              child: Text(l10n.cancelButton)),
           FilledButton(
               style: FilledButton.styleFrom(
                   backgroundColor: Theme.of(ctx).colorScheme.error,
                   foregroundColor: Theme.of(ctx).colorScheme.onError),
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Elimina')),
+              child: Text(l10n.deleteButton)),
         ],
-      ),
+      );},
     );
 
     if (confirm == true) {
@@ -180,7 +183,7 @@ class _FilesScreenState extends State<FilesScreen> {
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text('Errore: $e')));
+              .showSnackBar(SnackBar(content: Text('${context.l10n.error}: $e')));
         }
       }
     }
@@ -221,6 +224,7 @@ class _FilesScreenState extends State<FilesScreen> {
   @override
   Widget build(BuildContext context) {
     final ds = context.watch<DataService>();
+    final l10n = context.l10n;
     final cs = Theme.of(context).colorScheme;
 
     // Raccoglie tutti i file, i link e le immagini
@@ -260,7 +264,7 @@ class _FilesScreenState extends State<FilesScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('File Caricati'),
+            Text(l10n.uploadedFilesTitle),
             if (ds.isRemote && ds.currentInventory != null)
               Text(
                 ds.currentInventory!.name,
@@ -276,7 +280,7 @@ class _FilesScreenState extends State<FilesScreen> {
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
             child: SearchBar(
               controller: _searchCtrl,
-              hintText: 'Cerca file o componente...',
+              hintText: l10n.searchFileOrComponentPlaceholder,
               leading: const Icon(Icons.search),
               trailing: _query.isNotEmpty
                   ? [
@@ -299,7 +303,7 @@ class _FilesScreenState extends State<FilesScreen> {
             child: Row(
               children: [
                 Text(
-                  '${filtered.length} file trovati',
+                  l10n.filesFoundCount(filtered.length),
                   style: Theme.of(context)
                       .textTheme
                       .bodySmall
@@ -318,7 +322,7 @@ class _FilesScreenState extends State<FilesScreen> {
                             size: 64,
                             color: cs.onSurfaceVariant.withOpacity(0.4)),
                         const SizedBox(height: 12),
-                        const Text('Nessun file trovato'),
+                        Text(l10n.noFilesFound),
                       ],
                     ),
                   )
@@ -343,12 +347,12 @@ class _FilesScreenState extends State<FilesScreen> {
                                     color: cs.primary),
                               ),
                         title: Text(item.name),
-                        subtitle: Text('Componente: ${item.component.name}'),
+                        subtitle: Text('${l10n.componentPrefix}: ${item.component.name}'),
                         onTap: () => _openAttachment(context, item),
                         trailing: PopupMenuButton<String>(
                           icon:
                               Icon(Icons.more_vert, color: cs.onSurfaceVariant),
-                          tooltip: 'Opzioni',
+                          tooltip: l10n.options,
                           onSelected: (val) {
                             if (val == 'rename') {
                               _renameAttachment(context, item);
@@ -359,12 +363,12 @@ class _FilesScreenState extends State<FilesScreen> {
                           },
                           itemBuilder: (_) => [
                             if (!item.isImage)
-                              const PopupMenuItem(
+                              PopupMenuItem(
                                 value: 'rename',
                                 child: Row(children: [
-                                  Icon(Icons.edit_outlined, size: 18),
-                                  SizedBox(width: 10),
-                                  Text('Rinomina'),
+                                  const Icon(Icons.edit_outlined, size: 18),
+                                  const SizedBox(width: 10),
+                                  Text(l10n.renameAction),
                                 ]),
                               ),
                             PopupMenuItem(
@@ -374,7 +378,7 @@ class _FilesScreenState extends State<FilesScreen> {
                                     size: 18,
                                     color: Theme.of(context).colorScheme.error),
                                 const SizedBox(width: 10),
-                                Text('Elimina',
+                                Text(l10n.delete,
                                     style: TextStyle(
                                         color: Theme.of(context)
                                             .colorScheme

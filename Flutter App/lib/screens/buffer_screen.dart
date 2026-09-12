@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../l10n/app_localizations.dart';
 import '../models/component.dart';
 import '../models/settings.dart';
 import '../services/data_service.dart';
@@ -56,21 +57,23 @@ class _BufferScreenState extends State<BufferScreen> {
   void _deleteComponent(BuildContext context, Component component, DataService ds) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Elimina componente'),
-        content: Text('Sei sicuro di voler eliminare "${component.name}" dal buffer?'),
+      builder: (ctx) {
+        final l10n = ctx.l10n;
+        return AlertDialog(
+        title: Text(l10n.deleteComponentTitle),
+        content: Text(l10n.deleteBufferComponentConfirm(component.name)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annulla')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.cancelButton)),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
               foregroundColor: Theme.of(context).colorScheme.onError,
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Elimina'),
+            child: Text(l10n.deleteButton),
           ),
         ],
-      ),
+      );},
     );
 
     if (confirm == true) {
@@ -104,7 +107,7 @@ class _BufferScreenState extends State<BufferScreen> {
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('"${component.name}" posizionato con successo!'),
+                  content: Text(context.l10n.placeComponentSuccess(component.name)),
                   behavior: SnackBarBehavior.floating,
                 ),
               );
@@ -116,7 +119,7 @@ class _BufferScreenState extends State<BufferScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Errore nel caricamento delle impostazioni: $e'),
+            content: Text('${context.l10n.error}: $e'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -143,7 +146,7 @@ class _BufferScreenState extends State<BufferScreen> {
 
   String _getTargetInventoryName(DataService ds, String? targetId) {
     if (targetId == null) return '';
-    if (!ds.isRemote) return 'Inventario Locale';
+    if (!ds.isRemote) return AppLocalizations.current.localModeTitle;
     final inv = ds.inventories.firstWhere(
       (i) => i.id == targetId,
       orElse: () => InventoryMeta(id: targetId, name: targetId),
@@ -154,6 +157,7 @@ class _BufferScreenState extends State<BufferScreen> {
   @override
   Widget build(BuildContext context) {
     final ds = context.watch<DataService>();
+    final l10n = context.l10n;
     final items = ds.bufferComponents;
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
@@ -170,7 +174,7 @@ class _BufferScreenState extends State<BufferScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Buffer di Transito'),
+        title: Text(l10n.bufferTitle),
       ),
       body: items.isEmpty
           ? Center(
@@ -186,12 +190,12 @@ class _BufferScreenState extends State<BufferScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Il buffer è vuoto',
+                      l10n.emptyBufferTitle,
                       style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Aggiungi i componenti per registrarli temporaneamente prima di posizionarli.',
+                      l10n.emptyBufferDesc,
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: cs.onSurfaceVariant.withOpacity(0.7),
@@ -201,7 +205,7 @@ class _BufferScreenState extends State<BufferScreen> {
                     FilledButton.icon(
                       onPressed: () => _addComponent(context, ds),
                       icon: const Icon(Icons.add),
-                      label: const Text('Aggiungi Componente'),
+                      label: Text(l10n.addComponentToBuffer),
                     ),
                   ],
                 ),
@@ -215,7 +219,7 @@ class _BufferScreenState extends State<BufferScreen> {
                     height: 40,
                     child: SearchBar(
                       controller: _searchCtrl,
-                      hintText: 'Cerca per nome, tag, descrizione o nota...',
+                      hintText: l10n.searchBufferPlaceholder,
                       leading: const Icon(Icons.search, size: 18),
                       trailing: _query.isNotEmpty
                           ? [
@@ -261,12 +265,12 @@ class _BufferScreenState extends State<BufferScreen> {
                                 ),
                                 const SizedBox(height: 16),
                                 Text(
-                                  'Nessun risultato trovato',
+                                  l10n.noComponentsFound,
                                   style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  'Nessun componente nel buffer corrisponde alla tua ricerca.',
+                                  l10n.noBufferResultsDesc,
                                   textAlign: TextAlign.center,
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                     color: cs.onSurfaceVariant.withOpacity(0.7),
@@ -308,8 +312,8 @@ class _BufferScreenState extends State<BufferScreen> {
                                         // Status Badge
                                         Tooltip(
                                           message: hasTarget 
-                                              ? 'Destinazione assegnata: $targetName'
-                                              : 'Destinazione non specificata',
+                                              ? l10n.assignedDestination(targetName)
+                                              : l10n.destinationUnspecified,
                                           child: Container(
                                             width: 52,
                                             height: 52,
@@ -399,7 +403,7 @@ class _BufferScreenState extends State<BufferScreen> {
                                             const SizedBox(width: 4),
                                             Expanded(
                                               child: Text(
-                                                hasTarget ? targetName : 'Senza destinazione',
+                                                hasTarget ? targetName : l10n.noDestination,
                                                 style: theme.textTheme.bodyMedium?.copyWith(
                                                   color: hasTarget ? cs.onSurface : cs.error,
                                                   fontWeight: hasTarget ? FontWeight.bold : FontWeight.bold,
@@ -519,7 +523,7 @@ class _BufferScreenState extends State<BufferScreen> {
                                                       ),
                                                     )
                                                   : const Icon(Icons.inbox, size: 16),
-                                              label: const Text('Posiziona', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                              label: Text(l10n.placeAction, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                                             ),
                                           ],
                                         ),
@@ -539,7 +543,7 @@ class _BufferScreenState extends State<BufferScreen> {
               heroTag: 'fab_buffer',
               onPressed: () => _addComponent(context, ds),
               icon: const Icon(Icons.add),
-              label: const Text('Aggiungi'),
+              label: Text(l10n.add),
             )
           : null,
     );
@@ -615,6 +619,7 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final ds = Provider.of<DataService>(context, listen: false);
+    final l10n = context.l10n;
 
     final targetId = widget.component.targetInventoryId;
     final hasTarget = targetId != null;
@@ -622,7 +627,7 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
     String targetName = '';
     if (hasTarget) {
       if (!ds.isRemote) {
-        targetName = 'Inventario Locale';
+        targetName = l10n.localModeTitle;
       } else {
         final inv = ds.inventories.firstWhere(
           (i) => i.id == targetId,
@@ -639,14 +644,14 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
     final zones = widget.settings.drawerDividers[key] ?? 1;
 
     return AlertDialog(
-      title: Text('Posiziona "${widget.component.name}"'),
+      title: Text(l10n.placeItemDialogTitle(widget.component.name)),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Specifica la posizione fisica per spostare il componente dal buffer all\'inventario.'),
+              Text(l10n.placeItemDialogDesc),
               const SizedBox(height: 16),
               
               if (hasTarget) ...[
@@ -657,7 +662,7 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Destinazione: $targetName',
+                        l10n.destinationLabel(targetName),
                         style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -672,7 +677,7 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
                     widget.onEditTags();
                   },
                   icon: const Icon(Icons.swap_horiz),
-                  label: const Text('Cambia destinazione (e tag)'),
+                  label: Text(l10n.changeDestinationAndTags),
                 ),
                 const SizedBox(height: 16),
                 
@@ -680,7 +685,7 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
                   DropdownButtonFormField<int>(
                     value: _selectedCabinet,
                     decoration: InputDecoration(
-                      labelText: 'Cassettiera',
+                      labelText: l10n.selectCabinetLabel,
                       border: const OutlineInputBorder(),
                       filled: true,
                       fillColor: Colors.green.withOpacity(opacityGreen),
@@ -703,14 +708,14 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
                         textCapitalization: TextCapitalization.characters,
                         textInputAction: TextInputAction.next,
                         decoration: InputDecoration(
-                          labelText: 'Colonna',
+                          labelText: l10n.columnLabel,
                           hintText: 'Es: A',
                           border: const OutlineInputBorder(),
                           filled: true,
                           fillColor: Colors.green.withOpacity(opacityGreen),
                         ),
                         validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Obbligatorio';
+                          if (v == null || v.trim().isEmpty) return l10n.requiredField;
                           if (widget.settings.containers.isEmpty) return null;
                           final colStr = v.trim().toUpperCase();
                           final container = widget.settings.containers.firstWhere(
@@ -721,10 +726,10 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
                           if (r.isNotEmpty) {
                             final label = '$colStr$r';
                             if (container.disabledDrawers.contains(label)) {
-                              return 'Disattivato';
+                              return l10n.disabledDrawer;
                             }
                             if (!container.isDrawerValid(label)) {
-                              return 'Max colonna: ${container.columnLabels.last}';
+                              return l10n.maxColumnLabel(container.columnLabels.last);
                             }
                           }
                           return null;
@@ -738,14 +743,14 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
                         keyboardType: TextInputType.number,
                         textInputAction: TextInputAction.done,
                         decoration: InputDecoration(
-                          labelText: 'Riga',
+                          labelText: l10n.rowLabel,
                           hintText: 'Es: 3',
                           border: const OutlineInputBorder(),
                           filled: true,
                           fillColor: Colors.green.withOpacity(opacityGreen),
                         ),
                         validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Obbligatorio';
+                          if (v == null || v.trim().isEmpty) return l10n.requiredField;
                           if (widget.settings.containers.isEmpty) return null;
                           final rowVal = int.tryParse(v.trim()) ?? 0;
                           final container = widget.settings.containers.firstWhere(
@@ -753,13 +758,13 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
                             orElse: () => widget.settings.containers.first,
                           );
                           if (rowVal < 1 || rowVal > container.rows) {
-                            return 'Max riga: ${container.rows}';
+                            return l10n.maxRowLabel(container.rows);
                           }
                           final cStr = _colCtrl.text.trim().toUpperCase();
                           if (cStr.isNotEmpty) {
                             final label = '$cStr$rowVal';
                             if (container.disabledDrawers.contains(label)) {
-                              return 'Disattivato';
+                              return l10n.disabledDrawer;
                             }
                           }
                           return null;
@@ -774,7 +779,7 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
                   DropdownButtonFormField<int>(
                     value: _selectedZone == null || _selectedZone! < 1 || _selectedZone! > zones ? 1 : _selectedZone,
                     decoration: InputDecoration(
-                      labelText: 'Zona del cassetto (Separatore)',
+                      labelText: l10n.drawerZoneSeparator,
                       border: const OutlineInputBorder(),
                       filled: true,
                       fillColor: Colors.green.withOpacity(opacityGreen),
@@ -782,7 +787,7 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
                     items: List.generate(zones, (i) => i + 1)
                         .map((z) => DropdownMenuItem(
                               value: z,
-                              child: Text(getZoneLabel(z, zones)),
+                              child: Text(getZoneLabel(z, zones, l10n)),
                             ))
                         .toList(),
                     onChanged: (v) => setState(() => _selectedZone = v ?? 1),
@@ -799,7 +804,7 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Seleziona prima un inventario di destinazione.',
+                              l10n.selectTargetInventoryFirst,
                               style: TextStyle(color: cs.error, fontWeight: FontWeight.bold),
                             ),
                           ),
@@ -812,7 +817,7 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
                           widget.onEditTags();
                         },
                         icon: const Icon(Icons.edit),
-                        label: const Text('Imposta destinazione e tag'),
+                        label: Text(l10n.setDestinationAndTags),
                       ),
                     ],
                   ),
@@ -825,12 +830,12 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Annulla'),
+          child: Text(l10n.cancelButton),
         ),
         if (hasTarget)
           FilledButton(
             onPressed: _submit,
-            child: const Text('Salva Posizione'),
+            child: Text(l10n.savePosition),
           ),
       ],
     );
