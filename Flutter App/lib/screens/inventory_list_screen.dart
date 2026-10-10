@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../models/search_result.dart';
 import '../services/data_service.dart';
+import '../services/pdf_export_service.dart';
 import '../widgets/global_search_delegate.dart';
 
 /// Schermata per visualizzare, selezionare, creare, rinominare ed eliminare
@@ -92,6 +93,21 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf),
+            tooltip: l10n.exportPdfTooltip,
+            onPressed: (_query.isNotEmpty &&
+                    !_isSearching &&
+                    _searchResults != null &&
+                    _searchResults!.isNotEmpty)
+                ? () => PdfExportService.exportGlobalSearchResults(
+                      context: context,
+                      items: _searchResults!,
+                      settings: ds.settings,
+                      query: _query,
+                    )
+                : null,
+          ),
           if (ds.isRemote && ds.serverConnected)
             IconButton(
               icon: ds.syncing
@@ -276,13 +292,13 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
                   size: 64, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
               const SizedBox(height: 16),
               Text(
-                l10n.noComponentsFound,
+                l10n.noResults,
                 style: theme.textTheme.titleMedium
                     ?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               Text(
-                l10n.noMatchesForQuery(_query),
+                l10n.noResultsDescription(_query),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: cs.onSurfaceVariant),
               ),
@@ -335,7 +351,7 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(4, 8, 4, 6),
             child: Text(
-              'COMPONENTI INVENTARI',
+              l10n.inventoryComponentsSectionHeader,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
@@ -401,7 +417,7 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
       if (context.mounted) {
         final l10nErr = context.l10n;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('${context.l10n.error}: $e'),
+          content: Text('${l10nErr.error}: $e'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
@@ -465,7 +481,7 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
       if (context.mounted) {
         final l10nErr = context.l10n;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('${context.l10n.error}: $e'),
+          content: Text('${l10nErr.error}: $e'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
@@ -518,7 +534,7 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
       if (context.mounted) {
         final l10nErr = context.l10n;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('${context.l10n.error}: $e'),
+          content: Text('${l10nErr.error}: $e'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
@@ -584,7 +600,7 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
       if (context.mounted) {
         final l10nErr = context.l10n;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('${context.l10n.error}: $e'),
+          content: Text('${l10nErr.error}: $e'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }

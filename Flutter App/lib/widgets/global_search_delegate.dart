@@ -5,6 +5,7 @@ import '../l10n/app_localizations.dart';
 import '../models/search_result.dart';
 import '../models/settings.dart';
 import '../services/data_service.dart';
+import '../services/pdf_export_service.dart';
 import 'component_view_dialog.dart';
 import '../main.dart';
 
@@ -12,6 +13,7 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
   final DataService ds;
   Future<List<GlobalSearchResult>>? _searchFuture;
   String? _lastQuery;
+  List<GlobalSearchResult>? _lastResults;
 
   GlobalSearchDelegate(this.ds);
 
@@ -21,8 +23,30 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
 
   @override
   List<Widget>? buildActions(BuildContext context) {
+    final l10n = context.l10n;
     return [
-      if (query.isNotEmpty)
+      if (query.isNotEmpty) ...[
+        IconButton(
+          icon: const Icon(Icons.picture_as_pdf),
+          tooltip: l10n.exportPdfTooltip,
+          onPressed: () async {
+            final results = _lastResults ??
+                await (_searchFuture ?? ds.globalSearch(query));
+            if (!context.mounted) return;
+            if (results.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(l10n.noComponentsFound)),
+              );
+              return;
+            }
+            await PdfExportService.exportGlobalSearchResults(
+              context: context,
+              items: results,
+              settings: ds.settings,
+              query: query,
+            );
+          },
+        ),
         IconButton(
           icon: const Icon(Icons.clear),
           onPressed: () {
@@ -30,6 +54,7 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
             showSuggestions(context);
           },
         ),
+      ],
     ];
   }
 
@@ -54,6 +79,9 @@ class GlobalSearchDelegate extends SearchDelegate<void> {
     return FutureBuilder<List<GlobalSearchResult>>(
       future: _searchFuture,
       builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          _lastResults = snapshot.data;
+        }
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }

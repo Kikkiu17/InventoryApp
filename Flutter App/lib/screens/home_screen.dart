@@ -10,6 +10,7 @@ import '../models/component.dart';
 import '../models/settings.dart';
 import '../services/data_service.dart';
 import '../services/update_service.dart';
+import '../services/pdf_export_service.dart';
 import '../widgets/component_tile.dart';
 import '../widgets/component_dialog.dart';
 import '../widgets/component_view_dialog.dart';
@@ -91,69 +92,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Creazione ed esportazione del file PDF
   Future<void> _exportToPdf(List<Component> items, AppSettings settings, [String? title]) async {
-    final l10n = context.l10n;
-    final effectiveTitle = (title != null && title.trim().isNotEmpty)
-        ? title.trim()
-        : l10n.exportPdfTitle;
-    final fontData = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
-    final ttf = pw.Font.ttf(fontData);
-
-    final pdf = pw.Document(
-      theme: pw.ThemeData.withFont(base: ttf),
+    await PdfExportService.exportComponents(
+      context: context,
+      items: items,
+      settings: settings,
+      title: title,
     );
-
-
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
-        build: (context) => [
-          pw.Header(
-            level: 0,
-            child: pw.Text(effectiveTitle, style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-          ),
-          pw.SizedBox(height: 10),
-          pw.TableHelper.fromTextArray(
-            headers: [l10n.colName, l10n.colPosition, l10n.colQuantity, l10n.colDetails],
-            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-            cellAlignment: pw.Alignment.centerLeft,
-            // Aggiunto per evitare l'a capo sulle colonne strette
-            columnWidths: const {
-              0: pw.FlexColumnWidth(1.6),  // Nome (circa 2/3 di 2.5)
-              1: pw.FixedColumnWidth(70),  // Posizione
-              2: pw.FixedColumnWidth(40),  // Qtà
-              3: pw.FlexColumnWidth(4.9),  // Dettagli (allargata)
-            },
-            data: items.map((c) {
-              final key = '${c.cabinet}_${c.drawer}';
-              final zones = settings.drawerDividers[key] ?? 1;
-              var pos = c.drawer.isEmpty ? l10n.unassignedPosition : (settings.numCabinets > 1 ? '${c.cabinet}-${c.drawer}' : c.drawer);
-              if (c.drawer.isNotEmpty && c.drawerZone != null && zones >= 2) {
-                pos += '\nZ${c.drawerZone}';
-              }
-              final props = c.specialTagValues.entries.map((e) {
-                final st = settings.specialTags.where((s) => s.name == e.key).firstOrNull;
-                return '${e.key}: ${_formatValueWithUnit(e.value, st?.unit ?? '')}';
-              }).join(', ');
-              final details = [if (c.description.isNotEmpty) c.description, if (c.tags.isNotEmpty) c.tags.join(', '), if (props.isNotEmpty) props].join('\n');
-              
-              return [c.name, pos, c.quantity.toString(), details];
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-
-    try {
-      final dir = await getApplicationDocumentsDirectory();
-      final file = File('${dir.path}/inventario_export.pdf');
-      await file.writeAsBytes(await pdf.save());
-      await OpenFilex.open(file.path);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${l10n.exportError}: $e')));
-      }
-    }
   }
 
   @override

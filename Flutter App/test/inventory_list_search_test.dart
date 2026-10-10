@@ -1,11 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:inventario/l10n/app_localizations.dart';
 import 'package:inventario/models/component.dart';
 import 'package:inventario/screens/inventory_list_screen.dart';
 import 'package:inventario/services/data_service.dart';
 import 'package:inventario/widgets/global_search_delegate.dart';
+
+Widget _createTestApp(Widget child) {
+  return MaterialApp(
+    locale: const Locale('it'),
+    supportedLocales: AppLocalizations.supportedLocales,
+    localizationsDelegates: const [
+      AppLocalizations.delegate,
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+    home: child,
+  );
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -19,8 +35,8 @@ void main() {
       final ds = DataService();
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: ChangeNotifierProvider<DataService>.value(
+        _createTestApp(
+          ChangeNotifierProvider<DataService>.value(
             value: ds,
             child: const InventoryListScreen(),
           ),
@@ -56,8 +72,8 @@ void main() {
       ));
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: ChangeNotifierProvider<DataService>.value(
+        _createTestApp(
+          ChangeNotifierProvider<DataService>.value(
             value: ds,
             child: const InventoryListScreen(),
           ),
@@ -96,8 +112,8 @@ void main() {
       final ds = DataService();
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: ChangeNotifierProvider<DataService>.value(
+        _createTestApp(
+          ChangeNotifierProvider<DataService>.value(
             value: ds,
             child: const InventoryListScreen(),
           ),
@@ -128,10 +144,10 @@ void main() {
       final delegate = GlobalSearchDelegate(ds);
 
       await tester.pumpWidget(
-        ChangeNotifierProvider<DataService>.value(
-          value: ds,
-          child: MaterialApp(
-            home: Scaffold(
+        _createTestApp(
+          ChangeNotifierProvider<DataService>.value(
+            value: ds,
+            child: Scaffold(
               body: Builder(
                 builder: (context) {
                   delegate.query = 'Condensatore';
@@ -148,6 +164,76 @@ void main() {
       expect(find.text('COMPONENTI BUFFER'), findsOneWidget);
       expect(find.text('Condensatore 100nF'), findsOneWidget);
       expect(find.text('Q.tà: 15'), findsOneWidget);
+    });
+
+    testWidgets('buildActions renders PDF export button when query is not empty', (tester) async {
+      final ds = DataService();
+      final delegate = GlobalSearchDelegate(ds);
+
+      await tester.pumpWidget(
+        _createTestApp(
+          ChangeNotifierProvider<DataService>.value(
+            value: ds,
+            child: Scaffold(
+              body: Builder(
+                builder: (context) {
+                  delegate.query = 'TestQuery';
+                  final actions = delegate.buildActions(context) ?? [];
+                  return Row(children: actions);
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final pdfButtonFinder = find.byIcon(Icons.picture_as_pdf);
+      expect(pdfButtonFinder, findsOneWidget);
+    });
+  });
+
+  group('InventoryListScreen PDF Export Button Tests', () {
+    testWidgets('PDF export button is disabled when search is empty and enables when search returns results', (tester) async {
+      final ds = DataService();
+      await ds.addBufferComponent(Component(
+        id: 'comp-10',
+        name: 'Transistor BC547',
+        drawer: 'C1',
+        quantity: 20,
+      ));
+
+      await tester.pumpWidget(
+        _createTestApp(
+          ChangeNotifierProvider<DataService>.value(
+            value: ds,
+            child: const InventoryListScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Check PDF button exists and is disabled initially
+      final pdfIconFinder = find.byIcon(Icons.picture_as_pdf);
+      expect(pdfIconFinder, findsOneWidget);
+      final pdfButtonFinder = find.ancestor(
+        of: pdfIconFinder,
+        matching: find.byType(IconButton),
+      );
+      expect(pdfButtonFinder, findsOneWidget);
+      final initialButton = tester.widget<IconButton>(pdfButtonFinder);
+      expect(initialButton.onPressed, isNull);
+
+      // Search for Transistor
+      await tester.enterText(find.byType(SearchBar), 'Transistor');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+
+      // Button should now be enabled
+      final enabledButton = tester.widget<IconButton>(pdfButtonFinder);
+      expect(enabledButton.onPressed, isNotNull);
     });
   });
 }
