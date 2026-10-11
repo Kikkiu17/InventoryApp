@@ -63,7 +63,7 @@ else
   echo "Warning: Icon not found at $ICON_SRC"
 fi
 
-# Copy Desktop file & update X-AppImage-Version with version from pubspec.yaml
+# Copy Desktop file & update X-AppImage-Version and X-AppImage-UpdateInformation
 DESKTOP_SRC="$SCRIPT_DIR/inventario.desktop"
 DESKTOP_DST="$APP_DIR/inventario.desktop"
 cp "$DESKTOP_SRC" "$DESKTOP_DST"
@@ -72,6 +72,13 @@ if grep -q "^X-AppImage-Version=" "$DESKTOP_DST"; then
   sed -i "s/^X-AppImage-Version=.*/X-AppImage-Version=$VERSION/" "$DESKTOP_DST"
 else
   echo "X-AppImage-Version=$VERSION" >> "$DESKTOP_DST"
+fi
+
+UPDATE_INFO="gh-releases-zsync|Kikkiu17|InventoryApp|latest|Inventario-*-x86_64.AppImage.zsync"
+if grep -q "^X-AppImage-UpdateInformation=" "$DESKTOP_DST"; then
+  sed -i "s|^X-AppImage-UpdateInformation=.*|X-AppImage-UpdateInformation=$UPDATE_INFO|" "$DESKTOP_DST"
+else
+  echo "X-AppImage-UpdateInformation=$UPDATE_INFO" >> "$DESKTOP_DST"
 fi
 
 # Copy AppRun entrypoint
@@ -94,11 +101,12 @@ fi
 # 5. Package into AppImage
 OUTPUT_APPIMAGE="$SCRIPT_DIR/Inventario-${VERSION}-x86_64.AppImage"
 echo "Packaging into AppImage: $OUTPUT_APPIMAGE..."
+echo "Embedding update information: $UPDATE_INFO"
 
 if [ "$APPIMAGETOOL_CMD" = "$APPIMAGETOOL" ]; then
-  ARCH=x86_64 "$APPIMAGETOOL_CMD" --appimage-extract-and-run "$APP_DIR" "$OUTPUT_APPIMAGE"
+  ARCH=x86_64 "$APPIMAGETOOL_CMD" -u "$UPDATE_INFO" --appimage-extract-and-run "$APP_DIR" "$OUTPUT_APPIMAGE"
 else
-  ARCH=x86_64 "$APPIMAGETOOL_CMD" "$APP_DIR" "$OUTPUT_APPIMAGE"
+  ARCH=x86_64 "$APPIMAGETOOL_CMD" -u "$UPDATE_INFO" "$APP_DIR" "$OUTPUT_APPIMAGE"
 fi
 
 echo "=== AppImage build completed successfully! ==="

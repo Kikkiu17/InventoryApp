@@ -7,3 +7,4 @@ Type=Application
 Categories=Utility;
 Comment=App per la gestione dell'inventario dei componenti nei cassetti
 X-AppImage-Version=1.10.0
+X-AppImage-UpdateInformation=gh-releases-zsync|Kikkiu17|InventoryApp|latest|Inventario-*-x86_64.AppImage.zsync
