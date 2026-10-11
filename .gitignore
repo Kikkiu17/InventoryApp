@@ -1,6 +1,7 @@
 # AppImage builds
 *.AppImage
 *.appimage
+*.zsync
 /AppImage/AppDir/
 
 # APK builds

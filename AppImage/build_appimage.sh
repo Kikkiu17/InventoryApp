@@ -76,10 +76,9 @@ fi
 
 UPDATE_INFO="gh-releases-zsync|Kikkiu17|InventoryApp|latest|Inventario-*-x86_64.AppImage.zsync"
 if grep -q "^X-AppImage-UpdateInformation=" "$DESKTOP_DST"; then
-  sed -i "s|^X-AppImage-UpdateInformation=.*|X-AppImage-UpdateInformation=$UPDATE_INFO|" "$DESKTOP_DST"
-else
-  echo "X-AppImage-UpdateInformation=$UPDATE_INFO" >> "$DESKTOP_DST"
+  grep -v "^X-AppImage-UpdateInformation=" "$DESKTOP_DST" > "${DESKTOP_DST}.tmp" && mv "${DESKTOP_DST}.tmp" "$DESKTOP_DST"
 fi
+echo "X-AppImage-UpdateInformation=$UPDATE_INFO" >> "$DESKTOP_DST"
 
 # Copy AppRun entrypoint
 cp "$SCRIPT_DIR/AppRun" "$APP_DIR/AppRun"
@@ -109,5 +108,14 @@ else
   ARCH=x86_64 "$APPIMAGETOOL_CMD" -u "$UPDATE_INFO" "$APP_DIR" "$OUTPUT_APPIMAGE"
 fi
 
+# Ensure generated .zsync file is placed in SCRIPT_DIR alongside the AppImage
+ZSYNC_BASENAME="Inventario-${VERSION}-x86_64.AppImage.zsync"
+if [ -f "$PWD/$ZSYNC_BASENAME" ] && [ "$PWD" != "$SCRIPT_DIR" ]; then
+  mv "$PWD/$ZSYNC_BASENAME" "$SCRIPT_DIR/"
+fi
+
 echo "=== AppImage build completed successfully! ==="
 echo "Output: $OUTPUT_APPIMAGE"
+if [ -f "$SCRIPT_DIR/$ZSYNC_BASENAME" ]; then
+  echo "Zsync:  $SCRIPT_DIR/$ZSYNC_BASENAME"
+fi
