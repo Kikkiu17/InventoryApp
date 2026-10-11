@@ -1018,6 +1018,76 @@ class DataService extends ChangeNotifier {
     return null;
   }
 
+  Map<String, String> getAllInventoryNames() {
+    final names = <String, String>{};
+    names['_buffer_'] = AppLocalizations.current.tabBuffer;
+
+    if (_mode == StorageMode.remote) {
+      for (final inv in _inventories) {
+        names[inv.id] = inv.name;
+      }
+      if (!names.containsKey(_currentInventoryId)) {
+        final current = currentInventory;
+        names[_currentInventoryId] = current?.name ?? _currentInventoryId;
+      }
+    } else {
+      names['default'] = AppLocalizations.current.localInventory;
+      for (final inv in _inventories) {
+        names[inv.id] = inv.name;
+      }
+    }
+    return names;
+  }
+
+  Future<Map<String, List<Component>>> getAllInventoriesComponents() async {
+    final result = <String, List<Component>>{};
+    final prefs = await SharedPreferences.getInstance();
+
+    if (_mode == StorageMode.remote && _serverConnected && _api != null) {
+      // Current inventory
+      result[_currentInventoryId] = List<Component>.from(_components);
+      // Buffer
+      result['_buffer_'] = List<Component>.from(_bufferComponents);
+
+      // Other inventories
+      for (final inv in _inventories) {
+        if (inv.id == _currentInventoryId) continue;
+        try {
+          final comps = await _api!.withInventory(inv.id).getComponents();
+          result[inv.id] = comps;
+          await prefs.setString('components_${inv.id}',
+              jsonEncode(comps.map((c) => c.toJson()).toList()));
+        } catch (_) {
+          final cachedStr = prefs.getString('components_${inv.id}');
+          if (cachedStr != null) {
+            try {
+              result[inv.id] = (jsonDecode(cachedStr) as List)
+                  .map((e) => Component.fromJson(e))
+                  .toList();
+            } catch (_) {}
+          }
+        }
+      }
+    } else {
+      // Local mode
+      result['default'] = List<Component>.from(_components);
+      result['_buffer_'] = List<Component>.from(_bufferComponents);
+      for (final inv in _inventories) {
+        if (inv.id == 'default') continue;
+        final cachedStr = prefs.getString('components_${inv.id}');
+        if (cachedStr != null) {
+          try {
+            result[inv.id] = (jsonDecode(cachedStr) as List)
+                .map((e) => Component.fromJson(e))
+                .toList();
+          } catch (_) {}
+        }
+      }
+    }
+
+    return result;
+  }
+
   // ── Shared Buffer Operations ───────────────────────────────────────────────
   Future<void> _loadBufferFromLocal(SharedPreferences prefs) async {
     final cj = prefs.getString(_bufferComponentsKey);

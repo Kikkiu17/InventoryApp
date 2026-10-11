@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/settings.dart';
 import '../services/data_service.dart';
 import '../services/update_service.dart';
+import '../services/inventory_changes_service.dart';
 import '../l10n/app_localizations.dart';
 import 'inventory_list_screen.dart';
 
@@ -1493,6 +1494,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 if (await canLaunchUrl(uri)) {
                   await launchUrl(uri, mode: LaunchMode.externalApplication);
                 }
+              },
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: Icon(Icons.published_with_changes, color: cs.primary),
+              title: Text(l10n.whatsNewViewRecentChanges),
+              subtitle: Text(l10n.whatsNewSubtitle),
+              onTap: () =>
+                  InventoryChangesService.showRecentChanges(context, ds),
+            ),
+            const Divider(height: 1),
+            SwitchListTile(
+              secondary:
+                  Icon(Icons.notifications_active_outlined, color: cs.primary),
+              title: Text(l10n.whatsNewSettingTitle),
+              subtitle: Text(l10n.whatsNewSettingSubtitle),
+              value: !InventoryChangesService.isPopupDisabled,
+              onChanged: (val) async {
+                await InventoryChangesService.setDontShowPopup(!val);
+                setState(() {});
               },
             ),
           ])),

@@ -1004,4 +1004,46 @@ class AppLocalizationsEn extends AppLocalizations {
   String addSubTag(String parent) => 'Add in $parent...';
   @override
   String get addComponentTitle => 'Add component';
+
+  // What's Changed
+  @override
+  String get whatsNewTitle => 'What\'s Changed';
+  @override
+  String get whatsNewSubtitle => 'Changes in inventories since last launch';
+  @override
+  String get whatsNewDontShowAgain => 'Don\'t show this popup on startup anymore';
+  @override
+  String whatsNewTooltip(int count) => '$count recent changes in inventories';
+  @override
+  String get whatsNewNoChanges => 'No recent changes in inventories';
+  @override
+  String get whatsNewAdded => 'Added';
+  @override
+  String get whatsNewModified => 'Modified';
+  @override
+  String get whatsNewDeleted => 'Deleted';
+  @override
+  String get whatsNewComponentDeletedNotice => 'This component was deleted from the inventory';
+  @override
+  String whatsNewQuantityChanged(String oldQty, String newQty) => 'Quantity: $oldQty → $newQty';
+  @override
+  String whatsNewDrawerChanged(String oldDrawer, String newDrawer) => 'Drawer: $oldDrawer → $newDrawer';
+  @override
+  String whatsNewNameChanged(String oldName, String newName) => 'Name: $oldName → $newName';
+  @override
+  String get whatsNewDescriptionChanged => 'Description modified';
+  @override
+  String get whatsNewTagsChanged => 'Tags modified';
+  @override
+  String get whatsNewPropertiesChanged => 'Properties modified';
+  @override
+  String get whatsNewMarkAsRead => 'Mark as read';
+  @override
+  String get whatsNewSettingTitle => 'Show "What\'s Changed" on startup';
+  @override
+  String get whatsNewSettingSubtitle => 'If disabled, an icon appears in the top bar when changes exist';
+  @override
+  String get whatsNewViewRecentChanges => 'View recent changes';
+  @override
+  String whatsNewChangesCount(int count) => '$count changes';
 }

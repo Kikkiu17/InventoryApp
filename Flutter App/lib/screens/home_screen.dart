@@ -17,6 +17,8 @@ import '../widgets/component_view_dialog.dart';
 import '../widgets/cabinet_map_view.dart';
 import 'package:flutter/services.dart';
 import '../l10n/app_localizations.dart';
+import '../services/inventory_changes_service.dart';
+import '../models/inventory_change.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -43,13 +45,16 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       UpdateService.checkAndPromptUpdate(context);
       final ds = context.read<DataService>();
       // Retry loading from server in case the initial load() in main() failed
       // (e.g. network not ready on cold start). Safe: uses checkConflict:false
       // so it never triggers the conflict dialog.
-      ds.refreshFromServer();
+      await ds.refreshFromServer();
+      if (mounted) {
+        await InventoryChangesService.checkAndPromptChanges(context, ds);
+      }
     });
   }
 
@@ -190,6 +195,38 @@ class _HomeScreenState extends State<HomeScreen> {
                     l10n.updateAvailableBadge(updateInfo.latestVersion),
                 onPressed: () =>
                     UpdateService.showUpdateDialog(context, updateInfo),
+              );
+            },
+          ),
+          ValueListenableBuilder<InventoryChangesReport?>(
+            valueListenable: InventoryChangesService.changesNotifier,
+            builder: (context, report, _) {
+              if (report == null || !report.hasChanges) {
+                return const SizedBox.shrink();
+              }
+              return ValueListenableBuilder<bool>(
+                valueListenable:
+                    InventoryChangesService.isPopupDisabledNotifier,
+                builder: (context, isDisabled, _) {
+                  if (!isDisabled) {
+                    return const SizedBox.shrink();
+                  }
+                  return IconButton(
+                    icon: Badge(
+                      backgroundColor: cs.primary,
+                      label: Text('${report.totalChangesCount}'),
+                      child: Icon(Icons.published_with_changes,
+                          color: cs.primary),
+                    ),
+                    tooltip: l10n.whatsNewTooltip(report.totalChangesCount),
+                    onPressed: () =>
+                        InventoryChangesService.showChangesDialog(
+                      context,
+                      report,
+                      ds: ds,
+                    ),
+                  );
+                },
               );
             },
           ),

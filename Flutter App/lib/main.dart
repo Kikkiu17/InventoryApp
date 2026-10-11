@@ -12,6 +12,7 @@ import 'screens/inventory_list_screen.dart';
 import 'screens/files_screen.dart';
 import 'widgets/component_dialog.dart';
 import 'models/component.dart';
+import 'services/inventory_changes_service.dart';
 import 'l10n/app_localizations.dart';
 
 void main() async {
@@ -189,10 +190,17 @@ class MainShellState extends State<MainShell> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // paused: l'app va in background, detached: l'app viene chiusa
     if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
-      context.read<DataService>().createBackup();
+      final ds = context.read<DataService>();
+      ds.createBackup();
+      InventoryChangesService.saveCurrentAsBaseline(ds);
     } else if (state == AppLifecycleState.resumed) {
       // Sincronizza quando l'app torna in primo piano
-      context.read<DataService>().refreshFromServer();
+      final ds = context.read<DataService>();
+      ds.refreshFromServer().then((_) {
+        if (mounted) {
+          InventoryChangesService.checkAndPromptChanges(context, ds);
+        }
+      });
     }
   }
 

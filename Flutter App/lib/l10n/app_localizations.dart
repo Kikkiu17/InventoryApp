@@ -544,6 +544,28 @@ abstract class AppLocalizations {
   String get addMainTag;
   String addSubTag(String parent);
   String get addComponentTitle;
+
+  // What's Changed
+  String get whatsNewTitle;
+  String get whatsNewSubtitle;
+  String get whatsNewDontShowAgain;
+  String whatsNewTooltip(int count);
+  String get whatsNewNoChanges;
+  String get whatsNewAdded;
+  String get whatsNewModified;
+  String get whatsNewDeleted;
+  String get whatsNewComponentDeletedNotice;
+  String whatsNewQuantityChanged(String oldQty, String newQty);
+  String whatsNewDrawerChanged(String oldDrawer, String newDrawer);
+  String whatsNewNameChanged(String oldName, String newName);
+  String get whatsNewDescriptionChanged;
+  String get whatsNewTagsChanged;
+  String get whatsNewPropertiesChanged;
+  String get whatsNewMarkAsRead;
+  String get whatsNewSettingTitle;
+  String get whatsNewSettingSubtitle;
+  String get whatsNewViewRecentChanges;
+  String whatsNewChangesCount(int count);
 }
 
 

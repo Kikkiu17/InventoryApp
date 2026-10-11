@@ -1017,4 +1017,46 @@ class AppLocalizationsDe extends AppLocalizations {
   String addSubTag(String parent) => 'Hinzufügen in $parent...';
   @override
   String get addComponentTitle => 'Komponente hinzufügen';
+
+  // What's Changed
+  @override
+  String get whatsNewTitle => 'Was hat sich geändert';
+  @override
+  String get whatsNewSubtitle => 'Änderungen in Inventaren seit dem letzten Start';
+  @override
+  String get whatsNewDontShowAgain => 'Dieses Popup beim Start nicht mehr anzeigen';
+  @override
+  String whatsNewTooltip(int count) => '$count kürzliche Änderungen in Inventaren';
+  @override
+  String get whatsNewNoChanges => 'Keine kürzlichen Änderungen in Inventaren';
+  @override
+  String get whatsNewAdded => 'Hinzugefügt';
+  @override
+  String get whatsNewModified => 'Geändert';
+  @override
+  String get whatsNewDeleted => 'Gelöscht';
+  @override
+  String get whatsNewComponentDeletedNotice => 'Diese Komponente wurde aus dem Inventar gelöscht';
+  @override
+  String whatsNewQuantityChanged(String oldQty, String newQty) => 'Menge: $oldQty → $newQty';
+  @override
+  String whatsNewDrawerChanged(String oldDrawer, String newDrawer) => 'Schublade: $oldDrawer → $newDrawer';
+  @override
+  String whatsNewNameChanged(String oldName, String newName) => 'Name: $oldName → $newName';
+  @override
+  String get whatsNewDescriptionChanged => 'Beschreibung geändert';
+  @override
+  String get whatsNewTagsChanged => 'Tags geändert';
+  @override
+  String get whatsNewPropertiesChanged => 'Eigenschaften geändert';
+  @override
+  String get whatsNewMarkAsRead => 'Als gelesen markieren';
+  @override
+  String get whatsNewSettingTitle => '"Was hat sich geändert" beim Start anzeigen';
+  @override
+  String get whatsNewSettingSubtitle => 'Wenn deaktiviert, wird ein Symbol in der oberen Leiste angezeigt';
+  @override
+  String get whatsNewViewRecentChanges => 'Kürzliche Änderungen anzeigen';
+  @override
+  String whatsNewChangesCount(int count) => '$count Änderungen';
 }
