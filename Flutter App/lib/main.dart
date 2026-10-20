@@ -71,11 +71,13 @@ class MainShell extends StatefulWidget {
 
 class MainShellState extends State<MainShell> with WidgetsBindingObserver {
   int _currentIndex = 0;
+  AppLifecycleState? _lastLifecycleState;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _lastLifecycleState = WidgetsBinding.instance.lifecycleState;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _restoreDraftIfNeeded();
     });
@@ -188,13 +190,23 @@ class MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // paused: l'app va in background, detached: l'app viene chiusa
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+    if (_lastLifecycleState == state) {
+      return;
+    }
+    final previousState = _lastLifecycleState;
+    _lastLifecycleState = state;
+
+    // paused/hidden: l'app va in background/minimizzata, detached: l'app viene chiusa
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
       final ds = context.read<DataService>();
       ds.createBackup();
       InventoryChangesService.saveCurrentAsBaseline(ds);
-    } else if (state == AppLifecycleState.resumed) {
-      // Sincronizza quando l'app torna in primo piano
+    } else if (state == AppLifecycleState.resumed &&
+        (previousState == AppLifecycleState.paused ||
+            previousState == AppLifecycleState.hidden)) {
+      // Sincronizza quando l'app torna in primo piano da uno stato di sospensione/minimizzazione
       final ds = context.read<DataService>();
       ds.refreshFromServer().then((_) {
         if (mounted) {

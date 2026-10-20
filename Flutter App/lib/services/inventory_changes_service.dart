@@ -23,6 +23,26 @@ class InventoryChangesService {
       ValueNotifier<bool>(false);
 
   static bool _isInitialized = false;
+  static bool _isDialogShowing = false;
+  static bool _isChecking = false;
+  static bool _hasPromptedThisSession = false;
+
+  /// Whether a changes dialog is currently open
+  static bool get isDialogShowing => _isDialogShowing;
+
+  /// Whether the popup has already been automatically prompted in this session
+  static bool get hasPromptedThisSession => _hasPromptedThisSession;
+
+  /// Reset state for testing
+  @visibleForTesting
+  static void resetStateForTesting() {
+    changesNotifier.value = null;
+    isPopupDisabledNotifier.value = false;
+    _isInitialized = false;
+    _isDialogShowing = false;
+    _isChecking = false;
+    _hasPromptedThisSession = false;
+  }
 
   /// Whether the user has opted to not display the popup automatically
   static bool get isPopupDisabled => isPopupDisabledNotifier.value;
@@ -264,32 +284,44 @@ class InventoryChangesService {
   /// Checks for changes since last session on app launch and prompts popup if appropriate
   static Future<void> checkAndPromptChanges(
       BuildContext context, DataService ds) async {
-    await initPreferences();
+    if (_isChecking || _isDialogShowing) return;
+    _isChecking = true;
 
-    final currentInventories = await ds.getAllInventoriesComponents();
-    final inventoryNames = ds.getAllInventoryNames();
-    final previousSnapshot = await loadSnapshot();
+    try {
+      await initPreferences();
 
-    if (previousSnapshot == null) {
-      // First launch ever: save current baseline and return
-      await saveSnapshot(currentInventories);
-      return;
-    }
+      final currentInventories = await ds.getAllInventoriesComponents();
+      final inventoryNames = ds.getAllInventoryNames();
+      final previousSnapshot = await loadSnapshot();
 
-    final report = computeChanges(
-      currentInventories: currentInventories,
-      previousInventories: previousSnapshot,
-      inventoryNames: inventoryNames,
-    );
-
-    if (report.hasChanges) {
-      changesNotifier.value = report;
-
-      // If user chose not to display popup anymore, we do NOT show dialog automatically.
-      // In this case, the icon on the top will appear!
-      if (!isPopupDisabled && context.mounted) {
-        await showChangesDialog(context, report, ds: ds);
+      if (previousSnapshot == null) {
+        // First launch ever: save current baseline and return
+        await saveSnapshot(currentInventories);
+        return;
       }
+
+      final report = computeChanges(
+        currentInventories: currentInventories,
+        previousInventories: previousSnapshot,
+        inventoryNames: inventoryNames,
+      );
+
+      if (report.hasChanges) {
+        changesNotifier.value = report;
+
+        // If user chose not to display popup anymore, or if already prompted this session,
+        // we do NOT show dialog automatically.
+        // In this case, the icon on the top will appear!
+        if (!isPopupDisabled &&
+            !_hasPromptedThisSession &&
+            !_isDialogShowing &&
+            context.mounted) {
+          _hasPromptedThisSession = true;
+          await showChangesDialog(context, report, ds: ds);
+        }
+      }
+    } finally {
+      _isChecking = false;
     }
   }
 
@@ -381,62 +413,73 @@ class InventoryChangesService {
     InventoryChangesReport report, {
     required DataService ds,
   }) async {
-    await initPreferences();
-    if (!context.mounted) return;
+    if (_isDialogShowing) return;
+    _isDialogShowing = true;
 
-    bool dontShowAgain = isPopupDisabled;
+    try {
+      await initPreferences();
+      if (!context.mounted) return;
 
-    await showDialog<void>(
-      context: context,
-      builder: (dialogCtx) {
-        final l10n = dialogCtx.l10n;
-        final theme = Theme.of(dialogCtx);
-        final cs = theme.colorScheme;
+      bool dontShowAgain = isPopupDisabled;
 
-        return StatefulBuilder(
-          builder: (ctx, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20)),
-              titlePadding: const EdgeInsets.fromLTRB(20, 20, 16, 12),
-              contentPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              title: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: cs.primaryContainer,
-                      borderRadius: BorderRadius.circular(12),
+      await showDialog<void>(
+        context: context,
+        builder: (dialogCtx) {
+          final l10n = dialogCtx.l10n;
+          final theme = Theme.of(dialogCtx);
+          final cs = theme.colorScheme;
+
+          return StatefulBuilder(
+            builder: (ctx, setDialogState) {
+              return AlertDialog(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20)),
+                titlePadding: const EdgeInsets.fromLTRB(20, 20, 16, 12),
+                contentPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                title: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: cs.primaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(Icons.published_with_changes,
+                          color: cs.onPrimaryContainer, size: 24),
                     ),
-                    child: Icon(Icons.published_with_changes,
-                        color: cs.onPrimaryContainer, size: 24),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          l10n.whatsNewTitle,
-                          style: theme.textTheme.titleLarge
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          l10n.whatsNewSubtitle,
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(color: cs.onSurfaceVariant),
-                        ),
-                      ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l10n.whatsNewTitle,
+                            style: theme.textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            l10n.whatsNewSubtitle,
+                            style: theme.textTheme.bodySmall
+                                ?.copyWith(color: cs.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    tooltip: l10n.close,
-                    onPressed: () => Navigator.pop(dialogCtx),
-                  ),
-                ],
-              ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      tooltip: l10n.close,
+                      onPressed: () async {
+                        await setDontShowPopup(dontShowAgain);
+                        await saveCurrentAsBaseline(ds);
+                        changesNotifier.value = null;
+                        if (dialogCtx.mounted) {
+                          Navigator.pop(dialogCtx);
+                        }
+                      },
+                    ),
+                  ],
+                ),
               content: SizedBox(
                 width: 480,
                 child: SingleChildScrollView(
@@ -624,6 +667,9 @@ class InventoryChangesService {
 
     // Save preference when dialog completes
     await setDontShowPopup(dontShowAgain);
+    } finally {
+      _isDialogShowing = false;
+    }
   }
 
   static Widget _buildChangeTile(
@@ -796,6 +842,7 @@ class InventoryChangesService {
   /// Manually show recent changes (e.g. from Settings)
   static Future<void> showRecentChanges(
       BuildContext context, DataService ds) async {
+    if (_isDialogShowing) return;
     final report = changesNotifier.value;
     if (report != null && report.hasChanges) {
       await showChangesDialog(context, report, ds: ds);

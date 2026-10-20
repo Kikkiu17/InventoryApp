@@ -15,8 +15,7 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
-    InventoryChangesService.changesNotifier.value = null;
-    InventoryChangesService.isPopupDisabledNotifier.value = false;
+    InventoryChangesService.resetStateForTesting();
   });
 
   group('InventoryChangesService Diff Computation', () {
@@ -551,6 +550,192 @@ void main() {
 
       expect(find.text("What's Changed"), findsOneWidget);
       expect(find.text('New Component'), findsOneWidget);
+    });
+
+    testWidgets('showChangesDialog does not open a second dialog if already showing', (tester) async {
+      final comp = Component(id: 'c1', name: 'New Component', drawer: 'A1', quantity: 1);
+      final report = InventoryChangesService.computeChanges(
+        currentInventories: {'inv1': [comp]},
+        previousInventories: {'inv1': []},
+        inventoryNames: {'inv1': 'My Inventory'},
+      );
+
+      final ds = DataService();
+      BuildContext? testContext;
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<DataService>.value(
+          value: ds,
+          child: MaterialApp(
+            locale: const Locale('en'),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            home: Builder(
+              builder: (context) {
+                testContext = context;
+                return Scaffold(
+                  body: Center(
+                    child: ElevatedButton(
+                      onPressed: () => InventoryChangesService.showChangesDialog(
+                        context,
+                        report,
+                        ds: ds,
+                      ),
+                      child: const Text('Open Dialog'),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Open dialog first time
+      await tester.tap(find.text('Open Dialog'));
+      await tester.pumpAndSettle();
+
+      expect(find.text("What's Changed"), findsOneWidget);
+      expect(InventoryChangesService.isDialogShowing, isTrue);
+
+      // Attempt to open dialog a second time while it is still open
+      InventoryChangesService.showChangesDialog(testContext!, report, ds: ds);
+      await tester.pumpAndSettle();
+
+      // Still only one dialog exists
+      expect(find.text("What's Changed"), findsOneWidget);
+
+      // Dismiss dialog once
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+
+      // Completely dismissed
+      expect(find.text("What's Changed"), findsNothing);
+      expect(InventoryChangesService.isDialogShowing, isFalse);
+    });
+
+    testWidgets('tapping top-right X icon closes the dialog and saves baseline', (tester) async {
+      final comp = Component(id: 'c1', name: 'New Component', drawer: 'A1', quantity: 1);
+      final report = InventoryChangesService.computeChanges(
+        currentInventories: {'inv1': [comp]},
+        previousInventories: {'inv1': []},
+        inventoryNames: {'inv1': 'My Inventory'},
+      );
+
+      final ds = DataService();
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<DataService>.value(
+          value: ds,
+          child: MaterialApp(
+            locale: const Locale('en'),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            home: Builder(
+              builder: (context) {
+                return Scaffold(
+                  body: Center(
+                    child: ElevatedButton(
+                      onPressed: () => InventoryChangesService.showChangesDialog(
+                        context,
+                        report,
+                        ds: ds,
+                      ),
+                      child: const Text('Open Dialog'),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open Dialog'));
+      await tester.pumpAndSettle();
+
+      expect(find.text("What's Changed"), findsOneWidget);
+      expect(InventoryChangesService.isDialogShowing, isTrue);
+
+      // Tap on close 'X' button
+      await tester.tap(find.byTooltip('Close'));
+      await tester.pumpAndSettle();
+
+      expect(find.text("What's Changed"), findsNothing);
+      expect(InventoryChangesService.isDialogShowing, isFalse);
+      expect(InventoryChangesService.changesNotifier.value, isNull);
+    });
+
+    testWidgets('checkAndPromptChanges only opens dialog once and ignores duplicate calls', (tester) async {
+      final comp = Component(id: 'c1', name: 'Comp1', drawer: 'D1', quantity: 5);
+      final ds = DataService();
+      await ds.addComponent(comp);
+
+      // Save an empty snapshot so that comp1 counts as an added change
+      await InventoryChangesService.saveSnapshot({'default': []});
+
+      BuildContext? testContext;
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<DataService>.value(
+          value: ds,
+          child: MaterialApp(
+            locale: const Locale('en'),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            home: Builder(
+              builder: (context) {
+                testContext = context;
+                return const Scaffold(body: Center(child: Text('Home')));
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Simulate multiple concurrent calls (e.g. Linux window mapping & focus events)
+      InventoryChangesService.checkAndPromptChanges(testContext!, ds);
+      InventoryChangesService.checkAndPromptChanges(testContext!, ds);
+      InventoryChangesService.checkAndPromptChanges(testContext!, ds);
+      InventoryChangesService.checkAndPromptChanges(testContext!, ds);
+      await tester.pumpAndSettle();
+
+      // Only one dialog should be open
+      expect(find.text("What's Changed"), findsOneWidget);
+      expect(InventoryChangesService.hasPromptedThisSession, isTrue);
+
+      // Dismiss the dialog ONCE
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+
+      // Dialog should be gone completely
+      expect(find.text("What's Changed"), findsNothing);
+      expect(InventoryChangesService.isDialogShowing, isFalse);
+
+      // Calling checkAndPromptChanges again during the same session does not reopen it
+      await InventoryChangesService.checkAndPromptChanges(testContext!, ds);
+      await tester.pumpAndSettle();
+      expect(find.text("What's Changed"), findsNothing);
     });
   });
 }
