@@ -38,7 +38,8 @@ class _BufferScreenState extends State<BufferScreen> {
     }
   }
 
-  void _editComponent(BuildContext context, Component component, DataService ds) async {
+  void _editComponent(
+      BuildContext context, Component component, DataService ds) async {
     final result = await showDialog<dynamic>(
       context: context,
       builder: (ctx) => ComponentDialog(
@@ -54,26 +55,30 @@ class _BufferScreenState extends State<BufferScreen> {
     }
   }
 
-  void _deleteComponent(BuildContext context, Component component, DataService ds) async {
+  void _deleteComponent(
+      BuildContext context, Component component, DataService ds) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         final l10n = ctx.l10n;
         return AlertDialog(
-        title: Text(l10n.deleteComponentTitle),
-        content: Text(l10n.deleteBufferComponentConfirm(component.name)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.cancelButton)),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Theme.of(context).colorScheme.onError,
+          title: Text(l10n.deleteComponentTitle),
+          content: Text(l10n.deleteBufferComponentConfirm(component.name)),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(l10n.cancelButton)),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l10n.deleteButton),
             ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l10n.deleteButton),
-          ),
-        ],
-      );},
+          ],
+        );
+      },
     );
 
     if (confirm == true) {
@@ -81,7 +86,8 @@ class _BufferScreenState extends State<BufferScreen> {
     }
   }
 
-  void _showPlaceItemDialog(BuildContext context, Component component, DataService ds) async {
+  void _showPlaceItemDialog(
+      BuildContext context, Component component, DataService ds) async {
     setState(() => _isPlacingId = component.id);
 
     try {
@@ -103,11 +109,13 @@ class _BufferScreenState extends State<BufferScreen> {
             _editComponent(context, component, ds);
           },
           onPlace: (cabinet, drawer, zone) async {
-            await ds.placeComponent(component, component.targetInventoryId!, cabinet, drawer, zone);
+            await ds.placeComponent(
+                component, component.targetInventoryId!, cabinet, drawer, zone);
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(context.l10n.placeComponentSuccess(component.name)),
+                  content:
+                      Text(context.l10n.placeComponentSuccess(component.name)),
                   behavior: SnackBarBehavior.floating,
                 ),
               );
@@ -131,7 +139,8 @@ class _BufferScreenState extends State<BufferScreen> {
     }
   }
 
-  void _viewComponent(BuildContext context, Component component, DataService ds) {
+  void _viewComponent(
+      BuildContext context, Component component, DataService ds) {
     showDialog(
       context: context,
       builder: (ctx) => ComponentViewDialog(
@@ -186,19 +195,20 @@ class _BufferScreenState extends State<BufferScreen> {
                     Icon(
                       Icons.shopping_bag_outlined,
                       size: 72,
-                      color: cs.onSurfaceVariant.withOpacity(0.4),
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.4),
                     ),
                     const SizedBox(height: 16),
                     Text(
                       l10n.emptyBufferTitle,
-                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                      style: theme.textTheme.titleLarge
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       l10n.emptyBufferDesc,
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: cs.onSurfaceVariant.withOpacity(0.7),
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.7),
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -243,10 +253,12 @@ class _BufferScreenState extends State<BufferScreen> {
                       shape: WidgetStatePropertyAll(
                         RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
-                          side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                          side: BorderSide(
+                              color: cs.outlineVariant.withValues(alpha: 0.5)),
                         ),
                       ),
-                      padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 10)),
+                      padding: const WidgetStatePropertyAll(
+                          EdgeInsets.symmetric(horizontal: 10)),
                     ),
                   ),
                 ),
@@ -261,19 +273,22 @@ class _BufferScreenState extends State<BufferScreen> {
                                 Icon(
                                   Icons.search_off,
                                   size: 64,
-                                  color: cs.onSurfaceVariant.withOpacity(0.4),
+                                  color: cs.onSurfaceVariant
+                                      .withValues(alpha: 0.4),
                                 ),
                                 const SizedBox(height: 16),
                                 Text(
                                   l10n.noComponentsFound,
-                                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                                  style: theme.textTheme.titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.bold),
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
                                   l10n.noBufferResultsDesc,
                                   textAlign: TextAlign.center,
                                   style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: cs.onSurfaceVariant.withOpacity(0.7),
+                                    color: cs.onSurfaceVariant
+                                        .withValues(alpha: 0.7),
                                   ),
                                 ),
                               ],
@@ -286,33 +301,38 @@ class _BufferScreenState extends State<BufferScreen> {
                           itemBuilder: (ctx, idx) {
                             final comp = filteredItems[idx];
                             final hasTarget = comp.targetInventoryId != null;
-                            final targetName = _getTargetInventoryName(ds, comp.targetInventoryId);
+                            final targetName = _getTargetInventoryName(
+                                ds, comp.targetInventoryId);
                             final isLoadingThis = _isPlacingId == comp.id;
 
                             return Card(
-                              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              margin: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 side: BorderSide(
-                                  color: hasTarget 
-                                      ? cs.outlineVariant.withOpacity(0.4)
-                                      : cs.error.withOpacity(0.4),
+                                  color: hasTarget
+                                      ? cs.outlineVariant.withValues(alpha: 0.4)
+                                      : cs.error.withValues(alpha: 0.4),
                                   width: 1,
                                 ),
                               ),
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     // Row 1: Status Badge, Name/Description, Actions
                                     Row(
-                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
                                       children: [
                                         // Status Badge
                                         Tooltip(
-                                          message: hasTarget 
-                                              ? l10n.assignedDestination(targetName)
+                                          message: hasTarget
+                                              ? l10n.assignedDestination(
+                                                  targetName)
                                               : l10n.destinationUnspecified,
                                           child: Container(
                                             width: 52,
@@ -321,13 +341,15 @@ class _BufferScreenState extends State<BufferScreen> {
                                               color: hasTarget
                                                   ? cs.primaryContainer
                                                   : cs.errorContainer,
-                                              borderRadius: BorderRadius.circular(8),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
                                             ),
                                             child: Center(
                                               child: Icon(
                                                 hasTarget
                                                     ? Icons.inventory_2_outlined
-                                                    : Icons.location_off_outlined,
+                                                    : Icons
+                                                        .location_off_outlined,
                                                 size: 20,
                                                 color: hasTarget
                                                     ? cs.onPrimaryContainer
@@ -340,23 +362,31 @@ class _BufferScreenState extends State<BufferScreen> {
                                         // Name and Description
                                         Expanded(
                                           child: InkWell(
-                                            onTap: () => _viewComponent(context, comp, ds),
+                                            onTap: () => _viewComponent(
+                                                context, comp, ds),
                                             child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               children: [
                                                 Text(
                                                   comp.name,
-                                                  style: theme.textTheme.titleMedium?.copyWith(
+                                                  style: theme
+                                                      .textTheme.titleMedium
+                                                      ?.copyWith(
                                                     fontWeight: FontWeight.bold,
                                                     fontSize: 16.0,
                                                   ),
                                                 ),
-                                                if (comp.description.isNotEmpty) ...[
+                                                if (comp.description
+                                                    .isNotEmpty) ...[
                                                   const SizedBox(height: 2),
                                                   Text(
                                                     comp.description,
-                                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                                      color: cs.onSurfaceVariant,
+                                                    style: theme
+                                                        .textTheme.bodyMedium
+                                                        ?.copyWith(
+                                                      color:
+                                                          cs.onSurfaceVariant,
                                                       fontSize: 13.0,
                                                     ),
                                                   ),
@@ -367,30 +397,37 @@ class _BufferScreenState extends State<BufferScreen> {
                                         ),
                                         // Edit and Delete Actions
                                         IconButton(
-                                          icon: const Icon(Icons.edit_outlined, size: 20),
+                                          icon: const Icon(Icons.edit_outlined,
+                                              size: 20),
                                           padding: EdgeInsets.zero,
                                           constraints: const BoxConstraints(),
                                           style: IconButton.styleFrom(
-                                            visualDensity: VisualDensity.compact,
+                                            visualDensity:
+                                                VisualDensity.compact,
                                           ),
-                                          onPressed: () => _editComponent(context, comp, ds),
+                                          onPressed: () =>
+                                              _editComponent(context, comp, ds),
                                         ),
                                         const SizedBox(width: 4),
                                         IconButton(
-                                          icon: Icon(Icons.delete_outline, size: 20, color: cs.error),
+                                          icon: Icon(Icons.delete_outline,
+                                              size: 20, color: cs.error),
                                           padding: EdgeInsets.zero,
                                           constraints: const BoxConstraints(),
                                           style: IconButton.styleFrom(
-                                            visualDensity: VisualDensity.compact,
+                                            visualDensity:
+                                                VisualDensity.compact,
                                           ),
-                                          onPressed: () => _deleteComponent(context, comp, ds),
+                                          onPressed: () => _deleteComponent(
+                                              context, comp, ds),
                                         ),
                                       ],
                                     ),
                                     const SizedBox(height: 6),
                                     // Row 2: Details (Target / Note / Tags), Actions (Qty / Place)
                                     Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         // Destination display
                                         Row(
@@ -398,15 +435,25 @@ class _BufferScreenState extends State<BufferScreen> {
                                             Icon(
                                               Icons.subdirectory_arrow_right,
                                               size: 14,
-                                              color: hasTarget ? cs.primary : cs.error,
+                                              color: hasTarget
+                                                  ? cs.primary
+                                                  : cs.error,
                                             ),
                                             const SizedBox(width: 4),
                                             Expanded(
                                               child: Text(
-                                                hasTarget ? targetName : l10n.noDestination,
-                                                style: theme.textTheme.bodyMedium?.copyWith(
-                                                  color: hasTarget ? cs.onSurface : cs.error,
-                                                  fontWeight: hasTarget ? FontWeight.bold : FontWeight.bold,
+                                                hasTarget
+                                                    ? targetName
+                                                    : l10n.noDestination,
+                                                style: theme
+                                                    .textTheme.bodyMedium
+                                                    ?.copyWith(
+                                                  color: hasTarget
+                                                      ? cs.onSurface
+                                                      : cs.error,
+                                                  fontWeight: hasTarget
+                                                      ? FontWeight.bold
+                                                      : FontWeight.bold,
                                                   fontSize: 13.0,
                                                 ),
                                                 maxLines: 1,
@@ -420,18 +467,23 @@ class _BufferScreenState extends State<BufferScreen> {
                                           const SizedBox(height: 3),
                                           Row(
                                             children: [
-                                              Icon(Icons.edit_note_outlined, size: 13, color: cs.secondary),
+                                              Icon(Icons.edit_note_outlined,
+                                                  size: 13,
+                                                  color: cs.secondary),
                                               const SizedBox(width: 4),
                                               Expanded(
                                                 child: Text(
                                                   comp.note,
-                                                  style: theme.textTheme.bodySmall?.copyWith(
+                                                  style: theme
+                                                      .textTheme.bodySmall
+                                                      ?.copyWith(
                                                     color: cs.onSurfaceVariant,
                                                     fontStyle: FontStyle.italic,
                                                     fontSize: 11.5,
                                                   ),
                                                   maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                 ),
                                               ),
                                             ],
@@ -445,14 +497,23 @@ class _BufferScreenState extends State<BufferScreen> {
                                             runSpacing: 4,
                                             children: comp.tags
                                                 .map((t) => Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                          horizontal: 6,
+                                                          vertical: 2),
                                                       decoration: BoxDecoration(
-                                                        color: cs.surfaceContainerHighest,
-                                                        borderRadius: BorderRadius.circular(4),
+                                                        color: cs
+                                                            .surfaceContainerHighest,
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(4),
                                                       ),
                                                       child: Text(
                                                         t,
-                                                        style: theme.textTheme.bodySmall?.copyWith(fontSize: 10.0),
+                                                        style: theme
+                                                            .textTheme.bodySmall
+                                                            ?.copyWith(
+                                                                fontSize: 10.0),
                                                       ),
                                                     ))
                                                 .toList(),
@@ -461,43 +522,68 @@ class _BufferScreenState extends State<BufferScreen> {
                                         const SizedBox(height: 10),
                                         // Actions Row (Quantity & Place button)
                                         Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
                                           children: [
                                             // Quantity control
                                             Container(
                                               decoration: BoxDecoration(
-                                                border: Border.all(color: cs.outline.withOpacity(0.3)),
-                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(
+                                                    color: cs.outline
+                                                        .withValues(
+                                                            alpha: 0.3)),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
                                               ),
                                               child: Row(
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
                                                   InkWell(
-                                                    onTap: comp.quantity > 0 
-                                                        ? () => ds.updateBufferQuantity(comp.id, -1) 
+                                                    onTap: comp.quantity > 0
+                                                        ? () => ds
+                                                            .updateBufferQuantity(
+                                                                comp.id, -1)
                                                         : null,
-                                                    borderRadius: BorderRadius.circular(6),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            6),
                                                     child: Padding(
-                                                      padding: const EdgeInsets.all(6),
-                                                      child: Icon(
-                                                        Icons.remove, 
-                                                        size: 18, 
-                                                        color: comp.quantity > 0 ? null : theme.disabledColor
-                                                      ),
+                                                      padding:
+                                                          const EdgeInsets.all(
+                                                              6),
+                                                      child: Icon(Icons.remove,
+                                                          size: 18,
+                                                          color: comp.quantity >
+                                                                  0
+                                                              ? null
+                                                              : theme
+                                                                  .disabledColor),
                                                     ),
                                                   ),
                                                   SizedBox(
                                                     width: 36,
-                                                    child: Text('${comp.quantity}',
-                                                        textAlign: TextAlign.center,
-                                                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                                    child: Text(
+                                                        '${comp.quantity}',
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                        style: const TextStyle(
+                                                            fontSize: 16,
+                                                            fontWeight:
+                                                                FontWeight
+                                                                    .bold)),
                                                   ),
                                                   InkWell(
-                                                    onTap: () => ds.updateBufferQuantity(comp.id, 1),
-                                                    borderRadius: BorderRadius.circular(6),
+                                                    onTap: () =>
+                                                        ds.updateBufferQuantity(
+                                                            comp.id, 1),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            6),
                                                     child: const Padding(
-                                                      padding: const EdgeInsets.all(6),
-                                                      child: Icon(Icons.add, size: 18),
+                                                      padding:
+                                                          EdgeInsets.all(6),
+                                                      child: Icon(Icons.add,
+                                                          size: 18),
                                                     ),
                                                   ),
                                                 ],
@@ -506,24 +592,36 @@ class _BufferScreenState extends State<BufferScreen> {
                                             // Place button
                                             FilledButton.icon(
                                               style: FilledButton.styleFrom(
-                                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 14,
+                                                        vertical: 8),
                                                 minimumSize: Size.zero,
-                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                tapTargetSize:
+                                                    MaterialTapTargetSize
+                                                        .shrinkWrap,
                                               ),
-                                              onPressed: isLoadingThis 
-                                                  ? null 
-                                                  : () => _showPlaceItemDialog(context, comp, ds),
+                                              onPressed: isLoadingThis
+                                                  ? null
+                                                  : () => _showPlaceItemDialog(
+                                                      context, comp, ds),
                                               icon: isLoadingThis
                                                   ? const SizedBox(
                                                       width: 16,
                                                       height: 16,
-                                                      child: CircularProgressIndicator(
+                                                      child:
+                                                          CircularProgressIndicator(
                                                         strokeWidth: 2.0,
                                                         color: Colors.white,
                                                       ),
                                                     )
-                                                  : const Icon(Icons.inbox, size: 16),
-                                              label: Text(l10n.placeAction, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                                  : const Icon(Icons.inbox,
+                                                      size: 16),
+                                              label: Text(l10n.placeAction,
+                                                  style: const TextStyle(
+                                                      fontSize: 13,
+                                                      fontWeight:
+                                                          FontWeight.bold)),
                                             ),
                                           ],
                                         ),
@@ -578,7 +676,9 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
   @override
   void initState() {
     super.initState();
-    _selectedCabinet = widget.settings.containers.isNotEmpty ? widget.settings.containers.first.id : 1;
+    _selectedCabinet = widget.settings.containers.isNotEmpty
+        ? widget.settings.containers.first.id
+        : 1;
     _colCtrl.addListener(_onCoordinatesChanged);
     _rowCtrl.addListener(_onCoordinatesChanged);
   }
@@ -653,7 +753,6 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
             children: [
               Text(l10n.placeItemDialogDesc),
               const SizedBox(height: 16),
-              
               if (hasTarget) ...[
                 // Display current target inventory name
                 Row(
@@ -663,13 +762,14 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
                     Expanded(
                       child: Text(
                         l10n.destinationLabel(targetName),
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                        style: theme.textTheme.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                
+
                 // Button to change destination (opens edit flow)
                 OutlinedButton.icon(
                   onPressed: () {
@@ -680,20 +780,21 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
                   label: Text(l10n.changeDestinationAndTags),
                 ),
                 const SizedBox(height: 16),
-                
+
                 if (widget.settings.containers.length > 1) ...[
                   DropdownButtonFormField<int>(
-                    value: _selectedCabinet,
+                    initialValue: _selectedCabinet,
                     decoration: InputDecoration(
                       labelText: l10n.selectCabinetLabel,
                       border: const OutlineInputBorder(),
                       filled: true,
-                      fillColor: Colors.green.withOpacity(opacityGreen),
+                      fillColor: Colors.green.withValues(alpha: opacityGreen),
                     ),
                     items: widget.settings.containers
                         .map((c) => DropdownMenuItem(
                               value: c.id,
-                              child: Text(c.name.isNotEmpty ? c.name : 'N° ${c.id}'),
+                              child: Text(
+                                  c.name.isNotEmpty ? c.name : 'N° ${c.id}'),
                             ))
                         .toList(),
                     onChanged: (v) => setState(() => _selectedCabinet = v ?? 1),
@@ -712,13 +813,16 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
                           hintText: 'Es: A',
                           border: const OutlineInputBorder(),
                           filled: true,
-                          fillColor: Colors.green.withOpacity(opacityGreen),
+                          fillColor:
+                              Colors.green.withValues(alpha: opacityGreen),
                         ),
                         validator: (v) {
-                          if (v == null || v.trim().isEmpty) return l10n.requiredField;
+                          if (v == null || v.trim().isEmpty)
+                            return l10n.requiredField;
                           if (widget.settings.containers.isEmpty) return null;
                           final colStr = v.trim().toUpperCase();
-                          final container = widget.settings.containers.firstWhere(
+                          final container =
+                              widget.settings.containers.firstWhere(
                             (c) => c.id == _selectedCabinet,
                             orElse: () => widget.settings.containers.first,
                           );
@@ -729,7 +833,8 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
                               return l10n.disabledDrawer;
                             }
                             if (!container.isDrawerValid(label)) {
-                              return l10n.maxColumnLabel(container.columnLabels.last);
+                              return l10n
+                                  .maxColumnLabel(container.columnLabels.last);
                             }
                           }
                           return null;
@@ -747,13 +852,16 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
                           hintText: 'Es: 3',
                           border: const OutlineInputBorder(),
                           filled: true,
-                          fillColor: Colors.green.withOpacity(opacityGreen),
+                          fillColor:
+                              Colors.green.withValues(alpha: opacityGreen),
                         ),
                         validator: (v) {
-                          if (v == null || v.trim().isEmpty) return l10n.requiredField;
+                          if (v == null || v.trim().isEmpty)
+                            return l10n.requiredField;
                           if (widget.settings.containers.isEmpty) return null;
                           final rowVal = int.tryParse(v.trim()) ?? 0;
-                          final container = widget.settings.containers.firstWhere(
+                          final container =
+                              widget.settings.containers.firstWhere(
                             (c) => c.id == _selectedCabinet,
                             orElse: () => widget.settings.containers.first,
                           );
@@ -777,12 +885,16 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
                 if (zones >= 2) ...[
                   const SizedBox(height: 16),
                   DropdownButtonFormField<int>(
-                    value: _selectedZone == null || _selectedZone! < 1 || _selectedZone! > zones ? 1 : _selectedZone,
+                    initialValue: _selectedZone == null ||
+                            _selectedZone! < 1 ||
+                            _selectedZone! > zones
+                        ? 1
+                        : _selectedZone,
                     decoration: InputDecoration(
                       labelText: l10n.drawerZoneSeparator,
                       border: const OutlineInputBorder(),
                       filled: true,
-                      fillColor: Colors.green.withOpacity(opacityGreen),
+                      fillColor: Colors.green.withValues(alpha: opacityGreen),
                     ),
                     items: List.generate(zones, (i) => i + 1)
                         .map((z) => DropdownMenuItem(
@@ -805,7 +917,8 @@ class _PlaceItemDialogState extends State<PlaceItemDialog> {
                           Expanded(
                             child: Text(
                               l10n.selectTargetInventoryFirst,
-                              style: TextStyle(color: cs.error, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                  color: cs.error, fontWeight: FontWeight.bold),
                             ),
                           ),
                         ],

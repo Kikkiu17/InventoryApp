@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 import 'package:image/image.dart' as img;
 import '../models/component.dart';
 import '../models/settings.dart';
@@ -40,17 +41,52 @@ class InventoryMeta {
 }
 
 class ApiClient {
-  final String baseUrl;       // es: "http://192.168.1.2:8080"
+  final String baseUrl;       // es: "http://192.168.1.2:8080" o "https://192.168.1.2:8443"
   final String inventoryId;   // ID inventario attivo
+  final bool allowSelfSigned;
+  final http.Client _client;
+  final bool _isInternalClient;
 
   // Set after every write; callers use this to store the exact server
   // timestamp locally, preventing false sync-conflict dialogs on relaunch.
   String? lastUpdated;
 
-  ApiClient(this.baseUrl, {this.inventoryId = 'default'});
+  ApiClient(
+    String url, {
+    this.inventoryId = 'default',
+    http.Client? client,
+    this.allowSelfSigned = true,
+  })  : baseUrl = _normalizeUrl(url),
+        _client = client ?? (allowSelfSigned ? _createSelfSignedClient() : http.Client()),
+        _isInternalClient = (client == null);
+
+  static String _normalizeUrl(String url) {
+    String u = url.trim();
+    while (u.endsWith('/')) {
+      u = u.substring(0, u.length - 1);
+    }
+    return u;
+  }
+
+  static http.Client _createSelfSignedClient() {
+    final ioClient = HttpClient()
+      ..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+    return IOClient(ioClient);
+  }
 
   /// Crea un clone con un inventario diverso
-  ApiClient withInventory(String id) => ApiClient(baseUrl, inventoryId: id);
+  ApiClient withInventory(String id) => ApiClient(
+        baseUrl,
+        inventoryId: id,
+        client: _client,
+        allowSelfSigned: allowSelfSigned,
+      );
+
+  void close() {
+    if (_isInternalClient) {
+      _client.close();
+    }
+  }
 
   static const _timeout = Duration(seconds: 8);
 
@@ -72,21 +108,21 @@ class ApiClient {
   // ── Ping ────────────────────────────────────────────────────────────────────
   Future<bool> ping() async {
     try {
-      final res = await http.get(_root('/api/status')).timeout(_timeout);
+      final res = await _client.get(_root('/api/status')).timeout(_timeout);
       return res.statusCode == 200;
     } catch (_) { return false; }
   }
 
   // ── Inventari ────────────────────────────────────────────────────────────────
   Future<List<InventoryMeta>> listInventories() async {
-    final res = await http.get(_root('/api/inventories')).timeout(_timeout);
+    final res = await _client.get(_root('/api/inventories')).timeout(_timeout);
     await _check(res);
     return (jsonDecode(res.body) as List)
         .map((e) => InventoryMeta.fromJson(e)).toList();
   }
 
   Future<InventoryMeta> createInventory(String name, {String description = ''}) async {
-    final res = await http.post(
+    final res = await _client.post(
       _root('/api/inventories'),
       headers: _headers,
       body: jsonEncode({'name': name, 'description': description}),
@@ -96,7 +132,7 @@ class ApiClient {
   }
 
   Future<InventoryMeta> renameInventory(String id, String name, {String description = ''}) async {
-    final res = await http.put(
+    final res = await _client.put(
       _root('/api/inventories/$id'),
       headers: _headers,
       body: jsonEncode({'name': name, 'description': description}),
@@ -106,60 +142,60 @@ class ApiClient {
   }
 
   Future<void> deleteInventory(String id) async {
-    final res = await http.delete(_root('/api/inventories/$id')).timeout(_timeout);
+    final res = await _client.delete(_root('/api/inventories/$id')).timeout(_timeout);
     await _check(res);
   }
 
   // ── Global Search ────────────────────────────────────────────────────────────
   Future<List<dynamic>> searchAll(String query) async {
     final uri = Uri.parse('$baseUrl/api/search?q=${Uri.encodeQueryComponent(query)}');
-    final res = await http.get(uri).timeout(_timeout);
+    final res = await _client.get(uri).timeout(_timeout);
     await _check(res);
     return jsonDecode(res.body) as List<dynamic>;
   }
 
   // ── Components ───────────────────────────────────────────────────────────────
   Future<List<Component>> getComponents() async {
-    final res = await http.get(_inv('/components')).timeout(_timeout);
+    final res = await _client.get(_inv('/components')).timeout(_timeout);
     await _check(res);
     return (jsonDecode(res.body) as List).map((e) => Component.fromJson(e)).toList();
   }
 
   Future<Component> createComponent(Component c) async {
-    final res = await http.post(_inv('/components'),
+    final res = await _client.post(_inv('/components'),
         headers: _headers, body: jsonEncode(c.toJson())).timeout(_timeout);
     await _check(res);
     return Component.fromJson(jsonDecode(res.body));
   }
 
   Future<Component> updateComponent(Component c) async {
-    final res = await http.put(_inv('/components/${c.id}'),
+    final res = await _client.put(_inv('/components/${c.id}'),
         headers: _headers, body: jsonEncode(c.toJson())).timeout(_timeout);
     await _check(res);
     return Component.fromJson(jsonDecode(res.body));
   }
 
   Future<Component> patchQuantity(String id, int delta) async {
-    final res = await http.patch(_inv('/components/$id/quantity'),
+    final res = await _client.patch(_inv('/components/$id/quantity'),
         headers: _headers, body: jsonEncode({'delta': delta})).timeout(_timeout);
     await _check(res);
     return Component.fromJson(jsonDecode(res.body));
   }
 
   Future<void> deleteComponent(String id) async {
-    final res = await http.delete(_inv('/components/$id')).timeout(_timeout);
+    final res = await _client.delete(_inv('/components/$id')).timeout(_timeout);
     await _check(res);
   }
 
   // ── Settings ─────────────────────────────────────────────────────────────────
   Future<AppSettings> getSettings() async {
-    final res = await http.get(_inv('/settings')).timeout(_timeout);
+    final res = await _client.get(_inv('/settings')).timeout(_timeout);
     await _check(res);
     return AppSettings.fromJson(jsonDecode(res.body));
   }
 
   Future<AppSettings> updateSettings(AppSettings s) async {
-    final res = await http.put(_inv('/settings'),
+    final res = await _client.put(_inv('/settings'),
         headers: _headers, body: jsonEncode(s.toJson())).timeout(_timeout);
     await _check(res);
     return AppSettings.fromJson(jsonDecode(res.body));
@@ -167,31 +203,31 @@ class ApiClient {
 
   // ── Full DB ───────────────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> getFullDb() async {
-    final res = await http.get(_inv('/db')).timeout(_timeout);
+    final res = await _client.get(_inv('/db')).timeout(_timeout);
     await _check(res);
     return jsonDecode(res.body);
   }
 
   Future<void> uploadFullDb(Map<String, dynamic> db) async {
-    final res = await http.post(_inv('/db'),
+    final res = await _client.post(_inv('/db'),
         headers: _headers, body: jsonEncode(db)).timeout(_timeout);
     await _check(res);
   }
 
   // ── Backups ──────────────────────────────────────────────────────────────────
   Future<List<String>> getBackups() async {
-    final res = await http.get(_inv('/backups')).timeout(_timeout);
+    final res = await _client.get(_inv('/backups')).timeout(_timeout);
     await _check(res);
     return List<String>.from(jsonDecode(res.body));
   }
 
   Future<void> restoreBackup(String filename) async {
-    final res = await http.post(_inv('/backups/$filename/restore'), headers: _headers).timeout(_timeout);
+    final res = await _client.post(_inv('/backups/$filename/restore'), headers: _headers).timeout(_timeout);
     await _check(res);
   }
 
   Future<void> createBackup() async {
-    final res = await http.post(_inv('/backup'), headers: _headers).timeout(_timeout);
+    final res = await _client.post(_inv('/backup'), headers: _headers).timeout(_timeout);
     await _check(res);
   }
 
@@ -224,7 +260,7 @@ class ApiClient {
     final req = http.Request('POST', _inv('/attachments'));
     req.headers['X-Filename'] = filename;
     req.bodyBytes = bytes;
-    final res = await req.send().timeout(_timeout);
+    final res = await _client.send(req).timeout(_timeout);
     final bodyStr = await res.stream.bytesToString();
     if (res.statusCode < 200 || res.statusCode >= 300) {
       String msg = 'Errore ${res.statusCode}';
@@ -236,7 +272,7 @@ class ApiClient {
   }
 
   Future<void> moveComponent(String componentId, String targetInventoryId) async {
-    final res = await http.post(
+    final res = await _client.post(
       _inv('/components/$componentId/move'),
       headers: _headers,
       body: jsonEncode({'targetInventoryId': targetInventoryId}),
@@ -245,7 +281,7 @@ class ApiClient {
   }
 
   Future<void> deleteAttachment(String filename) async {
-    final res = await http.delete(_inv('/attachments/$filename')).timeout(_timeout);
+    final res = await _client.delete(_inv('/attachments/$filename')).timeout(_timeout);
     await _check(res);
   }
 

@@ -117,8 +117,9 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                     avatar: Icon(Icons.kitchen_outlined,
                         size: 16,
                         color: isSelected ? cs.onPrimary : cs.onSurfaceVariant),
-                    label: Text(
-                        c.name.isNotEmpty ? c.name : l10n.containerNumber(c.id)),
+                    label: Text(c.name.isNotEmpty
+                        ? c.name
+                        : l10n.containerNumber(c.id)),
                     selected: isSelected,
                     onSelected: (val) {
                       if (val) {
@@ -160,20 +161,18 @@ class _CabinetMapViewState extends State<CabinetMapView> {
               Flexible(
                 child: Text(
                   l10n.dragToScrollGrid,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: cs.onSurfaceVariant.withOpacity(0.7)),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: 8),
               Text(
-                l10n.activeDrawersCount(selectedContainer.rows * selectedContainer.columns - selectedContainer.disabledDrawers.length),
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: cs.onSurfaceVariant.withOpacity(0.7)),
+                l10n.activeDrawersCount(
+                    selectedContainer.rows * selectedContainer.columns -
+                        selectedContainer.disabledDrawers.length),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
               ),
             ],
           ),
@@ -185,7 +184,8 @@ class _CabinetMapViewState extends State<CabinetMapView> {
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             decoration: BoxDecoration(
-              border: Border.all(color: cs.outlineVariant.withOpacity(0.5)),
+              border:
+                  Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
               borderRadius: BorderRadius.circular(12),
               color: cs.surfaceContainerLowest,
             ),
@@ -199,9 +199,13 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                   final contentWidth = selectedContainer.columns * 88.0 + 24.0;
                   final contentHeight = selectedContainer.rows * 68.0 + 24.0;
 
-                  final double scaleX = viewportWidth > 0 && contentWidth > 0 ? viewportWidth / contentWidth : 1.0;
-                  final double scaleY = viewportHeight > 0 && contentHeight > 0 ? viewportHeight / contentHeight : 1.0;
-                  
+                  final double scaleX = viewportWidth > 0 && contentWidth > 0
+                      ? viewportWidth / contentWidth
+                      : 1.0;
+                  final double scaleY = viewportHeight > 0 && contentHeight > 0
+                      ? viewportHeight / contentHeight
+                      : 1.0;
+
                   // Fit scale to ensure the entire cabinet fits in viewport
                   final double fitScale = scaleX < scaleY ? scaleX : scaleY;
                   final double initialScale = fitScale > 1.0 ? 1.0 : fitScale;
@@ -221,11 +225,13 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                       dx = (viewportWidth - contentWidth * initialScale) / 2.0;
                     }
                     if (contentHeight * initialScale < viewportHeight) {
-                      dy = (viewportHeight - contentHeight * initialScale) / 2.0;
+                      dy =
+                          (viewportHeight - contentHeight * initialScale) / 2.0;
                     }
 
-                    final newMatrix = Matrix4.diagonal3Values(initialScale, initialScale, 1.0)
-                      ..setTranslationRaw(dx, dy, 0.0);
+                    final newMatrix =
+                        Matrix4.diagonal3Values(initialScale, initialScale, 1.0)
+                          ..setTranslationRaw(dx, dy, 0.0);
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (mounted) {
                         _transformationController.value = newMatrix;
@@ -377,16 +383,16 @@ class _CabinetMapViewState extends State<CabinetMapView> {
       return Container(
         margin: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest.withOpacity(0.15),
+          color: cs.surfaceContainerHighest.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: cs.outlineVariant.withOpacity(0.2)),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.2)),
         ),
         alignment: Alignment.center,
         child: Text(
           displayLabel,
           style: TextStyle(
             fontSize: group != null ? 9 : 11,
-            color: cs.onSurfaceVariant.withOpacity(0.25),
+            color: cs.onSurfaceVariant.withValues(alpha: 0.25),
             decoration: TextDecoration.lineThrough,
           ),
           maxLines: 1,
@@ -419,14 +425,14 @@ class _CabinetMapViewState extends State<CabinetMapView> {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: drawerComps.isNotEmpty
-              ? cs.primary.withOpacity(0.6)
-              : cs.outlineVariant.withOpacity(0.7),
+              ? cs.primary.withValues(alpha: 0.6)
+              : cs.outlineVariant.withValues(alpha: 0.7),
           width: drawerComps.isNotEmpty ? 1.5 : 1.0,
         ),
         boxShadow: drawerComps.isNotEmpty
             ? [
                 BoxShadow(
-                  color: cs.primary.withOpacity(0.04),
+                  color: cs.primary.withValues(alpha: 0.04),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 )
@@ -461,7 +467,8 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                               border: i < totalZones - 1
                                   ? Border(
                                       bottom: BorderSide(
-                                          color: cs.outlineVariant.withOpacity(0.4),
+                                          color: cs.outlineVariant
+                                              .withValues(alpha: 0.4),
                                           width: 0.8))
                                   : null,
                             ),
@@ -488,10 +495,10 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                   decoration: BoxDecoration(
-                    color: cs.surface.withOpacity(0.9),
+                    color: cs.surface.withValues(alpha: 0.9),
                     borderRadius: BorderRadius.circular(4),
-                    border:
-                        Border.all(color: cs.outlineVariant.withOpacity(0.5)),
+                    border: Border.all(
+                        color: cs.outlineVariant.withValues(alpha: 0.5)),
                   ),
                   child: Text(
                     displayLabel,
@@ -524,7 +531,7 @@ class _CabinetMapViewState extends State<CabinetMapView> {
     final isOccupied = comps.isNotEmpty;
     return Material(
       color: isOccupied
-          ? cs.primaryContainer.withOpacity(totalZones > 1 ? 0.75 : 0.9)
+          ? cs.primaryContainer.withValues(alpha: totalZones > 1 ? 0.75 : 0.9)
           : cs.surface,
       child: InkWell(
         onTap: () => _showDrawerDetails(context, cabinetId, drawerLabel),
@@ -539,15 +546,16 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                   left: 2,
                   child: Text(
                     () {
-                      final label = getZoneLabel(zoneIndex, totalZones, context.l10n);
+                      final label =
+                          getZoneLabel(zoneIndex, totalZones, context.l10n);
                       return label.isNotEmpty ? label[0].toUpperCase() : '';
                     }(),
                     style: TextStyle(
                       fontSize: 7.5,
                       fontWeight: FontWeight.bold,
                       color: isOccupied
-                          ? cs.onPrimaryContainer.withOpacity(0.65)
-                          : cs.onSurfaceVariant.withOpacity(0.5),
+                          ? cs.onPrimaryContainer.withValues(alpha: 0.65)
+                          : cs.onSurfaceVariant.withValues(alpha: 0.5),
                     ),
                   ),
                 ),
@@ -682,7 +690,8 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                       itemCount: totalZones,
                       itemBuilder: (ctx2, index) {
                         final zoneIdx = index + 1;
-                        final zoneLabel = getZoneLabel(zoneIdx, totalZones, l10n);
+                        final zoneLabel =
+                            getZoneLabel(zoneIdx, totalZones, l10n);
                         final zoneComps = drawerComps
                             .where((c) => (c.drawerZone ?? 1) == zoneIdx)
                             .toList();
@@ -694,7 +703,8 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                             side: BorderSide(
-                                color: cs.outlineVariant.withOpacity(0.5)),
+                                color:
+                                    cs.outlineVariant.withValues(alpha: 0.5)),
                           ),
                           child: Padding(
                             padding: const EdgeInsets.all(12.0),
@@ -762,7 +772,7 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                                         style: TextStyle(
                                           fontSize: 13,
                                           color: cs.onSurfaceVariant
-                                              .withOpacity(0.7),
+                                              .withValues(alpha: 0.7),
                                           fontStyle: FontStyle.italic,
                                         ),
                                       ),
@@ -802,7 +812,7 @@ class _CabinetMapViewState extends State<CabinetMapView> {
       decoration: BoxDecoration(
         color: cs.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: cs.outlineVariant.withOpacity(0.3)),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -832,7 +842,7 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 1.5),
                           decoration: BoxDecoration(
-                            color: cs.secondaryContainer.withOpacity(0.6),
+                            color: cs.secondaryContainer.withValues(alpha: 0.6),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
@@ -919,8 +929,7 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                   child: Icon(Icons.add),
                 ),
                 title: Text(l10n.newComponent),
-                subtitle:
-                    Text(l10n.createFromScratchAndInsert),
+                subtitle: Text(l10n.createFromScratchAndInsert),
                 onTap: () {
                   Navigator.pop(dialogCtx);
                   widget.onAddComponentAt(cabinetId, drawerLabel, zoneIndex);
@@ -1067,7 +1076,7 @@ class _UnassignedComponentPickerDialogState
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                         side: BorderSide(
-                            color: cs.outlineVariant.withOpacity(0.5)),
+                            color: cs.outlineVariant.withValues(alpha: 0.5)),
                       ),
                       child: ListTile(
                         title: Text(comp.name,
@@ -1090,7 +1099,7 @@ class _UnassignedComponentPickerDialogState
                                               horizontal: 4, vertical: 1),
                                           decoration: BoxDecoration(
                                             color: cs.secondaryContainer
-                                                .withOpacity(0.5),
+                                                .withValues(alpha: 0.5),
                                             borderRadius:
                                                 BorderRadius.circular(4),
                                           ),
@@ -1133,16 +1142,16 @@ class _UnassignedComponentPickerDialogState
                               Navigator.pop(ctx); // Close picker dialog
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                    content: Text(
-                                        l10n.componentAssignedSuccess(comp.name))),
+                                    content: Text(l10n
+                                        .componentAssignedSuccess(comp.name))),
                               );
                             }
                           } catch (e) {
                             if (ctx.mounted) {
                               ScaffoldMessenger.of(ctx).showSnackBar(
                                 SnackBar(
-                                    content: Text(
-                                        l10n.assignError(e.toString()))),
+                                    content:
+                                        Text(l10n.assignError(e.toString()))),
                               );
                             }
                           }

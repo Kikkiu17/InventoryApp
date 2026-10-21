@@ -190,6 +190,8 @@ abstract class AppLocalizations {
   String get serverDisconnectedStatus;
   String get localStorageStatus;
   String get serverUrl;
+  String get trustSelfSignedCertificates;
+  String get trustSelfSignedCertificatesDesc;
   String get testConnection;
   String get connectionSuccess;
   String get connectionFailed;

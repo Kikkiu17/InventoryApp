@@ -69,7 +69,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
   List<String> _treePath = [];
   bool _showLooseTags = false;
 
-  Map<String, TextEditingController> _specialTagCtrls = {};
+  final Map<String, TextEditingController> _specialTagCtrls = {};
 
   List<Attachment> _attachments = [];
   List<String> _images = [];
@@ -386,8 +386,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                   context: context,
                   builder: (ctx) => AlertDialog(
                     title: Text(l10n.deleteComponentTitle),
-                    content:
-                        Text(l10n.deleteComponentConfirmMsg),
+                    content: Text(l10n.deleteComponentConfirmMsg),
                     actions: [
                       TextButton(
                           onPressed: () => Navigator.pop(ctx, false),
@@ -425,7 +424,8 @@ class _ComponentDialogState extends State<ComponentDialog> {
                   labelText: l10n.nameRequired,
                   border: const OutlineInputBorder(),
                   filled: true,
-                  fillColor: cs.primaryContainer.withOpacity(_opacityPrimary),
+                  fillColor:
+                      cs.primaryContainer.withValues(alpha: _opacityPrimary),
                 ),
                 validator: (v) {
                   final text = (v ?? '').trim();
@@ -446,8 +446,8 @@ class _ComponentDialogState extends State<ComponentDialog> {
                   labelText: l10n.descriptionOptional,
                   border: const OutlineInputBorder(),
                   filled: true,
-                  fillColor:
-                      cs.surfaceContainerHighest.withOpacity(_opacityNeutral),
+                  fillColor: cs.surfaceContainerHighest
+                      .withValues(alpha: _opacityNeutral),
                 ),
                 onFieldSubmitted: (_) => _submit(),
               ),
@@ -460,8 +460,8 @@ class _ComponentDialogState extends State<ComponentDialog> {
                     labelText: l10n.noteReminder,
                     border: const OutlineInputBorder(),
                     filled: true,
-                    fillColor:
-                        cs.surfaceContainerHighest.withOpacity(_opacityNeutral),
+                    fillColor: cs.surfaceContainerHighest
+                        .withValues(alpha: _opacityNeutral),
                   ),
                   onFieldSubmitted: (_) => _submit(),
                 ),
@@ -474,13 +474,13 @@ class _ComponentDialogState extends State<ComponentDialog> {
                               id: 'default', name: l10n.localInventory)
                         ];
                   return DropdownButtonFormField<String?>(
-                    value: _selectedTargetInventoryId,
+                    initialValue: _selectedTargetInventoryId,
                     decoration: InputDecoration(
                       labelText: l10n.targetInventoryLabel,
                       border: const OutlineInputBorder(),
                       filled: true,
-                      fillColor:
-                          cs.primaryContainer.withOpacity(_opacityPrimary),
+                      fillColor: cs.primaryContainer
+                          .withValues(alpha: _opacityPrimary),
                     ),
                     items: [
                       DropdownMenuItem<String?>(
@@ -507,14 +507,15 @@ class _ComponentDialogState extends State<ComponentDialog> {
                       labelText: l10n.quantityLabel,
                       border: const OutlineInputBorder(),
                       filled: true,
-                      fillColor: Colors.green.withOpacity(_opacityGreen),
+                      fillColor: Colors.green.withValues(alpha: _opacityGreen),
                     ),
                     keyboardType: TextInputType.number,
                     onFieldSubmitted: (_) => _submit(),
                     validator: (v) {
                       if (v == null || v.isEmpty) return null;
-                      if (int.tryParse(v) == null || int.parse(v) < 0)
+                      if (int.tryParse(v) == null || int.parse(v) < 0) {
                         return l10n.invalidNumber;
+                      }
                       return null;
                     },
                   ),
@@ -523,7 +524,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: DropdownButtonFormField<int>(
-                      value: settings.containers
+                      initialValue: settings.containers
                               .any((c) => c.id == _selectedCabinet)
                           ? _selectedCabinet
                           : (settings.containers.isNotEmpty
@@ -533,7 +534,8 @@ class _ComponentDialogState extends State<ComponentDialog> {
                         labelText: l10n.cabinetLabel,
                         border: const OutlineInputBorder(),
                         filled: true,
-                        fillColor: Colors.green.withOpacity(_opacityGreen),
+                        fillColor:
+                            Colors.green.withValues(alpha: _opacityGreen),
                       ),
                       items: settings.containers
                           .map((c) => DropdownMenuItem(
@@ -556,7 +558,8 @@ class _ComponentDialogState extends State<ComponentDialog> {
                   color: cs.surfaceContainerLowest,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                    side: BorderSide(
+                        color: cs.outlineVariant.withValues(alpha: 0.5)),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(12),
@@ -576,15 +579,14 @@ class _ComponentDialogState extends State<ComponentDialog> {
                             child: TextFormField(
                               controller: _colCtrl,
                               textInputAction: TextInputAction.next,
-                              textCapitalization:
-                                  TextCapitalization.characters,
+                              textCapitalization: TextCapitalization.characters,
                               decoration: InputDecoration(
                                 labelText: l10n.columnHeader,
                                 hintText: l10n.columnHint,
                                 border: const OutlineInputBorder(),
                                 filled: true,
-                                fillColor:
-                                    Colors.green.withValues(alpha: _opacityGreen),
+                                fillColor: Colors.green
+                                    .withValues(alpha: _opacityGreen),
                               ),
                               validator: (v) {
                                 if ((v?.isEmpty ?? true) &&
@@ -631,8 +633,8 @@ class _ComponentDialogState extends State<ComponentDialog> {
                                 hintText: l10n.rowHint,
                                 border: const OutlineInputBorder(),
                                 filled: true,
-                                fillColor:
-                                    Colors.green.withValues(alpha: _opacityGreen),
+                                fillColor: Colors.green
+                                    .withValues(alpha: _opacityGreen),
                               ),
                               validator: (v) {
                                 if ((v?.isEmpty ?? true) &&
@@ -696,8 +698,9 @@ class _ComponentDialogState extends State<ComponentDialog> {
                         () {
                           final col = _colCtrl.text.trim().toUpperCase();
                           final row = _rowCtrl.text.trim();
-                          if (col.isEmpty || row.isEmpty)
+                          if (col.isEmpty || row.isEmpty) {
                             return const SizedBox.shrink();
+                          }
 
                           final drawer = '$col$row';
                           final key = '${_selectedCabinet}_$drawer';
@@ -721,7 +724,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                               if (zones >= 2) ...[
                                 const SizedBox(height: 12),
                                 DropdownButtonFormField<int>(
-                                  value: _selectedZone == null ||
+                                  initialValue: _selectedZone == null ||
                                           _selectedZone! < 1 ||
                                           _selectedZone! > zones
                                       ? 1
@@ -730,13 +733,14 @@ class _ComponentDialogState extends State<ComponentDialog> {
                                     labelText: l10n.zoneSeparatorLabel,
                                     border: const OutlineInputBorder(),
                                     filled: true,
-                                    fillColor:
-                                        Colors.green.withOpacity(_opacityGreen),
+                                    fillColor: Colors.green
+                                        .withValues(alpha: _opacityGreen),
                                   ),
                                   items: List.generate(zones, (i) => i + 1)
                                       .map((z) => DropdownMenuItem(
                                             value: z,
-                                            child: Text(getZoneLabel(z, zones, l10n)),
+                                            child: Text(
+                                                getZoneLabel(z, zones, l10n)),
                                           ))
                                       .toList(),
                                   onChanged: (v) =>
@@ -771,7 +775,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
               ] else if (activeSettingsForTags == null) ...[
                 const SizedBox(height: 16),
                 Card(
-                  color: cs.surfaceContainerHighest.withOpacity(0.5),
+                  color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
                   child: Padding(
                     padding: const EdgeInsets.all(12),
                     child: Row(
@@ -832,7 +836,8 @@ class _ComponentDialogState extends State<ComponentDialog> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     decoration: BoxDecoration(
-                        color: cs.surfaceContainerHighest.withOpacity(0.5),
+                        color:
+                            cs.surfaceContainerHighest.withValues(alpha: 0.5),
                         borderRadius: BorderRadius.circular(6)),
                     child: Wrap(
                         crossAxisAlignment: WrapCrossAlignment.center,
@@ -943,14 +948,15 @@ class _ComponentDialogState extends State<ComponentDialog> {
                                 : l10n.specialTagNumericHint,
                             filled: true,
                             fillColor: cs.tertiaryContainer
-                                .withOpacity(_opacityTertiary),
+                                .withValues(alpha: _opacityTertiary),
                           ),
                           keyboardType: TextInputType.text,
                           onFieldSubmitted: (_) => _submit(),
                           validator: (v) {
                             if (v == null || v.isEmpty) return null;
-                            if (!st.isString && parseSpecialValue(v) == null)
+                            if (!st.isString && parseSpecialValue(v) == null) {
                               return l10n.invalidNumberFormat;
+                            }
                             return null;
                           },
                         ),
@@ -958,7 +964,8 @@ class _ComponentDialogState extends State<ComponentDialog> {
                 ],
               ],
               const SizedBox(height: 16),
-              Text(l10n.attachmentsTitle, style: Theme.of(context).textTheme.labelLarge),
+              Text(l10n.attachmentsTitle,
+                  style: Theme.of(context).textTheme.labelLarge),
               const SizedBox(height: 8),
               if (_attachments.isNotEmpty)
                 Column(
@@ -1062,8 +1069,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
                       if (existingFiles.isEmpty) {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                  content: Text(l10n.noExistingFiles)));
+                              SnackBar(content: Text(l10n.noExistingFiles)));
                         }
                         return;
                       }
@@ -1109,7 +1115,8 @@ class _ComponentDialogState extends State<ComponentDialog> {
                 ],
               ),
               const SizedBox(height: 16),
-              Text(l10n.imagesSectionTitle, style: Theme.of(context).textTheme.labelLarge),
+              Text(l10n.imagesSectionTitle,
+                  style: Theme.of(context).textTheme.labelLarge),
               const SizedBox(height: 8),
               if (_images.isNotEmpty) ...[
                 SizedBox(
@@ -1332,7 +1339,8 @@ class _ComponentDialogState extends State<ComponentDialog> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, dialogState) => AlertDialog(
-          title: Text(l10n.configureSeparatorsForDrawer(label, _selectedCabinet)),
+          title:
+              Text(l10n.configureSeparatorsForDrawer(label, _selectedCabinet)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1423,9 +1431,9 @@ class _ComponentDialogState extends State<ComponentDialog> {
 
     // Se il nome non è specificato, usa automaticamente i tag dell'albero come nome
     if (_nameCtrl.text.trim().isEmpty) {
-      final autoName = _collectTreeTags(
-              activeSettings?.tagTree ?? {}, _selectedTags)
-          .join(' ');
+      final autoName =
+          _collectTreeTags(activeSettings?.tagTree ?? {}, _selectedTags)
+              .join(' ');
       if (autoName.isNotEmpty) {
         _nameCtrl.text = autoName;
         _lastAutoGeneratedName = autoName;

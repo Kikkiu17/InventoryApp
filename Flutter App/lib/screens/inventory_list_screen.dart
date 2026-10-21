@@ -73,10 +73,10 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ds    = context.watch<DataService>();
-    final l10n  = context.l10n;
+    final ds = context.watch<DataService>();
+    final l10n = context.l10n;
     final theme = Theme.of(context);
-    final cs    = theme.colorScheme;
+    final cs = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
@@ -112,7 +112,8 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
             IconButton(
               icon: ds.syncing
                   ? const SizedBox(
-                      width: 20, height: 20,
+                      width: 20,
+                      height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.refresh),
               tooltip: l10n.refreshList,
@@ -155,7 +156,8 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
                 shape: WidgetStatePropertyAll(
                   RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
-                    side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+                    side: BorderSide(
+                        color: cs.outlineVariant.withValues(alpha: 0.5)),
                   ),
                 ),
                 padding: const WidgetStatePropertyAll(
@@ -182,7 +184,8 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
     );
   }
 
-  Widget _buildNormalBody(DataService ds, ColorScheme cs, AppLocalizations l10n) {
+  Widget _buildNormalBody(
+      DataService ds, ColorScheme cs, AppLocalizations l10n) {
     if (!ds.isRemote) {
       return _Placeholder(
         icon: Icons.cloud_off_outlined,
@@ -221,23 +224,23 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 100),
         itemCount: ds.inventories.length,
         itemBuilder: (ctx, i) {
-          final inv       = ds.inventories[i];
+          final inv = ds.inventories[i];
           final isCurrent = inv.id == ds.currentInventoryId;
           return _InventoryCard(
-            inv:       inv,
+            inv: inv,
             isCurrent: isCurrent,
             canDelete: ds.inventories.length > 1,
-            onSelect:  () => _selectInventory(context, ds, inv.id),
-            onRename:  () => _showRenameDialog(context, ds, inv),
-            onDelete:  () => _confirmDelete(context, ds, inv),
+            onSelect: () => _selectInventory(context, ds, inv.id),
+            onRename: () => _showRenameDialog(context, ds, inv),
+            onDelete: () => _confirmDelete(context, ds, inv),
           );
         },
       );
     }
   }
 
-  Widget _buildSearchResults(
-      BuildContext context, DataService ds, ColorScheme cs, ThemeData theme, AppLocalizations l10n) {
+  Widget _buildSearchResults(BuildContext context, DataService ds,
+      ColorScheme cs, ThemeData theme, AppLocalizations l10n) {
     if (_isSearching && _searchResults == null) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -438,7 +441,8 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
           TextField(
             controller: nameCtrl,
             decoration: InputDecoration(
-                labelText: l10n.nameRequired, border: const OutlineInputBorder()),
+                labelText: l10n.nameRequired,
+                border: const OutlineInputBorder()),
             autofocus: true,
             textCapitalization: TextCapitalization.sentences,
           ),
@@ -466,8 +470,8 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
     if (name.isEmpty) return;
 
     try {
-      final created = await ds.createInventory(name,
-          description: descCtrl.text.trim());
+      final created =
+          await ds.createInventory(name, description: descCtrl.text.trim());
       await ds.switchInventory(created.id);
       if (context.mounted) {
         final l10nSuccess = context.l10n;
@@ -510,7 +514,8 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
           TextField(
             controller: descCtrl,
             decoration: InputDecoration(
-                labelText: l10n.descriptionOptional, border: const OutlineInputBorder()),
+                labelText: l10n.descriptionOptional,
+                border: const OutlineInputBorder()),
           ),
         ]),
         actions: [
@@ -528,8 +533,7 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
     final name = nameCtrl.text.trim();
     if (name.isEmpty) return;
     try {
-      await ds.renameInventory(inv.id, name,
-          description: descCtrl.text.trim());
+      await ds.renameInventory(inv.id, name, description: descCtrl.text.trim());
     } catch (e) {
       if (context.mounted) {
         final l10nErr = context.l10n;
@@ -628,9 +632,9 @@ class _InventoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs    = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
-    final l10n  = context.l10n;
+    final l10n = context.l10n;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 5),
@@ -638,10 +642,12 @@ class _InventoryCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         side: isCurrent
             ? BorderSide(color: cs.primary, width: 2.5)
-            : BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+            : BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
       ),
       elevation: isCurrent ? 2 : 0,
-      color: isCurrent ? cs.primaryContainer.withOpacity(0.25) : cs.surfaceContainerLow,
+      color: isCurrent
+          ? cs.primaryContainer.withValues(alpha: 0.25)
+          : cs.surfaceContainerLow,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: onSelect,
@@ -705,7 +711,7 @@ class _InventoryCard extends StatelessWidget {
                   Text('ID: ${inv.id}',
                       style: TextStyle(
                           fontSize: 10,
-                          color: cs.onSurfaceVariant.withOpacity(0.5))),
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.5))),
                 ],
               ),
             ),
@@ -731,13 +737,11 @@ class _InventoryCard extends StatelessWidget {
                     value: 'delete',
                     child: Row(children: [
                       Icon(Icons.delete_outline,
-                          size: 18,
-                          color: Theme.of(context).colorScheme.error),
+                          size: 18, color: Theme.of(context).colorScheme.error),
                       const SizedBox(width: 10),
                       Text(l10n.delete,
                           style: TextStyle(
-                              color:
-                                  Theme.of(context).colorScheme.error)),
+                              color: Theme.of(context).colorScheme.error)),
                     ]),
                   ),
               ],
@@ -770,7 +774,8 @@ class _Placeholder extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(36),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(icon, size: 64, color: cs.onSurfaceVariant.withOpacity(0.35)),
+            Icon(icon,
+                size: 64, color: cs.onSurfaceVariant.withValues(alpha: 0.35)),
             const SizedBox(height: 16),
             Text(title,
                 style: Theme.of(context)

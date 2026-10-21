@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:inventario/models/settings.dart';
 import 'package:inventario/screens/settings_screen.dart';
 import 'package:inventario/services/data_service.dart';
 
@@ -19,7 +18,9 @@ void main() {
     ('390x844 modern mobile', const Size(390, 844)),
     ('800x600 tablet/desktop', const Size(800, 600)),
   ]) {
-    testWidgets('Settings screen renders properties with value section without overflow on $label', (tester) async {
+    testWidgets(
+        'Settings screen renders properties with value section without overflow on $label',
+        (tester) async {
       tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -42,12 +43,14 @@ void main() {
         if (find.text('Proprietà con valore').evaluate().isNotEmpty) {
           break;
         }
-        await tester.dragFrom(Offset(10, size.height * 0.7), const Offset(0, -200));
+        await tester.dragFrom(
+            Offset(10, size.height * 0.7), const Offset(0, -200));
         await tester.pumpAndSettle();
       }
 
       // Scroll a bit more so all fields in the card are in view
-      await tester.dragFrom(Offset(10, size.height * 0.7), const Offset(0, -150));
+      await tester.dragFrom(
+          Offset(10, size.height * 0.7), const Offset(0, -150));
       await tester.pumpAndSettle();
 
       final nameField = find.widgetWithText(TextField, 'Nome');

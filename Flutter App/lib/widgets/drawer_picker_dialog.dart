@@ -148,7 +148,7 @@ class _DrawerGridPickerState extends State<DrawerGridPicker> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: cs.primaryContainer.withOpacity(0.3),
+            color: cs.primaryContainer.withValues(alpha: 0.3),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
@@ -177,7 +177,7 @@ class _DrawerGridPickerState extends State<DrawerGridPicker> {
         Container(
           height: 280,
           decoration: BoxDecoration(
-            border: Border.all(color: cs.outlineVariant.withOpacity(0.5)),
+            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
             borderRadius: BorderRadius.circular(10),
             color: cs.surfaceContainerLowest,
           ),
@@ -191,9 +191,13 @@ class _DrawerGridPickerState extends State<DrawerGridPicker> {
                 final contentWidth = selectedContainer.columns * 80.0 + 16.0;
                 final contentHeight = selectedContainer.rows * 62.0 + 16.0;
 
-                final double scaleX = viewportWidth > 0 && contentWidth > 0 ? viewportWidth / contentWidth : 1.0;
-                final double scaleY = viewportHeight > 0 && contentHeight > 0 ? viewportHeight / contentHeight : 1.0;
-                
+                final double scaleX = viewportWidth > 0 && contentWidth > 0
+                    ? viewportWidth / contentWidth
+                    : 1.0;
+                final double scaleY = viewportHeight > 0 && contentHeight > 0
+                    ? viewportHeight / contentHeight
+                    : 1.0;
+
                 // Fit scale to ensure the entire cabinet fits in viewport
                 final double fitScale = scaleX < scaleY ? scaleX : scaleY;
                 final double initialScale = fitScale > 1.0 ? 1.0 : fitScale;
@@ -216,8 +220,9 @@ class _DrawerGridPickerState extends State<DrawerGridPicker> {
                     dy = (viewportHeight - contentHeight * initialScale) / 2.0;
                   }
 
-                  final newMatrix = Matrix4.diagonal3Values(initialScale, initialScale, 1.0)
-                    ..setTranslationRaw(dx, dy, 0.0);
+                  final newMatrix =
+                      Matrix4.diagonal3Values(initialScale, initialScale, 1.0)
+                        ..setTranslationRaw(dx, dy, 0.0);
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (mounted) {
                       _transformationController.value = newMatrix;
@@ -352,16 +357,16 @@ class _DrawerGridPickerState extends State<DrawerGridPicker> {
       return Container(
         margin: const EdgeInsets.all(3),
         decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest.withOpacity(0.15),
+          color: cs.surfaceContainerHighest.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: cs.outlineVariant.withOpacity(0.2)),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.2)),
         ),
         alignment: Alignment.center,
         child: Text(
           displayLabel,
           style: TextStyle(
             fontSize: group != null ? 8 : 10,
-            color: cs.onSurfaceVariant.withOpacity(0.25),
+            color: cs.onSurfaceVariant.withValues(alpha: 0.25),
             decoration: TextDecoration.lineThrough,
           ),
           maxLines: 1,
@@ -400,14 +405,14 @@ class _DrawerGridPickerState extends State<DrawerGridPicker> {
           color: isDrawerSelected
               ? cs.primary
               : drawerComps.isNotEmpty
-                  ? cs.primary.withOpacity(0.4)
-                  : cs.outlineVariant.withOpacity(0.7),
+                  ? cs.primary.withValues(alpha: 0.4)
+                  : cs.outlineVariant.withValues(alpha: 0.7),
           width: isDrawerSelected ? 2.5 : (drawerComps.isNotEmpty ? 1.5 : 1.0),
         ),
         boxShadow: isDrawerSelected
             ? [
                 BoxShadow(
-                  color: cs.primary.withOpacity(0.3),
+                  color: cs.primary.withValues(alpha: 0.3),
                   blurRadius: 6,
                   spreadRadius: 1,
                 )
@@ -428,7 +433,8 @@ class _DrawerGridPickerState extends State<DrawerGridPicker> {
                       1,
                       1,
                       isDrawerSelected &&
-                          (widget.selectedZone == null || widget.selectedZone == 1),
+                          (widget.selectedZone == null ||
+                              widget.selectedZone == 1),
                       drawerComps,
                       cs,
                     )
@@ -447,7 +453,8 @@ class _DrawerGridPickerState extends State<DrawerGridPicker> {
                               border: i < totalZones - 1
                                   ? Border(
                                       bottom: BorderSide(
-                                          color: cs.outlineVariant.withOpacity(0.4),
+                                          color: cs.outlineVariant
+                                              .withValues(alpha: 0.4),
                                           width: 0.8))
                                   : null,
                             ),
@@ -478,12 +485,12 @@ class _DrawerGridPickerState extends State<DrawerGridPicker> {
                   decoration: BoxDecoration(
                     color: isDrawerSelected
                         ? cs.primaryContainer
-                        : cs.surface.withOpacity(0.9),
+                        : cs.surface.withValues(alpha: 0.9),
                     borderRadius: BorderRadius.circular(3),
                     border: Border.all(
                       color: isDrawerSelected
                           ? cs.primary
-                          : cs.outlineVariant.withOpacity(0.5),
+                          : cs.outlineVariant.withValues(alpha: 0.5),
                     ),
                   ),
                   child: Text(
@@ -522,7 +529,7 @@ class _DrawerGridPickerState extends State<DrawerGridPicker> {
     final backgroundColor = isSelected
         ? cs.primaryContainer
         : isOccupied
-            ? cs.primaryContainer.withOpacity(totalZones > 1 ? 0.4 : 0.6)
+            ? cs.primaryContainer.withValues(alpha: totalZones > 1 ? 0.4 : 0.6)
             : cs.surface;
 
     return Material(
@@ -551,7 +558,7 @@ class _DrawerGridPickerState extends State<DrawerGridPicker> {
                       fontWeight: FontWeight.bold,
                       color: isSelected
                           ? cs.onPrimaryContainer
-                          : cs.onSurfaceVariant.withOpacity(0.6),
+                          : cs.onSurfaceVariant.withValues(alpha: 0.6),
                     ),
                   ),
                 ),
@@ -566,7 +573,7 @@ class _DrawerGridPickerState extends State<DrawerGridPicker> {
                     decoration: BoxDecoration(
                       color: isSelected
                           ? cs.primary
-                          : cs.primary.withOpacity(0.85),
+                          : cs.primary.withValues(alpha: 0.85),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(

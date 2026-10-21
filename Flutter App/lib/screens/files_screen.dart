@@ -41,7 +41,8 @@ class _FilesScreenState extends State<FilesScreen> {
     super.dispose();
   }
 
-  Future<void> _openAttachment(BuildContext context, FilesScreenItem item) async {
+  Future<void> _openAttachment(
+      BuildContext context, FilesScreenItem item) async {
     if (item.isImage) {
       Navigator.push(
         context,
@@ -84,8 +85,8 @@ class _FilesScreenState extends State<FilesScreen> {
           await OpenFilex.open(localPath);
         } catch (_) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text(context.l10n.cannotOpenLocalFile)));
+            ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(context.l10n.cannotOpenLocalFile)));
           }
         }
       }
@@ -94,7 +95,8 @@ class _FilesScreenState extends State<FilesScreen> {
 
   Future<void> _renameAttachment(
       BuildContext context, FilesScreenItem item) async {
-    if (item.isImage) return; // Images don't support custom display names in this screen
+    if (item.isImage)
+      return; // Images don't support custom display names in this screen
     final ctrl = TextEditingController(text: item.name);
     final newName = await showDialog<String>(
       context: context,
@@ -122,19 +124,19 @@ class _FilesScreenState extends State<FilesScreen> {
     if (newName != null && newName.isNotEmpty && newName != item.name) {
       final newAttachments = item.component.attachments.map((att) {
         if (att.path == item.path && att.name == item.name) {
-          return Attachment(name: newName, path: item.path, isLink: item.isLink);
+          return Attachment(
+              name: newName, path: item.path, isLink: item.isLink);
         }
         return att;
       }).toList();
 
       try {
-        await context
-            .read<DataService>()
-            .updateComponent(item.component.copyWith(attachments: newAttachments));
+        await context.read<DataService>().updateComponent(
+            item.component.copyWith(attachments: newAttachments));
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text('${context.l10n.error}: $e')));
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('${context.l10n.error}: $e')));
         }
       }
     }
@@ -147,20 +149,22 @@ class _FilesScreenState extends State<FilesScreen> {
       builder: (ctx) {
         final l10n = context.l10n;
         return AlertDialog(
-        title: Text(item.isImage ? l10n.deleteImageTitle : l10n.deleteFileTitle),
-        content: Text(l10n.deleteAttachmentConfirm(item.name)),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(l10n.cancelButton)),
-          FilledButton(
-              style: FilledButton.styleFrom(
-                  backgroundColor: Theme.of(ctx).colorScheme.error,
-                  foregroundColor: Theme.of(ctx).colorScheme.onError),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(l10n.deleteButton)),
-        ],
-      );},
+          title:
+              Text(item.isImage ? l10n.deleteImageTitle : l10n.deleteFileTitle),
+          content: Text(l10n.deleteAttachmentConfirm(item.name)),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(l10n.cancelButton)),
+            FilledButton(
+                style: FilledButton.styleFrom(
+                    backgroundColor: Theme.of(ctx).colorScheme.error,
+                    foregroundColor: Theme.of(ctx).colorScheme.onError),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(l10n.deleteButton)),
+          ],
+        );
+      },
     );
 
     if (confirm == true) {
@@ -170,20 +174,20 @@ class _FilesScreenState extends State<FilesScreen> {
           await ds.deleteAttachment(item.path);
         }
         if (item.isImage) {
-          final newImages = item.component.images
-              .where((img) => img != item.path)
-              .toList();
+          final newImages =
+              item.component.images.where((img) => img != item.path).toList();
           await ds.updateComponent(item.component.copyWith(images: newImages));
         } else {
           final newAttachments = item.component.attachments
               .where((att) => att.path != item.path || att.name != item.name)
               .toList();
-          await ds.updateComponent(item.component.copyWith(attachments: newAttachments));
+          await ds.updateComponent(
+              item.component.copyWith(attachments: newAttachments));
         }
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text('${context.l10n.error}: $e')));
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('${context.l10n.error}: $e')));
         }
       }
     }
@@ -197,7 +201,8 @@ class _FilesScreenState extends State<FilesScreen> {
         fit: BoxFit.cover,
         errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image),
       );
-    } else if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    } else if (imagePath.startsWith('http://') ||
+        imagePath.startsWith('https://')) {
       return Image.network(
         imagePath,
         fit: BoxFit.cover,
@@ -320,7 +325,7 @@ class _FilesScreenState extends State<FilesScreen> {
                       children: [
                         Icon(Icons.attachment_outlined,
                             size: 64,
-                            color: cs.onSurfaceVariant.withOpacity(0.4)),
+                            color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
                         const SizedBox(height: 12),
                         Text(l10n.noFilesFound),
                       ],
@@ -343,11 +348,14 @@ class _FilesScreenState extends State<FilesScreen> {
                             : CircleAvatar(
                                 backgroundColor: cs.primaryContainer,
                                 child: Icon(
-                                    item.isLink ? Icons.link : Icons.insert_drive_file,
+                                    item.isLink
+                                        ? Icons.link
+                                        : Icons.insert_drive_file,
                                     color: cs.primary),
                               ),
                         title: Text(item.name),
-                        subtitle: Text('${l10n.componentPrefix}: ${item.component.name}'),
+                        subtitle: Text(
+                            '${l10n.componentPrefix}: ${item.component.name}'),
                         onTap: () => _openAttachment(context, item),
                         trailing: PopupMenuButton<String>(
                           icon:

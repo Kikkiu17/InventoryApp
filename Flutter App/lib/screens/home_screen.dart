@@ -33,13 +33,13 @@ class _HomeScreenState extends State<HomeScreen> {
   String _query = '';
   List<String> _selectedTags = [];
   SortMode _sortMode = SortMode.name;
-  String? _sortSpecialTag; 
+  String? _sortSpecialTag;
   bool _sortAscending = true;
   Map<String, SpecialFilter> _specialFilters = {};
-  int? _cabinetFilter; 
+  int? _cabinetFilter;
   bool _unassignedPosition = false;
   String _viewMode = 'list';
-  
+
   String _lastInventoryId = '';
 
   @override
@@ -75,7 +75,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return null;
   }
 
-  void _removeNodeAndDescendants(String node, dynamic subtree, List<String> list) {
+  void _removeNodeAndDescendants(
+      String node, dynamic subtree, List<String> list) {
     list.remove(node);
     if (subtree is Map<String, dynamic>) {
       for (final k in subtree.keys) {
@@ -96,7 +97,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Creazione ed esportazione del file PDF
-  Future<void> _exportToPdf(List<Component> items, AppSettings settings, [String? title]) async {
+  Future<void> _exportToPdf(List<Component> items, AppSettings settings,
+      [String? title]) async {
     await PdfExportService.exportComponents(
       context: context,
       items: items,
@@ -141,8 +143,13 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     }
 
-    final results = ds.search(_query, _selectedTags, _sortMode, _specialFilters, _sortSpecialTag, _cabinetFilter, _unassignedPosition, _sortAscending);
-    final hasFilter = _query.isNotEmpty || _selectedTags.isNotEmpty || _specialFilters.isNotEmpty || _cabinetFilter != null || _unassignedPosition;
+    final results = ds.search(_query, _selectedTags, _sortMode, _specialFilters,
+        _sortSpecialTag, _cabinetFilter, _unassignedPosition, _sortAscending);
+    final hasFilter = _query.isNotEmpty ||
+        _selectedTags.isNotEmpty ||
+        _specialFilters.isNotEmpty ||
+        _cabinetFilter != null ||
+        _unassignedPosition;
 
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
@@ -191,8 +198,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   smallSize: 8,
                   child: Icon(Icons.system_update_alt, color: cs.primary),
                 ),
-                tooltip:
-                    l10n.updateAvailableBadge(updateInfo.latestVersion),
+                tooltip: l10n.updateAvailableBadge(updateInfo.latestVersion),
                 onPressed: () =>
                     UpdateService.showUpdateDialog(context, updateInfo),
               );
@@ -215,12 +221,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     icon: Badge(
                       backgroundColor: cs.primary,
                       label: Text('${report.totalChangesCount}'),
-                      child: Icon(Icons.published_with_changes,
-                          color: cs.primary),
+                      child:
+                          Icon(Icons.published_with_changes, color: cs.primary),
                     ),
                     tooltip: l10n.whatsNewTooltip(report.totalChangesCount),
-                    onPressed: () =>
-                        InventoryChangesService.showChangesDialog(
+                    onPressed: () => InventoryChangesService.showChangesDialog(
                       context,
                       report,
                       ds: ds,
@@ -243,7 +248,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ds.syncing
                 ? const Padding(
                     padding: EdgeInsets.all(14),
-                    child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+                    child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2)))
                 : IconButton(
                     icon: const Icon(Icons.sync),
                     tooltip: l10n.sync,
@@ -261,28 +269,44 @@ class _HomeScreenState extends State<HomeScreen> {
                   _sortSpecialTag = val.substring(3);
                 } else {
                   _sortSpecialTag = null;
-                  if (val == 'name') _sortMode = SortMode.name;
-                  else if (val == 'quantity') _sortMode = SortMode.quantity;
+                  if (val == 'name') {
+                    _sortMode = SortMode.name;
+                  } else if (val == 'quantity')
+                    _sortMode = SortMode.quantity;
                   else if (val == 'drawer') _sortMode = SortMode.drawer;
                 }
               });
             },
             itemBuilder: (_) => [
-              _sortItem('name', l10n.sortName, Icons.sort_by_alpha, _sortMode == SortMode.name),
-              _sortItem('quantity', l10n.sortQuantity, Icons.format_list_numbered, _sortMode == SortMode.quantity),
-              _sortItem('drawer', l10n.sortDrawer, Icons.inbox, _sortMode == SortMode.drawer),
-              if (ds.settings.specialTags.any((st) => !st.isString)) const PopupMenuDivider(),
-              ...ds.settings.specialTags.where((st) => !st.isString).map((st) => 
-                _sortItem('sp_${st.name}', '${l10n.sortBy} ${st.name}', Icons.tune, _sortMode == SortMode.specialTag && _sortSpecialTag == st.name)
-              ),
+              _sortItem('name', l10n.sortName, Icons.sort_by_alpha,
+                  _sortMode == SortMode.name),
+              _sortItem('quantity', l10n.sortQuantity,
+                  Icons.format_list_numbered, _sortMode == SortMode.quantity),
+              _sortItem('drawer', l10n.sortDrawer, Icons.inbox,
+                  _sortMode == SortMode.drawer),
+              if (ds.settings.specialTags.any((st) => !st.isString))
+                const PopupMenuDivider(),
+              ...ds.settings.specialTags.where((st) => !st.isString).map((st) =>
+                  _sortItem(
+                      'sp_${st.name}',
+                      '${l10n.sortBy} ${st.name}',
+                      Icons.tune,
+                      _sortMode == SortMode.specialTag &&
+                          _sortSpecialTag == st.name)),
               const PopupMenuDivider(),
               PopupMenuItem(
                 value: 'toggle_direction',
                 child: Row(
                   children: [
-                    Icon(_sortAscending ? Icons.arrow_upward : Icons.arrow_downward, size: 20),
+                    Icon(
+                        _sortAscending
+                            ? Icons.arrow_upward
+                            : Icons.arrow_downward,
+                        size: 20),
                     const SizedBox(width: 8),
-                    Text(_sortAscending ? l10n.sortAscending : l10n.sortDescending),
+                    Text(_sortAscending
+                        ? l10n.sortAscending
+                        : l10n.sortDescending),
                   ],
                 ),
               ),
@@ -316,24 +340,39 @@ class _HomeScreenState extends State<HomeScreen> {
                               final isCurrent = inv.id == ds.currentInventoryId;
                               return ListTile(
                                 leading: Icon(
-                                  isCurrent ? Icons.inventory_2 : Icons.inventory_2_outlined,
-                                  color: isCurrent ? Theme.of(context).colorScheme.primary : null,
+                                  isCurrent
+                                      ? Icons.inventory_2
+                                      : Icons.inventory_2_outlined,
+                                  color: isCurrent
+                                      ? Theme.of(context).colorScheme.primary
+                                      : null,
                                 ),
                                 title: Text(
                                   inv.name,
                                   style: TextStyle(
-                                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                                    fontWeight: isCurrent
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
                                   ),
                                 ),
-                                trailing: isCurrent ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary) : null,
+                                trailing: isCurrent
+                                    ? Icon(Icons.check,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary)
+                                    : null,
                                 onTap: () async {
                                   Navigator.pop(context);
                                   try {
                                     await ds.switchInventory(inv.id);
                                   } catch (e) {
                                     if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text(l10n.errorChangingInventory(e.toString()))),
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                            content: Text(
+                                                l10n.errorChangingInventory(
+                                                    e.toString()))),
                                       );
                                     }
                                   }
@@ -355,9 +394,6 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             },
           ),
-
-
-
         if (_viewMode == 'map')
           Expanded(
             child: CabinetMapView(
@@ -416,10 +452,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     shape: WidgetStatePropertyAll(
                       RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
-                        side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                        side: BorderSide(
+                            color: cs.outlineVariant.withValues(alpha: 0.5)),
                       ),
                     ),
-                    padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 10)),
+                    padding: const WidgetStatePropertyAll(
+                        EdgeInsets.symmetric(horizontal: 10)),
                   ),
                 ),
               ),
@@ -445,29 +483,36 @@ class _HomeScreenState extends State<HomeScreen> {
                 selectedCabinet: _cabinetFilter,
                 unassignedPos: _unassignedPosition,
                 onChanged: (tags, filters, cab, unassigned) => setState(() {
-                  _selectedTags   = tags;
+                  _selectedTags = tags;
                   _specialFilters = filters;
-                  _cabinetFilter  = cab;
+                  _cabinetFilter = cab;
                   _unassignedPosition = unassigned;
                 }),
               ),
             ]),
           ),
-
-          if (_selectedTags.isNotEmpty || _specialFilters.isNotEmpty || _cabinetFilter != null || _unassignedPosition)
+          if (_selectedTags.isNotEmpty ||
+              _specialFilters.isNotEmpty ||
+              _cabinetFilter != null ||
+              _unassignedPosition)
             SizedBox(
               height: 44,
               child: ListView(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 children: [
                   if (_unassignedPosition)
                     Padding(
                       padding: const EdgeInsets.only(right: 6),
                       child: InputChip(
-                        avatar: const Icon(Icons.location_off_outlined, size: 16),
-                        label: Text(l10n.filterUnassigned, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        onDeleted: () => setState(() => _unassignedPosition = false),
+                        avatar:
+                            const Icon(Icons.location_off_outlined, size: 16),
+                        label: Text(l10n.filterUnassigned,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.bold)),
+                        onDeleted: () =>
+                            setState(() => _unassignedPosition = false),
                       ),
                     ),
                   if (_cabinetFilter != null)
@@ -478,9 +523,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         label: Text(() {
                           final container = ds.settings.containers.firstWhere(
                             (c) => c.id == _cabinetFilter,
-                            orElse: () => ContainerConfig(id: _cabinetFilter!, name: '${l10n.cabinetContainer} $_cabinetFilter', rows: 4, columns: 6),
+                            orElse: () => ContainerConfig(
+                                id: _cabinetFilter!,
+                                name:
+                                    '${l10n.cabinetContainer} $_cabinetFilter',
+                                rows: 4,
+                                columns: 6),
                           );
-                          return container.name.isNotEmpty ? container.name : '${l10n.cabinetContainer} ${container.id}';
+                          return container.name.isNotEmpty
+                              ? container.name
+                              : '${l10n.cabinetContainer} ${container.id}';
                         }()),
                         onDeleted: () => setState(() => _cabinetFilter = null),
                       ),
@@ -490,21 +542,26 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: InputChip(
                           label: Text(t),
                           onDeleted: () => setState(() {
-                            final subtree = _findSubtree(t, ds.settings.tagTree);
-                            _removeNodeAndDescendants(t, subtree ?? {}, _selectedTags);
+                            final subtree =
+                                _findSubtree(t, ds.settings.tagTree);
+                            _removeNodeAndDescendants(
+                                t, subtree ?? {}, _selectedTags);
                           }),
                         ),
                       )),
                   ..._specialFilters.entries.map((e) {
                     final f = e.value;
-                    final st = ds.settings.specialTags.where((s) => s.name == e.key).firstOrNull;
+                    final st = ds.settings.specialTags
+                        .where((s) => s.name == e.key)
+                        .firstOrNull;
                     final unit = st?.unit ?? '';
                     String labelText = '${e.key}: ';
-                    
+
                     if (f.exact.isNotEmpty) {
                       labelText += _formatValueWithUnit(f.exact, unit);
                     } else if (f.min.isNotEmpty && f.max.isNotEmpty) {
-                      labelText += '${_formatValueWithUnit(f.min, unit)} - ${_formatValueWithUnit(f.max, unit)}';
+                      labelText +=
+                          '${_formatValueWithUnit(f.min, unit)} - ${_formatValueWithUnit(f.max, unit)}';
                     } else if (f.min.isNotEmpty) {
                       labelText += '>= ${_formatValueWithUnit(f.min, unit)}';
                     } else if (f.max.isNotEmpty) {
@@ -515,14 +572,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       padding: const EdgeInsets.only(right: 6),
                       child: InputChip(
                         label: Text(labelText),
-                        onDeleted: () => setState(() => _specialFilters.remove(e.key)),
+                        onDeleted: () =>
+                            setState(() => _specialFilters.remove(e.key)),
                       ),
                     );
                   }),
                 ],
               ),
             ),
-
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
             child: Row(
@@ -546,18 +603,23 @@ class _HomeScreenState extends State<HomeScreen> {
                   hasFilter
                       ? l10n.resultsCount(results.length)
                       : '${l10n.componentsCount(results.length)} · ${_sortLabel(l10n)}',
-                  style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: cs.onSurfaceVariant),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 4),
-
           Expanded(
             child: results.isEmpty
                 ? Center(
                     child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.search_off, size: 64, color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.4)),
+                      Icon(Icons.search_off,
+                          size: 64,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant
+                              .withValues(alpha: 0.4)),
                       const SizedBox(height: 12),
                       Text(l10n.noComponentsFound),
                     ]),
@@ -595,8 +657,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (conflict == null) return;
     final l10n = context.l10n;
 
-    String formatTs(DateTime? dt) => dt != null 
-        ? "${dt.day}/${dt.month} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}" 
+    String formatTs(DateTime? dt) => dt != null
+        ? "${dt.day}/${dt.month} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}"
         : l10n.none;
 
     final choice = await showDialog<bool>(
@@ -623,8 +685,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.useRemote)),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l10n.useLocal)),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n.useRemote)),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l10n.useLocal)),
         ],
       ),
     );
@@ -632,38 +698,49 @@ class _HomeScreenState extends State<HomeScreen> {
     if (choice != null) await ds.resolveConflict(choice);
   }
 
-  PopupMenuItem<String> _sortItem(String value, String label, IconData icon, bool isSelected) =>
+  PopupMenuItem<String> _sortItem(
+          String value, String label, IconData icon, bool isSelected) =>
       PopupMenuItem(
-        value: value, 
-        child: Row(children: [
-          Icon(icon, size: 20), 
-          const SizedBox(width: 8), 
-          Text(label), 
-          if (isSelected) ...[const Spacer(), const Icon(Icons.check, size: 18)]
-        ])
-      );
+          value: value,
+          child: Row(children: [
+            Icon(icon, size: 20),
+            const SizedBox(width: 8),
+            Text(label),
+            if (isSelected) ...[
+              const Spacer(),
+              const Icon(Icons.check, size: 18)
+            ]
+          ]));
 
   String _sortLabel(AppLocalizations l10n) {
     String label = '';
     if (_sortMode == SortMode.specialTag && _sortSpecialTag != null) {
       label = '${l10n.sortBy} $_sortSpecialTag';
     } else {
-      label = switch (_sortMode) { 
-        SortMode.name => l10n.sortName, 
-        SortMode.quantity => l10n.sortQuantity, 
-        SortMode.drawer => l10n.sortDrawer, 
-        _ => '' 
+      label = switch (_sortMode) {
+        SortMode.name => l10n.sortName,
+        SortMode.quantity => l10n.sortQuantity,
+        SortMode.drawer => l10n.sortDrawer,
+        _ => ''
       };
     }
-    return _sortAscending ? '$label (${l10n.sortAscending})' : '$label (${l10n.sortDescending})';
+    return _sortAscending
+        ? '$label (${l10n.sortAscending})'
+        : '$label (${l10n.sortDescending})';
   }
 
   Future<void> _addComponent(BuildContext context) async {
     final ds = context.read<DataService>();
-    final result = await showDialog<Component>(context: context, builder: (_) => ComponentDialog(settings: ds.settings));
+    final result = await showDialog<Component>(
+        context: context,
+        builder: (_) => ComponentDialog(settings: ds.settings));
     if (result != null) {
-      try { await ds.addComponent(result); } catch (e) {
-        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${context.l10n.error}: $e')));
+      try {
+        await ds.addComponent(result);
+      } catch (e) {
+        if (context.mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('${context.l10n.error}: $e')));
       }
     }
   }
@@ -684,45 +761,73 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _editComponent(BuildContext context, Component comp) async {
     final ds = context.read<DataService>();
-    final result = await showDialog<dynamic>(context: context, builder: (_) => ComponentDialog(existing: comp, settings: ds.settings));
-    
+    final result = await showDialog<dynamic>(
+        context: context,
+        builder: (_) => ComponentDialog(existing: comp, settings: ds.settings));
+
     if (result is Component) {
-      try { 
-        await ds.updateComponent(result); 
+      try {
+        await ds.updateComponent(result);
       } catch (e) {
-        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${context.l10n.error}: $e')));
+        if (context.mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('${context.l10n.error}: $e')));
       }
     } else if (result == 'DELETE') {
-      try { 
-        await ds.deleteComponent(comp.id); 
+      try {
+        await ds.deleteComponent(comp.id);
       } catch (e) {
-        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${context.l10n.error}: $e')));
+        if (context.mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('${context.l10n.error}: $e')));
       }
     }
   }
 
   Future<void> _duplicateComponent(BuildContext context, Component comp) async {
     final ds = context.read<DataService>();
-    final result = await showDialog<dynamic>(context: context, builder: (_) => ComponentDialog(existing: comp, settings: ds.settings, isDuplicate: true));
-    
+    final result = await showDialog<dynamic>(
+        context: context,
+        builder: (_) => ComponentDialog(
+            existing: comp, settings: ds.settings, isDuplicate: true));
+
     if (result is Component) {
-      try { 
-        await ds.addComponent(result); 
+      try {
+        await ds.addComponent(result);
       } catch (e) {
-        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${context.l10n.error}: $e')));
+        if (context.mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('${context.l10n.error}: $e')));
       }
     }
   }
 }
 
 class _ConflictOption extends StatelessWidget {
-  final IconData icon; final String title; final String subtitle;
-  const _ConflictOption({required this.icon, required this.title, required this.subtitle});
-  @override Widget build(BuildContext context) {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  const _ConflictOption(
+      {required this.icon, required this.title, required this.subtitle});
+  @override
+  Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(8)),
-      child: Row(children: [Icon(icon, color: cs.primary), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(fontWeight: FontWeight.bold)), Text(subtitle, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant))]))]),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8)),
+      child: Row(children: [
+        Icon(icon, color: cs.primary),
+        const SizedBox(width: 12),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(subtitle,
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant))
+        ]))
+      ]),
     );
   }
 }
@@ -754,8 +859,8 @@ class _ServerBanner extends StatelessWidget {
       onTap: (isConnected && inventoryCount > 1) ? onSwitchTap : null,
       child: Container(
         color: isConnected
-            ? Colors.green.withOpacity(0.1)
-            : cs.errorContainer.withOpacity(0.6),
+            ? Colors.green.withValues(alpha: 0.1)
+            : cs.errorContainer.withValues(alpha: 0.6),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         child: Row(children: [
           Icon(
@@ -785,7 +890,7 @@ class _ServerBanner extends StatelessWidget {
                     error ?? l10n.offlineUsingLocal,
                     style: TextStyle(
                         fontSize: 11,
-                        color: cs.onErrorContainer.withOpacity(0.7)),
+                        color: cs.onErrorContainer.withValues(alpha: 0.7)),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -802,7 +907,8 @@ class _ServerBanner extends StatelessWidget {
                 foregroundColor: Colors.green[800],
               ),
               icon: const Icon(Icons.swap_horiz, size: 14),
-              label: Text(l10n.switchButton, style: const TextStyle(fontSize: 11)),
+              label:
+                  Text(l10n.switchButton, style: const TextStyle(fontSize: 11)),
             ),
         ]),
       ),
@@ -816,12 +922,13 @@ class _FilterButton extends StatelessWidget {
   final Map<String, SpecialFilter> specialFilters;
   final int? selectedCabinet;
   final bool unassignedPos;
-  final void Function(List<String>, Map<String, SpecialFilter>, int?, bool) onChanged;
+  final void Function(List<String>, Map<String, SpecialFilter>, int?, bool)
+      onChanged;
 
   const _FilterButton({
-    required this.settings, 
-    required this.selectedTags, 
-    required this.specialFilters, 
+    required this.settings,
+    required this.selectedTags,
+    required this.specialFilters,
     required this.selectedCabinet,
     required this.unassignedPos,
     required this.onChanged,
@@ -838,7 +945,8 @@ class _FilterButton extends StatelessWidget {
     return null;
   }
 
-  void _removeNodeAndDescendants(String node, dynamic subtree, List<String> list) {
+  void _removeNodeAndDescendants(
+      String node, dynamic subtree, List<String> list) {
     list.remove(node);
     if (subtree is Map<String, dynamic>) {
       for (final k in subtree.keys) {
@@ -849,16 +957,28 @@ class _FilterButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final active = selectedTags.isNotEmpty || specialFilters.isNotEmpty || selectedCabinet != null || unassignedPos;
-    final cs     = Theme.of(context).colorScheme;
-    final l10n   = context.l10n;
-    final count  = selectedTags.length + specialFilters.length + (selectedCabinet != null ? 1 : 0) + (unassignedPos ? 1 : 0);
+    final active = selectedTags.isNotEmpty ||
+        specialFilters.isNotEmpty ||
+        selectedCabinet != null ||
+        unassignedPos;
+    final cs = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
+    final count = selectedTags.length +
+        specialFilters.length +
+        (selectedCabinet != null ? 1 : 0) +
+        (unassignedPos ? 1 : 0);
 
     return Badge(
-      isLabelVisible: active, label: Text('$count'),
+      isLabelVisible: active,
+      label: Text('$count'),
       child: IconButton.filled(
-        icon: const Icon(Icons.filter_list), tooltip: l10n.filterAll,
-        style: active ? null : IconButton.styleFrom(backgroundColor: cs.surfaceContainerHighest, foregroundColor: cs.onSurface),
+        icon: const Icon(Icons.filter_list),
+        tooltip: l10n.filterAll,
+        style: active
+            ? null
+            : IconButton.styleFrom(
+                backgroundColor: cs.surfaceContainerHighest,
+                foregroundColor: cs.onSurface),
         onPressed: () => _showFilterSheet(context),
       ),
     );
@@ -869,7 +989,7 @@ class _FilterButton extends StatelessWidget {
     List<String> tempTags = List.from(selectedTags);
     int? tempCabinet = selectedCabinet;
     bool tempUnassigned = unassignedPos;
-    
+
     // Configurazione controller per i range
     Map<String, Map<String, TextEditingController>> tempCtrls = {};
     for (final st in settings.specialTags) {
@@ -900,7 +1020,7 @@ class _FilterButton extends StatelessWidget {
 
     void applyFilters() {
       final activeFilters = <String, SpecialFilter>{};
-      tempCtrls.forEach((k, v) { 
+      tempCtrls.forEach((k, v) {
         final exact = v['exact']!.text.trim();
         final min = v['min']!.text.trim();
         final max = v['max']!.text.trim();
@@ -913,7 +1033,7 @@ class _FilterButton extends StatelessWidget {
     }
 
     showModalBottomSheet(
-      context: context, 
+      context: context,
       isScrollControlled: true,
       useSafeArea: true,
       builder: (ctx) => StatefulBuilder(
@@ -928,85 +1048,112 @@ class _FilterButton extends StatelessWidget {
           final sortedLoose = List<String>.from(settings.availableTags)..sort();
 
           return DraggableScrollableSheet(
-            initialChildSize: 1.0, minChildSize: 0.5, maxChildSize: 1.0, expand: false,
+            initialChildSize: 1.0,
+            minChildSize: 0.5,
+            maxChildSize: 1.0,
+            expand: false,
             builder: (_, sc) => Padding(
               padding: const EdgeInsets.all(20),
               child: Column(children: [
-                Container(width: 40, height: 4, decoration: BoxDecoration(color: cs.onSurfaceVariant.withOpacity(0.3), borderRadius: BorderRadius.circular(2))),
+                Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(2))),
                 const SizedBox(height: 16),
-                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  Text(l10n.filterAll, style: Theme.of(ctx2).textTheme.titleMedium),
-                  TextButton(
-                    onPressed: () => setSt(() { 
-                      tempTags.clear(); 
-                      treePath.clear(); 
-                      tempCabinet = null;
-                      tempUnassigned = false;
-                      for (final grp in tempCtrls.values) {
-                        grp['exact']!.clear();
-                        grp['min']!.clear();
-                        grp['max']!.clear();
-                      }
-                    }),
-                    child: Text(l10n.filterRemoveAll),
-                  ),
-                ]),
+                Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(l10n.filterAll,
+                          style: Theme.of(ctx2).textTheme.titleMedium),
+                      TextButton(
+                        onPressed: () => setSt(() {
+                          tempTags.clear();
+                          treePath.clear();
+                          tempCabinet = null;
+                          tempUnassigned = false;
+                          for (final grp in tempCtrls.values) {
+                            grp['exact']!.clear();
+                            grp['min']!.clear();
+                            grp['max']!.clear();
+                          }
+                        }),
+                        child: Text(l10n.filterRemoveAll),
+                      ),
+                    ]),
                 Expanded(
                   child: ListView(controller: sc, children: [
-                    
                     SwitchListTile(
-                      title: Text(l10n.filterOnlyUnassigned, style: const TextStyle(fontWeight: FontWeight.w500)),
+                      title: Text(l10n.filterOnlyUnassigned,
+                          style: const TextStyle(fontWeight: FontWeight.w500)),
                       subtitle: Text(l10n.filterOnlyUnassignedDesc),
                       value: tempUnassigned,
                       onChanged: (v) => setSt(() => tempUnassigned = v),
                       contentPadding: EdgeInsets.zero,
                     ),
                     const Divider(),
-
                     if (tempTags.isNotEmpty || tempCabinet != null) ...[
                       const SizedBox(height: 8),
-                      Text(l10n.quickTags, style: Theme.of(ctx2).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+                      Text(l10n.quickTags,
+                          style: Theme.of(ctx2)
+                              .textTheme
+                              .labelSmall
+                              ?.copyWith(color: cs.onSurfaceVariant)),
                       const SizedBox(height: 4),
                       Wrap(
-                        spacing: 6, runSpacing: 10,
+                        spacing: 6,
+                        runSpacing: 10,
                         children: [
                           if (tempCabinet != null)
                             InputChip(
-                              avatar: const Icon(Icons.kitchen_outlined, size: 16),
-                              label: Text('N° $tempCabinet', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              avatar:
+                                  const Icon(Icons.kitchen_outlined, size: 16),
+                              label: Text('N° $tempCabinet',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold)),
                               backgroundColor: cs.primaryContainer,
                               onDeleted: () => setSt(() => tempCabinet = null),
                             ),
                           ...tempTags.map((tag) => InputChip(
-                            label: Text(tag, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            backgroundColor: cs.primaryContainer,
-                            onDeleted: () => setSt(() {
-                              final subtree = _findSubtree(tag, settings.tagTree);
-                              _removeNodeAndDescendants(tag, subtree ?? {}, tempTags);
-                              final idx = treePath.indexOf(tag);
-                              if (idx != -1) treePath = treePath.sublist(0, idx);
-                            }),
-                          )),
+                                label: Text(tag,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold)),
+                                backgroundColor: cs.primaryContainer,
+                                onDeleted: () => setSt(() {
+                                  final subtree =
+                                      _findSubtree(tag, settings.tagTree);
+                                  _removeNodeAndDescendants(
+                                      tag, subtree ?? {}, tempTags);
+                                  final idx = treePath.indexOf(tag);
+                                  if (idx != -1)
+                                    treePath = treePath.sublist(0, idx);
+                                }),
+                              )),
                         ],
                       ),
                       const SizedBox(height: 8),
                       const Divider(),
                     ],
-
                     if (settings.containers.length > 1) ...[
                       const SizedBox(height: 12),
-                      Text(l10n.cabinetContainer, style: Theme.of(ctx2).textTheme.labelLarge),
+                      Text(l10n.cabinetContainer,
+                          style: Theme.of(ctx2).textTheme.labelLarge),
                       const SizedBox(height: 8),
                       Wrap(
-                        spacing: 8, runSpacing: 8,
+                        spacing: 8,
+                        runSpacing: 8,
                         children: settings.containers.map((container) {
-                          final labelText = container.name.isNotEmpty ? container.name : '${l10n.cabinetContainer} ${container.id}';
+                          final labelText = container.name.isNotEmpty
+                              ? container.name
+                              : '${l10n.cabinetContainer} ${container.id}';
                           return ChoiceChip(
                             label: Text(labelText),
                             selected: tempCabinet == container.id,
                             selectedColor: cs.primaryContainer,
                             onSelected: (val) {
-                              setSt(() => tempCabinet = val ? container.id : null);
+                              setSt(() =>
+                                  tempCabinet = val ? container.id : null);
                             },
                           );
                         }).toList(),
@@ -1014,32 +1161,48 @@ class _FilterButton extends StatelessWidget {
                       const SizedBox(height: 12),
                       const Divider(),
                     ],
-
                     if (settings.tagTree.isNotEmpty) ...[
                       const SizedBox(height: 12),
-                      Text(l10n.navigateTagTree, style: Theme.of(ctx2).textTheme.labelLarge),
+                      Text(l10n.navigateTagTree,
+                          style: Theme.of(ctx2).textTheme.labelLarge),
                       const SizedBox(height: 8),
                       Container(
-                        width: double.infinity, padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                        decoration: BoxDecoration(color: cs.surfaceContainerHighest.withOpacity(0.5), borderRadius: BorderRadius.circular(6)),
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 6),
+                        decoration: BoxDecoration(
+                            color: cs.surfaceContainerHighest
+                                .withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(6)),
                         child: Wrap(
-                          crossAxisAlignment: WrapCrossAlignment.center, spacing: 4, runSpacing: 4,
-                          children: [
-                            ActionChip(label: Text(l10n.tagTreeRoot), avatar: const Icon(Icons.home, size: 16), onPressed: () => setSt(() => treePath.clear())),
-                            for (int i = 0; i < treePath.length; i++) ...[
-                              const Icon(Icons.chevron_right, size: 16),
-                              ActionChip(label: Text(treePath[i]), onPressed: () => setSt(() => treePath = treePath.sublist(0, i + 1))),
-                            ]
-                          ]
-                        ),
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 4,
+                            runSpacing: 4,
+                            children: [
+                              ActionChip(
+                                  label: Text(l10n.tagTreeRoot),
+                                  avatar: const Icon(Icons.home, size: 16),
+                                  onPressed: () =>
+                                      setSt(() => treePath.clear())),
+                              for (int i = 0; i < treePath.length; i++) ...[
+                                const Icon(Icons.chevron_right, size: 16),
+                                ActionChip(
+                                    label: Text(treePath[i]),
+                                    onPressed: () => setSt(() =>
+                                        treePath = treePath.sublist(0, i + 1))),
+                              ]
+                            ]),
                       ),
                       const SizedBox(height: 12),
-
                       if (sortedCurrentLevel.isEmpty)
-                        Text(l10n.noSubtags, style: TextStyle(fontStyle: FontStyle.italic, color: cs.onSurfaceVariant))
+                        Text(l10n.noSubtags,
+                            style: TextStyle(
+                                fontStyle: FontStyle.italic,
+                                color: cs.onSurfaceVariant))
                       else
                         Wrap(
-                          spacing: 8, runSpacing: 12,
+                          spacing: 8,
+                          runSpacing: 12,
                           children: sortedCurrentLevel.map((t) {
                             final isSelected = tempTags.contains(t);
                             return ChoiceChip(
@@ -1049,10 +1212,12 @@ class _FilterButton extends StatelessWidget {
                               onSelected: (sel) {
                                 if (!sel) return;
                                 setSt(() {
-                                  final siblings = sortedCurrentLevel.where((k) => k != t);
+                                  final siblings =
+                                      sortedCurrentLevel.where((k) => k != t);
                                   for (final s in siblings) {
                                     if (tempTags.contains(s)) {
-                                      _removeNodeAndDescendants(s, currentTreeLevel[s], tempTags);
+                                      _removeNodeAndDescendants(
+                                          s, currentTreeLevel[s], tempTags);
                                     }
                                   }
                                   if (!tempTags.contains(t)) tempTags.add(t);
@@ -1063,55 +1228,70 @@ class _FilterButton extends StatelessWidget {
                           }).toList(),
                         ),
                     ],
-
                     if (sortedLoose.isNotEmpty) ...[
                       const SizedBox(height: 16),
                       TextButton.icon(
-                        icon: Icon(showLooseTags ? Icons.expand_less : Icons.expand_more),
+                        icon: Icon(showLooseTags
+                            ? Icons.expand_less
+                            : Icons.expand_more),
                         label: Text(l10n.showGenericTags),
-                        onPressed: () => setSt(() => showLooseTags = !showLooseTags),
+                        onPressed: () =>
+                            setSt(() => showLooseTags = !showLooseTags),
                       ),
                       if (showLooseTags) ...[
                         const SizedBox(height: 8),
                         Wrap(
-                          spacing: 8, runSpacing: 12,
+                          spacing: 8,
+                          runSpacing: 12,
                           children: sortedLoose.map((tag) {
                             final sel = tempTags.contains(tag);
                             return FilterChip(
-                              label: Text(tag), selected: sel, selectedColor: cs.primaryContainer, backgroundColor: cs.surfaceContainerHighest,
-                              onSelected: (v) => setSt(() => v ? tempTags.add(tag) : tempTags.remove(tag)),
+                              label: Text(tag),
+                              selected: sel,
+                              selectedColor: cs.primaryContainer,
+                              backgroundColor: cs.surfaceContainerHighest,
+                              onSelected: (v) => setSt(() =>
+                                  v ? tempTags.add(tag) : tempTags.remove(tag)),
                             );
                           }).toList(),
                         ),
                       ],
                     ],
-
                     if (settings.specialTags.isNotEmpty) ...[
                       const SizedBox(height: 20),
-                      Text(l10n.propertyFilters, style: Theme.of(ctx2).textTheme.labelLarge),
+                      Text(l10n.propertyFilters,
+                          style: Theme.of(ctx2).textTheme.labelLarge),
                       ...settings.specialTags.map((st) {
                         final grp = tempCtrls[st.name]!;
                         final unit = st.unit.isNotEmpty ? ' (${st.unit})' : '';
-                        
+
                         return Padding(
                           padding: const EdgeInsets.only(top: 16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('${st.name}$unit', style: const TextStyle(fontWeight: FontWeight.w500)),
+                              Text('${st.name}$unit',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w500)),
                               const SizedBox(height: 8),
                               if (st.isString)
                                 TextField(
                                   controller: grp['exact'],
                                   textInputAction: TextInputAction.done,
-                                  decoration: InputDecoration(labelText: l10n.containsText, border: const OutlineInputBorder(), isDense: true),
+                                  decoration: InputDecoration(
+                                      labelText: l10n.containsText,
+                                      border: const OutlineInputBorder(),
+                                      isDense: true),
                                   onSubmitted: (_) => applyFilters(),
                                 )
                               else ...[
                                 TextField(
                                   controller: grp['exact'],
                                   textInputAction: TextInputAction.next,
-                                  decoration: InputDecoration(labelText: l10n.exactValue, border: const OutlineInputBorder(), isDense: true),
+                                  decoration: InputDecoration(
+                                      labelText: l10n.exactValue,
+                                      border: const OutlineInputBorder(),
+                                      isDense: true),
                                   onSubmitted: (_) => applyFilters(),
                                 ),
                                 const SizedBox(height: 8),
@@ -1121,7 +1301,10 @@ class _FilterButton extends StatelessWidget {
                                       child: TextField(
                                         controller: grp['min'],
                                         textInputAction: TextInputAction.next,
-                                        decoration: InputDecoration(labelText: l10n.fromMin, border: const OutlineInputBorder(), isDense: true),
+                                        decoration: InputDecoration(
+                                            labelText: l10n.fromMin,
+                                            border: const OutlineInputBorder(),
+                                            isDense: true),
                                         onSubmitted: (_) => applyFilters(),
                                       ),
                                     ),
@@ -1130,7 +1313,10 @@ class _FilterButton extends StatelessWidget {
                                       child: TextField(
                                         controller: grp['max'],
                                         textInputAction: TextInputAction.done,
-                                        decoration: InputDecoration(labelText: l10n.toMax, border: const OutlineInputBorder(), isDense: true),
+                                        decoration: InputDecoration(
+                                            labelText: l10n.toMax,
+                                            border: const OutlineInputBorder(),
+                                            isDense: true),
                                         onSubmitted: (_) => applyFilters(),
                                       ),
                                     ),

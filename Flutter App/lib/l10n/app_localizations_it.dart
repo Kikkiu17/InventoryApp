@@ -292,6 +292,11 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get serverUrl => 'Indirizzo server';
   @override
+  String get trustSelfSignedCertificates => 'Accetta certificati autofirmati';
+  @override
+  String get trustSelfSignedCertificatesDesc =>
+      'Consenti connessioni HTTPS con certificati SSL/TLS autofirmati o non verificati (consigliato per server locali)';
+  @override
   String get testConnection => 'Test connessione';
   @override
   String get connectionSuccess => 'Connessione stabilita con successo!';

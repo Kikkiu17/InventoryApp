@@ -20,3 +20,8 @@
 # Editor backups
 *~
 *.swp
+
+/Server/inventory_server
+*.pem
+*.key
+*.crt

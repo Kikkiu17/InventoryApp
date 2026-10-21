@@ -65,9 +65,16 @@ class ComponentTile extends StatelessWidget {
                         : () {
                             final container = settings.containers.firstWhere(
                               (c) => c.id == component.cabinet,
-                              orElse: () => ContainerConfig(id: component.cabinet, name: context.l10n.containerNumber(component.cabinet), rows: 4, columns: 6),
+                              orElse: () => ContainerConfig(
+                                  id: component.cabinet,
+                                  name: context.l10n
+                                      .containerNumber(component.cabinet),
+                                  rows: 4,
+                                  columns: 6),
                             );
-                            return container.name.isNotEmpty ? container.name : context.l10n.containerNumber(container.id);
+                            return container.name.isNotEmpty
+                                ? container.name
+                                : context.l10n.containerNumber(container.id);
                           }(),
                     child: Container(
                       width: 52,
@@ -151,7 +158,8 @@ class ComponentTile extends StatelessWidget {
                         child: SizedBox(
                           width: 56,
                           height: 56,
-                          child: _buildImageWidget(context, component.images.first),
+                          child: _buildImageWidget(
+                              context, component.images.first),
                         ),
                       ),
                     ),
@@ -197,7 +205,8 @@ class ComponentTile extends StatelessWidget {
                               .where((s) => s.name == e.key)
                               .firstOrNull;
                           final unit = st?.unit ?? '';
-                          final formattedLabel = _formatValueWithUnit(e.value, unit);
+                          final formattedLabel =
+                              _formatValueWithUnit(e.value, unit);
                           return _TagChip(
                             label: '${e.key}: $formattedLabel',
                             special: true,
@@ -255,7 +264,8 @@ class ComponentTile extends StatelessWidget {
         fit: BoxFit.cover,
         errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image),
       );
-    } else if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    } else if (imagePath.startsWith('http://') ||
+        imagePath.startsWith('https://')) {
       return Image.network(
         imagePath,
         fit: BoxFit.cover,
@@ -375,7 +385,7 @@ class _QuantityControl extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: cs.outline.withOpacity(0.3)),
+        border: Border.all(color: cs.outline.withValues(alpha: 0.3)),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
@@ -386,7 +396,8 @@ class _QuantityControl extends StatelessWidget {
             width: 36,
             child: Text('$quantity',
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                style:
+                    const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
           ),
           _QBtn(icon: Icons.add, onTap: onIncrement),
         ],

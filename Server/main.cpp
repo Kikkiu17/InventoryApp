@@ -14,6 +14,8 @@
 #include <regex>
 #include <optional>
 #include <unordered_map>
+#include <iostream>
+#include <cstdlib>
 
 using json = nlohmann::json;
 namespace fs = std::filesystem;
@@ -359,19 +361,152 @@ struct CORS {
     void before_handle(crow::request&, crow::response& res, context&) {
         res.add_header("Access-Control-Allow-Origin",  "*");
         res.add_header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-        res.add_header("Access-Control-Allow-Headers", "Content-Type");
+        res.add_header("Access-Control-Allow-Headers", "Content-Type, X-Filename, Authorization");
+        res.add_header("Access-Control-Expose-Headers", "X-Last-Updated, Content-Disposition");
     }
-    void after_handle(crow::request&, crow::response& res, context&) { res.add_header("Access-Control-Allow-Origin", "*"); }
+    void after_handle(crow::request&, crow::response& res, context&) {
+        res.add_header("Access-Control-Allow-Origin", "*");
+        res.add_header("Access-Control-Expose-Headers", "X-Last-Updated, Content-Disposition");
+    }
 };
+
+bool generate_self_signed_cert(const std::string& cert_path, const std::string& key_path) {
+    std::cout << "[HTTPS] Generazione certificato autofirmato in corso..." << std::endl;
+    std::string cmd = "openssl req -x509 -newkey rsa:2048 -nodes -keyout \"" + key_path +
+                      "\" -out \"" + cert_path + "\" -days 365 -subj \"/CN=InventoryServer\" 2>/dev/null";
+    int ret = std::system(cmd.c_str());
+    if (ret == 0 && fs::exists(cert_path) && fs::exists(key_path)) {
+        std::cout << "[HTTPS] Certificato autofirmato generato con successo:\n"
+                  << "        Certificato: " << cert_path << "\n"
+                  << "        Chiave:      " << key_path << std::endl;
+        return true;
+    }
+    std::cerr << "[HTTPS] ERRORE: Impossibile generare il certificato autofirmato con openssl." << std::endl;
+    return false;
+}
+
+void print_help(const char* prog) {
+    std::cout << "Uso: " << prog << " [porta] [data_dir] [opzioni]\n\n"
+              << "Argomenti posizionali:\n"
+              << "  porta               Porta di ascolto (default: 8080)\n"
+              << "  data_dir            Cartella dati/inventari (default: inventories)\n"
+              << "  cert.pem key.pem    File certificato e chiave SSL per HTTPS (opzionale)\n\n"
+              << "Opzioni HTTPS:\n"
+              << "  --ssl <cert> <key>  Abilita HTTPS con il certificato e la chiave specificati\n"
+              << "  --ssl-cert <cert>   Percorso del file certificato SSL (.pem o .crt)\n"
+              << "  --ssl-key <key>     Percorso del file chiave privata SSL (.pem o .key)\n"
+              << "  --generate-cert     Genera cert.pem e key.pem autofirmati se mancanti e avvia in HTTPS\n"
+              << "  --help, -h          Mostra questo messaggio di aiuto\n\n"
+              << "Variabili d'ambiente:\n"
+              << "  SSL_CERT            Percorso del certificato SSL\n"
+              << "  SSL_KEY             Percorso della chiave privata SSL\n"
+              << std::endl;
+}
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 int main(int argc, char* argv[]) {
     uint16_t port = 8080;
-    if (argc >= 2) port = static_cast<uint16_t>(std::stoi(argv[1]));
-    if (argc >= 3) DATA_DIR = argv[2];
+    std::string ssl_cert = "";
+    std::string ssl_key = "";
+    bool auto_ssl = false;
+    std::vector<std::string> positional;
+
+    if (const char* env_cert = std::getenv("SSL_CERT")) ssl_cert = env_cert;
+    if (const char* env_key  = std::getenv("SSL_KEY"))  ssl_key  = env_key;
+
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--help" || arg == "-h") {
+            print_help(argv[0]);
+            return 0;
+        } else if (arg == "--generate-cert" || arg == "--ssl-auto") {
+            auto_ssl = true;
+        } else if (arg == "--ssl") {
+            if (i + 2 < argc && argv[i + 1][0] != '-' && argv[i + 2][0] != '-') {
+                ssl_cert = argv[++i];
+                ssl_key  = argv[++i];
+            } else {
+                auto_ssl = true;
+            }
+        } else if (arg == "--ssl-cert") {
+            if (i + 1 < argc) ssl_cert = argv[++i];
+        } else if (arg == "--ssl-key") {
+            if (i + 1 < argc) ssl_key = argv[++i];
+        } else if (arg.rfind("--", 0) == 0) {
+            std::cerr << "Opzione sconosciuta: " << arg << std::endl;
+            print_help(argv[0]);
+            return 1;
+        } else {
+            positional.push_back(arg);
+        }
+    }
+
+    if (positional.size() >= 1) {
+        try {
+            port = static_cast<uint16_t>(std::stoi(positional[0]));
+        } catch (...) {
+            std::cerr << "ERRORE: Porta non valida: " << positional[0] << std::endl;
+            print_help(argv[0]);
+            return 1;
+        }
+    }
+    if (positional.size() == 3 && ssl_cert.empty() && ssl_key.empty()) {
+        auto has_ext = [](const std::string& s, const std::string& ext) {
+            return s.size() >= ext.size() && s.compare(s.size() - ext.size(), ext.size(), ext) == 0;
+        };
+        if ((has_ext(positional[1], ".pem") || has_ext(positional[1], ".crt")) &&
+            (has_ext(positional[2], ".pem") || has_ext(positional[2], ".key"))) {
+            ssl_cert = positional[1];
+            ssl_key  = positional[2];
+        } else {
+            DATA_DIR = positional[1];
+        }
+    } else {
+        if (positional.size() >= 2) {
+            DATA_DIR = positional[1];
+        }
+        if (positional.size() >= 4 && ssl_cert.empty() && ssl_key.empty()) {
+            ssl_cert = positional[2];
+            ssl_key  = positional[3];
+        }
+    }
 
     fs::create_directories(DATA_DIR);
     fs::create_directories(DATA_DIR + "/backups");
+
+    bool use_ssl = false;
+    if (!ssl_cert.empty() || !ssl_key.empty() || auto_ssl) {
+        use_ssl = true;
+        if (auto_ssl && (ssl_cert.empty() || ssl_key.empty())) {
+            std::string def_cert = DATA_DIR + "/cert.pem";
+            std::string def_key  = DATA_DIR + "/key.pem";
+            if (!fs::exists(def_cert) || !fs::exists(def_key)) {
+                if (fs::exists("cert.pem") && fs::exists("key.pem")) {
+                    def_cert = "cert.pem";
+                    def_key  = "key.pem";
+                } else {
+                    if (!generate_self_signed_cert(def_cert, def_key)) {
+                        return 1;
+                    }
+                }
+            }
+            ssl_cert = def_cert;
+            ssl_key  = def_key;
+        }
+
+        if (ssl_cert.empty() || ssl_key.empty()) {
+            std::cerr << "ERRORE: Per abilitare HTTPS devi specificare sia il certificato (--ssl-cert) che la chiave (--ssl-key)." << std::endl;
+            return 1;
+        }
+        if (!fs::exists(ssl_cert)) {
+            std::cerr << "ERRORE: File certificato SSL non trovato: " << ssl_cert << std::endl;
+            return 1;
+        }
+        if (!fs::exists(ssl_key)) {
+            std::cerr << "ERRORE: File chiave SSL non trovato: " << ssl_key << std::endl;
+            return 1;
+        }
+    }
 
     crow::App<CORS> app;
 
@@ -379,7 +514,14 @@ int main(int argc, char* argv[]) {
     ([](const crow::request&, crow::response& res, const std::string&) { res.code = 204; res.end(); });
 
     CROW_ROUTE(app, "/api/status").methods("GET"_method)
-    ([]() { return json_ok({{"status","ok"},{"server","inventory-multi"},{"version","2.0"}}); });
+    ([use_ssl]() {
+        return json_ok({
+            {"status", "ok"},
+            {"server", "inventory-multi"},
+            {"version", "2.0"},
+            {"https", use_ssl}
+        });
+    });
 
     // ── Backups ──
     CROW_ROUTE(app, "/api/inventories/<string>/backups").methods("GET"_method)
@@ -834,6 +976,28 @@ int main(int argc, char* argv[]) {
             return json_ok({{"backed_up", true}});
         } catch (const std::exception& e) { return json_err(e.what()); }
     });
+
+    if (use_ssl) {
+#ifdef CROW_ENABLE_SSL
+        app.ssl_file(ssl_cert, ssl_key);
+        std::cout << "=========================================" << std::endl;
+        std::cout << "  Inventory Server avviato in modalita' HTTPS" << std::endl;
+        std::cout << "  Porta:       " << port << std::endl;
+        std::cout << "  Certificato: " << ssl_cert << std::endl;
+        std::cout << "  Chiave:      " << ssl_key << std::endl;
+        std::cout << "  URL:         https://0.0.0.0:" << port << std::endl;
+        std::cout << "=========================================" << std::endl;
+#else
+        std::cerr << "ERRORE: Il server e' stato compilato senza supporto OpenSSL (CROW_ENABLE_SSL non definito)." << std::endl;
+        return 1;
+#endif
+    } else {
+        std::cout << "=========================================" << std::endl;
+        std::cout << "  Inventory Server avviato in modalita' HTTP" << std::endl;
+        std::cout << "  Porta:       " << port << std::endl;
+        std::cout << "  URL:         http://0.0.0.0:" << port << std::endl;
+        std::cout << "=========================================" << std::endl;
+    }
 
     app.port(port).multithreaded().run();
     return 0;

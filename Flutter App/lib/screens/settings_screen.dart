@@ -808,7 +808,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     controller: _serverUrlCtrl,
                     decoration: InputDecoration(
                       border: const OutlineInputBorder(),
-                      hintText: 'http://192.168.1.2:8080',
+                      hintText: 'https://192.168.1.2:8443',
                       isDense: true,
                       suffixIcon: _serverOk == null
                           ? null
@@ -831,7 +831,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     : FilledButton.tonal(
                         onPressed: _testServer, child: Text(l10n.check)),
               ]),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(l10n.trustSelfSignedCertificates),
+                subtitle: Text(
+                  l10n.trustSelfSignedCertificatesDesc,
+                  style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                ),
+                value: ds.trustSelfSigned,
+                onChanged: (val) async {
+                  await ds.setTrustSelfSigned(val);
+                },
+              ),
+              const SizedBox(height: 8),
               SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
@@ -1646,11 +1659,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _testServer() async {
     final l10n = context.l10n;
+    final ds = context.read<DataService>();
     setState(() {
       _testingServer = true;
       _serverOk = null;
     });
-    final ok = await ApiClient(_serverUrlCtrl.text.trim()).ping();
+    final client = ApiClient(
+      _serverUrlCtrl.text.trim(),
+      allowSelfSigned: ds.trustSelfSigned,
+    );
+    final ok = await client.ping();
+    client.close();
     setState(() {
       _testingServer = false;
       _serverOk = ok;
@@ -1663,8 +1682,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _applyServer() async {
     final url = _serverUrlCtrl.text.trim();
     if (url.isEmpty) return;
-    final ok = await context.read<DataService>().setServerUrl(url);
-    setState(() => _serverOk = ok);
+    final ds = context.read<DataService>();
+    final ok = await ds.setServerUrl(url);
+    setState(() {
+      _serverOk = ok;
+      _serverUrlCtrl.text = ds.serverUrl;
+    });
   }
 
   void _addTag() {

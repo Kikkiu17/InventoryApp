@@ -5,9 +5,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/inventario
-ExecStart=/home/pi/inventario/inventory_server 8080 /home/pi/inventario/inventories
+User=kik
+WorkingDirectory=/home/kik/inventario
+ExecStart=/home/kik/inventario/inventory_server 8443 /home/kik/inventario/inventories --generate-cert
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal

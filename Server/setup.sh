@@ -15,6 +15,7 @@ sudo apt-get install -y -qq \
     build-essential \
     cmake \
     libssl-dev \
+    libasio-dev \
     zlib1g-dev \
     wget \
     curl
@@ -47,9 +48,12 @@ echo ""
 echo "========================================="
 echo "  Compilazione completata!"
 echo ""
-echo "  Avvio:  ./inventory_server"
-echo "          ./inventory_server 8080"
-echo "          ./inventory_server 8080 /path/to/db.json"
+echo "  Avvio HTTP:   ./inventory_server"
+echo "                ./inventory_server 8080"
+echo "                ./inventory_server 8080 /path/to/db"
+echo ""
+echo "  Avvio HTTPS:  ./inventory_server 8443 /path/to/db --ssl cert.pem key.pem"
+echo "                ./inventory_server 8443 /path/to/db --generate-cert"
 echo ""
 echo "  Per avviare come servizio systemd:"
 echo "    sudo cp inventory.service /etc/systemd/system/"

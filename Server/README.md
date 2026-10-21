@@ -1,7 +1,8 @@
 # Inventory Server
 
 Server REST in C++ (Crow + nlohmann/json) per l'app Inventario Componenti.  
-Progettato per girare su Raspberry Pi, ma funziona su qualsiasi Linux.
+Progettato per girare su Raspberry Pi, ma funziona su qualsiasi Linux.  
+Supporta connessioni sia **HTTP** che **HTTPS** (TLS/SSL).
 
 ## Setup rapido
 
@@ -10,20 +11,73 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
-Lo script installa le dipendenze, scarica i due header-only (Crow e nlohmann/json) e compila.
+Lo script installa le dipendenze (`build-essential`, `cmake`, `libssl-dev`, `libasio-dev`, `zlib1g-dev`), scarica gli header necessari e compila l'eseguibile.
 
-## Avvio manuale
+## Avvio del server
+
+### Modalità HTTP (porta di default 8080)
+```bash
+./inventory_server                                # porta 8080, cartella dati "inventories"
+./inventory_server 9090                           # porta personalizzata
+./inventory_server 8080 /data/inventories         # path dati personalizzato
+```
+
+### Modalità HTTPS
+È possibile avviare il server in HTTPS fornendo un certificato SSL e una chiave privata (.pem o .crt/.key):
 
 ```bash
-./inventory_server                          # porta 8080, db locale
-./inventory_server 9090                     # porta diversa
-./inventory_server 8080 /data/inventory.json  # path DB personalizzato
+# Avvio con certificato e chiave esistenti
+./inventory_server 8443 /data/inventories --ssl cert.pem key.pem
+
+# Oppure tramite argomenti posizionali
+./inventory_server 8443 /data/inventories cert.pem key.pem
+
+# Generazione automatica di un certificato autofirmato (se assente) e avvio immediato
+./inventory_server 8443 /data/inventories --generate-cert
+
+# Tramite variabili d'ambiente
+export SSL_CERT=/path/to/cert.pem
+export SSL_KEY=/path/to/key.pem
+./inventory_server 8443 /data/inventories
+```
+
+### Come creare manualmente un certificato autofirmato con OpenSSL
+
+```bash
+openssl req -x509 -newkey rsa:2048 -nodes \
+  -keyout key.pem \
+  -out cert.pem \
+  -days 365 \
+  -subj "/CN=InventoryServer"
+```
+
+## Opzioni da riga di comando
+
+```
+Uso: ./inventory_server [porta] [data_dir] [opzioni]
+
+Argomenti posizionali:
+  porta               Porta di ascolto (default: 8080)
+  data_dir            Cartella dati/inventari (default: inventories)
+  cert.pem key.pem    File certificato e chiave SSL (opzionali)
+
+Opzioni HTTPS:
+  --ssl <cert> <key>  Abilita HTTPS con certificato e chiave specificati
+  --ssl-cert <cert>   Percorso del file certificato SSL (.pem o .crt)
+  --ssl-key <key>     Percorso del file chiave privata SSL (.pem o .key)
+  --generate-cert     Genera cert.pem e key.pem autofirmati se mancanti e avvia in HTTPS
+  --help, -h          Mostra la guida
 ```
 
 ## Avvio automatico (systemd)
 
+Modifica `inventory.service` se desideri eseguire in HTTPS:
+```ini
+ExecStart=/home/pi/inventario/inventory_server 8443 /home/pi/inventario/inventories --ssl /home/pi/inventario/cert.pem /home/pi/inventario/key.pem
+```
+
+Installazione del servizio:
 ```bash
-# Modifica inventory.service se l'utente non è "pi"
 sudo cp inventory.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now inventory
@@ -34,56 +88,46 @@ sudo systemctl status inventory
 
 | Metodo | Endpoint | Descrizione |
 |--------|----------|-------------|
-| GET | `/api/status` | Ping/stato server |
-| GET | `/api/components` | Lista tutti i componenti |
-| POST | `/api/components` | Crea componente |
-| GET | `/api/components/:id` | Dettaglio componente |
-| PUT | `/api/components/:id` | Aggiorna componente |
-| PATCH | `/api/components/:id/quantity` | Aggiorna quantità |
-| DELETE | `/api/components/:id` | Elimina componente |
-| GET | `/api/settings` | Leggi impostazioni |
-| PUT | `/api/settings` | Salva impostazioni |
-| GET | `/api/db` | Scarica intero database |
-| POST | `/api/db` | Carica/sovrascrive database |
+| GET | `/api/status` | Ping/stato server (restituisce anche `"https": true/false`) |
+| GET | `/api/inventories` | Lista tutti gli inventari |
+| POST | `/api/inventories` | Crea nuovo inventario |
+| PUT | `/api/inventories/:id` | Rinomina/aggiorna inventario |
+| DELETE | `/api/inventories/:id` | Elimina inventario |
+| GET | `/api/inventories/:id/components` | Lista componenti inventario |
+| POST | `/api/inventories/:id/components` | Crea componente |
+| PUT | `/api/inventories/:id/components/:cid` | Aggiorna componente |
+| PATCH | `/api/inventories/:id/components/:cid/quantity` | Aggiorna quantità (+/- delta) |
+| DELETE | `/api/inventories/:id/components/:cid` | Elimina componente |
+| POST | `/api/inventories/:id/components/:cid/move` | Sposta componente in altro inventario |
+| GET | `/api/inventories/:id/settings` | Leggi impostazioni inventario |
+| PUT | `/api/inventories/:id/settings` | Salva impostazioni inventario |
+| GET | `/api/inventories/:id/db` | Scarica backup JSON |
+| POST | `/api/inventories/:id/db` | Carica/ripristina DB |
+| GET | `/api/inventories/:id/backups` | Lista snapshot automatici |
+| POST | `/api/inventories/:id/backup` | Crea snapshot manuale |
+| POST | `/api/inventories/:id/backups/:fn/restore` | Ripristina snapshot |
+| POST | `/api/inventories/:id/attachments` | Carica allegato |
+| GET | `/api/inventories/:id/attachments/:fn` | Scarica allegato |
+| DELETE | `/api/inventories/:id/attachments/:fn` | Elimina allegato |
+| GET | `/api/search?q=...` | Ricerca globale su tutti gli inventari |
 
 ### Esempi curl
 
 ```bash
-# Stato server
-curl http://192.168.1.2:8080/api/status
+# Verifica stato in HTTPS (con -k per accettare certificati autofirmati)
+curl -k https://192.168.1.2:8443/api/status
 
-# Lista componenti
-curl http://192.168.1.2:8080/api/components
+# Lista inventari in HTTPS
+curl -k https://192.168.1.2:8443/api/inventories
 
-# Aggiungi componente
-curl -X POST http://192.168.1.2:8080/api/components \
-  -H "Content-Type: application/json" \
-  -d '{"id":"abc123","name":"Vite M3","quantity":50,"drawer":"A1","tags":["M3","Vite"]}'
-
-# Incrementa quantità di 5
-curl -X PATCH http://192.168.1.2:8080/api/components/abc123/quantity \
-  -H "Content-Type: application/json" \
-  -d '{"delta": 5}'
-
-# Scarica tutto il DB
-curl http://192.168.1.2:8080/api/db -o backup.json
-```
-
-## Database
-
-Il database è un semplice file JSON (`inventory.json`). È leggibile/modificabile a mano.
-
-```json
-{
-  "settings": { "drawerRows": 4, "drawerColumns": 6, "availableTags": [...] },
-  "components": [
-    { "id": "...", "name": "Vite M3x8", "quantity": 50, "drawer": "A1", "tags": ["M3","Vite"], "description": "" }
-  ]
-}
+# Lista componenti inventario
+curl -k https://192.168.1.2:8443/api/inventories/default/components
 ```
 
 ## Dipendenze
 
-- **Crow** v1.2.0 — framework HTTP header-only
+- **Crow** v1.2.0 — framework HTTP/HTTPS C++ header-only
 - **nlohmann/json** v3.11.3 — JSON header-only
-- **libssl-dev** + **zlib1g-dev** — opzionali (TLS e compressione)
+- **OpenSSL** (`libssl-dev`) — supporto crittografico e TLS/HTTPS
+- **Asio** (`libasio-dev` o scaricato automaticamente via CMake FetchContent)
+- **zlib** (`zlib1g-dev`) — compressione opzionale

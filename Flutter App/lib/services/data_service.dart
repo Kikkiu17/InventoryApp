@@ -16,6 +16,21 @@ export 'api_client.dart' show ApiClient, InventoryMeta;
 
 enum StorageMode { local, remote }
 
+class AppHttpOverrides extends HttpOverrides {
+  final bool trustSelfSigned;
+  AppHttpOverrides({required this.trustSelfSigned});
+
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    final client = super.createHttpClient(context);
+    if (trustSelfSigned) {
+      client.badCertificateCallback =
+          (X509Certificate cert, String host, int port) => true;
+    }
+    return client;
+  }
+}
+
 enum SortMode { none, name, quantity, drawer, specialTag }
 
 // Nuova classe per gestire i filtri a range e testuali
@@ -97,6 +112,7 @@ bool matchesQuery(Component c, String query, AppSettings settings) {
 
 class DataService extends ChangeNotifier {
   static const _serverUrlKey = 'serverUrl';
+  static const _trustSelfSignedKey = 'trustSelfSigned';
   static const _storageModeKey = 'storageMode';
   static const _inventoryIdKey = 'currentInventoryId';
   static const _themeModeKey = 'themeMode';
@@ -109,9 +125,15 @@ class DataService extends ChangeNotifier {
 
   StorageMode _mode = StorageMode.local;
   String _serverUrl = 'http://192.168.1.2:8080';
+  bool _trustSelfSigned = true;
   String _currentInventoryId = 'default';
   String? _globalSearchQuery;
   ApiClient? _api;
+
+  DataService() {
+    _applyHttpOverrides();
+  }
+
   ThemeMode _themeMode = ThemeMode.system;
   String _languageCode = 'en';
   String? _savedLanguageCode;
@@ -141,6 +163,7 @@ class DataService extends ChangeNotifier {
 
   StorageMode get mode => _mode;
   String get serverUrl => _serverUrl;
+  bool get trustSelfSigned => _trustSelfSigned;
   bool get serverConnected => _serverConnected;
   bool get syncing => _syncing;
   String? get lastError => _lastError;
@@ -210,6 +233,8 @@ class DataService extends ChangeNotifier {
     }
 
     _serverUrl = prefs.getString(_serverUrlKey) ?? 'http://192.168.1.2:8080';
+    _trustSelfSigned = prefs.getBool(_trustSelfSignedKey) ?? true;
+    _applyHttpOverrides();
     _currentInventoryId = prefs.getString(_inventoryIdKey) ?? 'default';
     final modeStr = prefs.getString(_storageModeKey) ?? 'local';
     _mode = modeStr == 'remote' ? StorageMode.remote : StorageMode.local;
@@ -232,7 +257,11 @@ class DataService extends ChangeNotifier {
         AppLocalizations.fromLocale(Locale(_languageCode));
 
     if (_mode == StorageMode.remote) {
-      _api = ApiClient(_serverUrl, inventoryId: _currentInventoryId);
+      _api = ApiClient(
+        _serverUrl,
+        inventoryId: _currentInventoryId,
+        allowSelfSigned: _trustSelfSigned,
+      );
       await _loadFromServer(checkConflict: true);
       await _loadBufferFromServer();
     } else {
@@ -438,14 +467,46 @@ class DataService extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<bool> setServerUrl(String url) async {
-    _serverUrl = url;
-    _api = ApiClient(url, inventoryId: _currentInventoryId);
+  void _applyHttpOverrides() {
+    HttpOverrides.global = AppHttpOverrides(trustSelfSigned: _trustSelfSigned);
+  }
+
+  Future<void> setTrustSelfSigned(bool value) async {
+    _trustSelfSigned = value;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_serverUrlKey, url);
+    await prefs.setBool(_trustSelfSignedKey, value);
+    _applyHttpOverrides();
+    if (_mode == StorageMode.remote) {
+      _api?.close();
+      _api = ApiClient(
+        _serverUrl,
+        inventoryId: _currentInventoryId,
+        allowSelfSigned: _trustSelfSigned,
+      );
+    }
+    notifyListeners();
+  }
+
+  Future<bool> setServerUrl(String url) async {
+    String normalized = url.trim();
+    while (normalized.endsWith('/')) {
+      normalized = normalized.substring(0, normalized.length - 1);
+    }
+    if (!normalized.startsWith('http://') && !normalized.startsWith('https://')) {
+      normalized = 'http://$normalized';
+    }
+    _serverUrl = normalized;
+    _api?.close();
+    _api = ApiClient(
+      _serverUrl,
+      inventoryId: _currentInventoryId,
+      allowSelfSigned: _trustSelfSigned,
+    );
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_serverUrlKey, normalized);
     final ok = await _api!.ping();
     _serverConnected = ok;
-    _lastError = ok ? null : 'Impossibile connettersi a $url';
+    _lastError = ok ? null : 'Impossibile connettersi a $_serverUrl';
     notifyListeners();
     return ok;
   }
@@ -456,7 +517,12 @@ class DataService extends ChangeNotifier {
     await prefs.setString(
         _storageModeKey, mode == StorageMode.remote ? 'remote' : 'local');
     if (mode == StorageMode.remote) {
-      _api = ApiClient(_serverUrl, inventoryId: _currentInventoryId);
+      _api?.close();
+      _api = ApiClient(
+        _serverUrl,
+        inventoryId: _currentInventoryId,
+        allowSelfSigned: _trustSelfSigned,
+      );
       await _loadFromServer(checkConflict: true);
       await _loadBufferFromServer();
     } else {
