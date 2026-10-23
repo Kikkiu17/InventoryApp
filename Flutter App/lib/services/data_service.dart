@@ -1019,6 +1019,21 @@ class DataService extends ChangeNotifier {
     return '';
   }
 
+  Future<String> getOrDownloadAttachment(String filename) async {
+    final localPath = await getLocalAttachmentPath(filename);
+    final file = File(localPath);
+    if (await file.exists() && await file.length() > 0) {
+      return localPath;
+    }
+    if (_mode == StorageMode.remote && _api != null) {
+      final bytes = await _api!.downloadAttachment(filename);
+      await file.parent.create(recursive: true);
+      await file.writeAsBytes(bytes);
+      return localPath;
+    }
+    return localPath;
+  }
+
   // ── Ricerca Globale ────────────────────────────────────────────────────────
   Future<List<GlobalSearchResult>> globalSearch(String query) async {
     final q = query.toLowerCase().trim();

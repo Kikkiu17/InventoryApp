@@ -243,16 +243,10 @@ class ComponentTile extends StatelessWidget {
       } catch (_) {}
     } else {
       final ds = Provider.of<DataService>(context, listen: false);
-      if (ds.mode == StorageMode.remote && ds.serverConnected) {
-        final url = ds.getAttachmentUrl(a.path);
-        final uri = Uri.parse(url);
-        try {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        } catch (_) {}
-      } else {
-        final localPath = await ds.getLocalAttachmentPath(a.path);
+      try {
+        final localPath = await ds.getOrDownloadAttachment(a.path);
         await OpenFilex.open(localPath);
-      }
+      } catch (_) {}
     }
   }
 

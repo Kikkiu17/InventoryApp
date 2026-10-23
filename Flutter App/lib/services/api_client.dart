@@ -285,6 +285,12 @@ class ApiClient {
     await _check(res);
   }
 
+  Future<Uint8List> downloadAttachment(String filename) async {
+    final res = await _client.get(_inv('/attachments/$filename')).timeout(const Duration(seconds: 30));
+    await _check(res);
+    return res.bodyBytes;
+  }
+
   String getAttachmentUrl(String filename) {
     return _inv('/attachments/$filename').toString();
   }

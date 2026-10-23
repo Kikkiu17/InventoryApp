@@ -68,26 +68,13 @@ class _FilesScreenState extends State<FilesScreen> {
       }
     } else {
       final ds = Provider.of<DataService>(context, listen: false);
-      if (ds.mode == StorageMode.remote && ds.serverConnected) {
-        final url = ds.getAttachmentUrl(item.path);
-        final uri = Uri.parse(url);
-        try {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        } catch (_) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(context.l10n.cannotOpenFile)));
-          }
-        }
-      } else {
-        try {
-          final localPath = await ds.getLocalAttachmentPath(item.path);
-          await OpenFilex.open(localPath);
-        } catch (_) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(context.l10n.cannotOpenLocalFile)));
-          }
+      try {
+        final localPath = await ds.getOrDownloadAttachment(item.path);
+        await OpenFilex.open(localPath);
+      } catch (_) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(context.l10n.cannotOpenFile)));
         }
       }
     }

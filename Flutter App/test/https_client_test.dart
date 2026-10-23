@@ -67,6 +67,8 @@ void main() {
               headers: {'content-type': 'application/json', 'x-last-updated': '2026-10-21T18:00:00Z'},
             );
           }
+        } else if (request.url.path == '/api/inventories/default/attachments/sample.pdf') {
+          return http.Response.bytes([1, 2, 3, 4], 200, headers: {'content-type': 'application/pdf'});
         }
         return http.Response('Not Found', 404);
       });
@@ -75,6 +77,9 @@ void main() {
 
       final pingOk = await client.ping();
       expect(pingOk, isTrue);
+
+      final pdfBytes = await client.downloadAttachment('sample.pdf');
+      expect(pdfBytes, equals([1, 2, 3, 4]));
 
       final components = await client.getComponents();
       expect(components.length, equals(1));
