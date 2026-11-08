@@ -568,6 +568,13 @@ abstract class AppLocalizations {
   String get whatsNewSettingSubtitle;
   String get whatsNewViewRecentChanges;
   String whatsNewChangesCount(int count);
+
+  // Backup diff & Search position navigation
+  String get goToPosition;
+  String get viewBackupDiff;
+  String get backupDiffTitle;
+  String get noDifferencesWithBackup;
+  String get errorLoadingBackup;
 }
 
 

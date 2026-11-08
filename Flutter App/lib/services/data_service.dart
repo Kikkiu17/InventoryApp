@@ -272,13 +272,14 @@ class DataService extends ChangeNotifier {
   }
 
   Future<void> _loadFromLocal(SharedPreferences prefs) async {
-    final sj = prefs.getString(_settingsKey);
-    _settings =
-        sj != null ? AppSettings.fromJson(jsonDecode(sj)) : AppSettings();
     final cj = prefs.getString(_componentsKey);
     _components = cj != null
         ? (jsonDecode(cj) as List).map((e) => Component.fromJson(e)).toList()
         : [];
+    final sj = prefs.getString(_settingsKey);
+    final rawSettings =
+        sj != null ? AppSettings.fromJson(jsonDecode(sj)) : AppSettings();
+    _settings = ensureSettingsIntegrity(rawSettings);
   }
 
   Future<void> _loadFromServer({bool checkConflict = false}) async {
@@ -298,7 +299,9 @@ class DataService extends ChangeNotifier {
       final remoteComponents = (remoteDb['components'] as List)
           .map((e) => Component.fromJson(e))
           .toList();
-      final remoteSettings = AppSettings.fromJson(remoteDb['settings']);
+      final rawRemoteSettings = AppSettings.fromJson(remoteDb['settings']);
+      final remoteSettings =
+          ensureSettingsIntegrity(rawRemoteSettings, remoteComponents);
       final remoteTs = DateTime.tryParse(remoteDb['lastUpdated'] ?? '');
 
       // 2. Fetch Local Data
@@ -320,8 +323,10 @@ class DataService extends ChangeNotifier {
               (jsonDecode(prefs.getString(_componentsKey)!) as List)
                   .map((e) => Component.fromJson(e))
                   .toList();
-          final localSettings =
+          final rawLocal =
               AppSettings.fromJson(jsonDecode(prefs.getString(_settingsKey)!));
+          final localSettings =
+              ensureSettingsIntegrity(rawLocal, localComponents);
 
           _pendingConflict = SyncConflict(
             localComponents: localComponents,
@@ -644,11 +649,147 @@ class DataService extends ChangeNotifier {
     notifyListeners();
   }
 
+  AppSettings ensureSettingsIntegrity(AppSettings s, [List<Component>? comps]) {
+    final effectiveComps = comps ?? _components;
+    // 1. Ensure at least one container exists
+    var containers = s.containers.map((c) => c.clone()).toList();
+    if (containers.isEmpty) {
+      containers = [
+        ContainerConfig(id: 1, name: '', rows: 4, columns: 6)
+      ];
+    }
+
+    // 2. Ensure container dimensions are at least as large as any component placed in them
+    for (final c in effectiveComps) {
+      if (c.drawer.trim().isEmpty) continue;
+      final cabId = c.cabinet;
+      var container = containers.firstWhere(
+        (ct) => ct.id == cabId,
+        orElse: () {
+          final newC = ContainerConfig(
+            id: cabId,
+            name: 'Mobiletto $cabId',
+            rows: 4,
+            columns: 6,
+          );
+          containers.add(newC);
+          return newC;
+        },
+      );
+
+      final match = RegExp(r'^([A-Z]+)(\d+)$').firstMatch(c.drawer.trim().toUpperCase());
+      if (match != null) {
+        final colStr = match.group(1)!;
+        final rowVal = int.tryParse(match.group(2)!) ?? 0;
+        int colVal = 0;
+        for (int i = 0; i < colStr.length; i++) {
+          colVal = colVal * 26 + (colStr.codeUnitAt(i) - 65 + 1);
+        }
+        if (rowVal > container.rows) {
+          container.rows = rowVal;
+        }
+        if (colVal > container.columns) {
+          container.columns = colVal;
+        }
+      }
+    }
+
+    // 3. Ensure drawerDividers has entries for any component with drawerZone >= 2 (or >= 1)
+    final dividers = Map<String, int>.from(s.drawerDividers);
+    for (final c in effectiveComps) {
+      if (c.drawer.trim().isEmpty || c.drawerZone == null) continue;
+      final key = '${c.cabinet}_${c.drawer.trim().toUpperCase()}';
+      final minZone = c.drawerZone! >= 2 ? c.drawerZone! : 2;
+      final current = dividers[key] ?? 1;
+      if (current < minZone) {
+        dividers[key] = minZone;
+      }
+    }
+
+    // 4. Ensure availableTags includes loose tags from components not already in tagTree
+    final treeTags = <String>{};
+    AppSettings.flattenTree(s.tagTree, treeTags);
+
+    final tagsSet = Set<String>.from(s.availableTags);
+    // Tree tags must never be duplicated into loose availableTags
+    tagsSet.removeAll(treeTags);
+
+    for (final c in effectiveComps) {
+      for (final t in c.tags) {
+        final trimmed = t.trim();
+        if (trimmed.isNotEmpty && !treeTags.contains(trimmed)) {
+          tagsSet.add(trimmed);
+        }
+      }
+    }
+    final tagsList = tagsSet.toList()..sort();
+
+    // 5. Ensure specialTags includes all special tags present on components
+    final specialTagsList = s.specialTags.map((t) => t.clone()).toList();
+    final existingSpecialNames = specialTagsList.map((t) => t.name).toSet();
+    for (final c in effectiveComps) {
+      for (final sKey in c.specialTagValues.keys) {
+        final trimmed = sKey.trim();
+        if (trimmed.isNotEmpty && !existingSpecialNames.contains(trimmed)) {
+          existingSpecialNames.add(trimmed);
+          String unit = '';
+          String shortId = trimmed.length > 3
+              ? trimmed.substring(0, 3).toUpperCase()
+              : trimmed.toUpperCase();
+          if (trimmed == 'diametro' ||
+              trimmed == 'lunghezza' ||
+              trimmed == 'larghezza' ||
+              trimmed == 'profondità') {
+            unit = 'mm';
+            if (trimmed == 'diametro') shortId = 'D';
+            if (trimmed == 'lunghezza') shortId = 'L';
+            if (trimmed == 'larghezza') shortId = 'W';
+            if (trimmed == 'profondità') shortId = 'P';
+          } else if (trimmed == 'tensione') {
+            unit = 'V';
+            shortId = 'V';
+          } else if (trimmed == 'corrente') {
+            unit = 'A';
+            shortId = 'I';
+          } else if (trimmed == 'capacità') {
+            unit = 'F';
+            shortId = 'C';
+          } else if (trimmed == 'resistenza') {
+            unit = 'Ω';
+            shortId = 'R';
+          }
+          specialTagsList.add(SpecialTag(
+            name: trimmed,
+            unit: unit,
+            shortId: shortId,
+            isString: false,
+          ));
+        }
+      }
+    }
+
+    // 6. Preserve bufferBags
+    final bufferBags = s.bufferBags.isNotEmpty ? s.bufferBags : _settings.bufferBags;
+
+    return AppSettings(
+      containers: containers,
+      numCabinets: containers.length,
+      drawerRows: containers.isNotEmpty ? containers.first.rows : 4,
+      drawerColumns: containers.isNotEmpty ? containers.first.columns : 6,
+      availableTags: tagsList,
+      tagTree: s.tagTree,
+      specialTags: specialTagsList,
+      drawerDividers: dividers,
+      bufferBags: bufferBags,
+    );
+  }
+
   Future<void> updateSettings(AppSettings s) async {
-    _settings = s;
+    final healed = ensureSettingsIntegrity(s);
+    _settings = healed;
     if (_mode == StorageMode.remote && _serverConnected) {
       try {
-        await _api!.updateSettings(s);
+        await _api!.updateSettings(healed);
         final ts = DateTime.tryParse(_api!.lastUpdated ?? '');
         await _mirrorToLocal(_components, _settings, timestamp: ts);
       } catch (e) {
@@ -772,11 +913,16 @@ class DataService extends ChangeNotifier {
             .map((e) => Component.fromJson(e))
             .toList();
       }
-      if (data.containsKey('settings')) {
-        _settings = AppSettings.fromJson(data['settings']);
-      }
+      final rawSettings = data.containsKey('settings')
+          ? AppSettings.fromJson(data['settings'])
+          : AppSettings();
+      _settings = ensureSettingsIntegrity(rawSettings);
+      final fullDb = {
+        'components': _components.map((c) => c.toJson()).toList(),
+        'settings': _settings.toJson(),
+      };
       if (_mode == StorageMode.remote && _serverConnected) {
-        await _api!.uploadFullDb(data);
+        await _api!.uploadFullDb(fullDb);
       }
       await _saveLocal();
       notifyListeners();
@@ -925,6 +1071,16 @@ class DataService extends ChangeNotifier {
       print('ERRORE BACKUP: $e');
       _lastError = e.toString();
       return [];
+    }
+  }
+
+  Future<Map<String, dynamic>?> getBackupContent(String filename) async {
+    if (_mode != StorageMode.remote || !_serverConnected) return null;
+    try {
+      return await _api!.getBackupContent(filename);
+    } catch (e) {
+      _lastError = e.toString();
+      return null;
     }
   }
 

@@ -643,11 +643,11 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ]),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
         heroTag: 'fab_home',
         onPressed: () => _addComponent(context),
-        icon: const Icon(Icons.add),
-        label: Text(l10n.add),
+        tooltip: l10n.add,
+        child: const Icon(Icons.add),
       ),
     );
   }

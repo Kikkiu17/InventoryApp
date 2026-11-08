@@ -740,22 +740,15 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                                         ],
                                       ),
                                     ),
-                                    TextButton.icon(
-                                      icon: const Icon(Icons.add, size: 16),
-                                      label: Text(l10n.add,
-                                          style: const TextStyle(fontSize: 12)),
+                                    IconButton(
+                                      icon: const Icon(Icons.add, size: 18),
+                                      tooltip: l10n.add,
                                       onPressed: () => _addComponentAtZone(
                                           bSheetCtx,
                                           cabinetId,
                                           primaryLabel,
                                           zoneIdx),
-                                      style: TextButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 4),
-                                        minimumSize: Size.zero,
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                      ),
+                                      visualDensity: VisualDensity.compact,
                                     ),
                                   ],
                                 ),
@@ -814,7 +807,10 @@ class _CabinetMapViewState extends State<CabinetMapView> {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
       ),
-      child: ListTile(
+      child: Material(
+        type: MaterialType.transparency,
+        borderRadius: BorderRadius.circular(8),
+        child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         title: Text(
           comp.name,
@@ -901,6 +897,7 @@ class _CabinetMapViewState extends State<CabinetMapView> {
           // Open details viewer
           widget.onViewComponent(comp);
         },
+      ),
       ),
     );
   }

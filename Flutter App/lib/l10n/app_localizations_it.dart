@@ -284,7 +284,7 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get useRemoteServer => 'Usa server remoto';
   @override
-  String get serverConnectedStatus => '✅ Connesso';
+  String get serverConnectedStatus => 'Connesso';
   @override
   String get serverDisconnectedStatus => '❌ Non connesso';
   @override
@@ -1022,7 +1022,7 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get whatsNewSubtitle => 'Modifiche negli inventari dall\'ultimo avvio';
   @override
-  String get whatsNewDontShowAgain => 'Non mostrare più questo popup all\'avvio';
+  String get whatsNewDontShowAgain => 'Non mostrare più';
   @override
   String whatsNewTooltip(int count) => '$count modifiche recenti negli inventari';
   @override
@@ -1057,4 +1057,15 @@ class AppLocalizationsIt extends AppLocalizations {
   String get whatsNewViewRecentChanges => 'Visualizza modifiche recenti';
   @override
   String whatsNewChangesCount(int count) => '$count modifiche';
+
+  @override
+  String get goToPosition => 'Vai alla posizione';
+  @override
+  String get viewBackupDiff => 'Mostra differenze';
+  @override
+  String get backupDiffTitle => 'Differenze backup';
+  @override
+  String get noDifferencesWithBackup => 'Nessuna differenza rispetto allo stato attuale';
+  @override
+  String get errorLoadingBackup => 'Errore durante il caricamento del backup';
 }

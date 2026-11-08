@@ -221,6 +221,12 @@ class ApiClient {
     return List<String>.from(jsonDecode(res.body));
   }
 
+  Future<Map<String, dynamic>> getBackupContent(String filename) async {
+    final res = await _client.get(_inv('/backups/$filename')).timeout(_timeout);
+    await _check(res);
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
   Future<void> restoreBackup(String filename) async {
     final res = await _client.post(_inv('/backups/$filename/restore'), headers: _headers).timeout(_timeout);
     await _check(res);

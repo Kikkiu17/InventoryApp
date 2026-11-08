@@ -347,11 +347,10 @@ void main() {
       expect(find.text('New Sensor'), findsOneWidget);
       expect(find.text('Resistor'), findsOneWidget);
 
-      // Verify "Don't show this popup on startup anymore" checkbox exists
-      expect(find.text("Don't show this popup on startup anymore"), findsOneWidget);
+      // Verify "Don't show again" checkbox exists
+      expect(find.text("Don't show again"), findsOneWidget);
 
-      // Verify "Mark as read" and "Close" buttons exist
-      expect(find.text('Mark as read'), findsOneWidget);
+      // Verify "Close" button exists
       expect(find.text('Close'), findsOneWidget);
 
       // Close dialog
@@ -410,8 +409,8 @@ void main() {
 
       expect(InventoryChangesService.isPopupDisabled, isFalse);
 
-      // Tap on the "Don't show this popup on startup anymore" checkbox row
-      await tester.tap(find.text("Don't show this popup on startup anymore"));
+      // Tap on the "Don't show again" checkbox row
+      await tester.tap(find.text("Don't show again"));
       await tester.pumpAndSettle();
 
       // Close dialog to persist

@@ -412,12 +412,17 @@ class InventoryChangesService {
     BuildContext context,
     InventoryChangesReport report, {
     required DataService ds,
+    bool updateBaseline = true,
+    String? customTitle,
+    String? customSubtitle,
   }) async {
     if (_isDialogShowing) return;
     _isDialogShowing = true;
 
     try {
-      await initPreferences();
+      if (updateBaseline) {
+        await initPreferences();
+      }
       if (!context.mounted) return;
 
       bool dontShowAgain = isPopupDisabled;
@@ -454,12 +459,12 @@ class InventoryChangesService {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            l10n.whatsNewTitle,
+                            customTitle ?? l10n.whatsNewTitle,
                             style: theme.textTheme.titleLarge
                                 ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           Text(
-                            l10n.whatsNewSubtitle,
+                            customSubtitle ?? l10n.whatsNewSubtitle,
                             style: theme.textTheme.bodySmall
                                 ?.copyWith(color: cs.onSurfaceVariant),
                           ),
@@ -470,9 +475,11 @@ class InventoryChangesService {
                       icon: const Icon(Icons.close),
                       tooltip: l10n.close,
                       onPressed: () async {
-                        await setDontShowPopup(dontShowAgain);
-                        await saveCurrentAsBaseline(ds);
-                        changesNotifier.value = null;
+                        if (updateBaseline) {
+                          await setDontShowPopup(dontShowAgain);
+                          await saveCurrentAsBaseline(ds);
+                          changesNotifier.value = null;
+                        }
                         if (dialogCtx.mounted) {
                           Navigator.pop(dialogCtx);
                         }
@@ -581,9 +588,19 @@ class InventoryChangesService {
                                     l10n,
                                     cs,
                                     onTap: () {
-                                      Navigator.pop(dialogCtx);
-                                      navigateToComponentChange(
-                                          context, ds, change);
+                                      if (!updateBaseline) {
+                                        showDialog(
+                                          context: dialogCtx,
+                                          builder: (ctx) => ComponentViewDialog(
+                                            component: change.component,
+                                            settings: ds.settings,
+                                          ),
+                                        );
+                                      } else {
+                                        Navigator.pop(dialogCtx);
+                                        navigateToComponentChange(
+                                            context, ds, change);
+                                      }
                                     },
                                   );
                                 },
@@ -593,71 +610,84 @@ class InventoryChangesService {
                         );
                       }),
 
-                      const SizedBox(height: 6),
-                      // Checkbox: "Non mostrare più questo popup all'avvio"
-                      InkWell(
-                        onTap: () {
-                          setDialogState(() {
-                            dontShowAgain = !dontShowAgain;
-                          });
-                        },
-                        borderRadius: BorderRadius.circular(8),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 6, horizontal: 4),
-                          child: Row(
-                            children: [
-                              SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: Checkbox(
-                                  value: dontShowAgain,
-                                  onChanged: (val) {
-                                    setDialogState(() {
-                                      dontShowAgain = val ?? false;
-                                    });
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  l10n.whatsNewDontShowAgain,
-                                  style: const TextStyle(fontSize: 12.5),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
               ),
               actions: [
-                TextButton.icon(
-                  icon: const Icon(Icons.done_all, size: 18),
-                  label: Text(l10n.whatsNewMarkAsRead),
-                  onPressed: () async {
-                    await setDontShowPopup(dontShowAgain);
-                    await saveCurrentAsBaseline(ds);
-                    changesNotifier.value = null;
-                    if (dialogCtx.mounted) {
-                      Navigator.pop(dialogCtx);
-                    }
-                  },
-                ),
-                FilledButton(
-                  onPressed: () async {
-                    await setDontShowPopup(dontShowAgain);
-                    await saveCurrentAsBaseline(ds);
-                    changesNotifier.value = null;
-                    if (dialogCtx.mounted) {
-                      Navigator.pop(dialogCtx);
-                    }
-                  },
-                  child: Text(l10n.close),
-                ),
+                if (updateBaseline)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () {
+                            setDialogState(() {
+                              dontShowAgain = !dontShowAgain;
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 4, horizontal: 2),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: Checkbox(
+                                    value: dontShowAgain,
+                                    materialTapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    visualDensity: VisualDensity.compact,
+                                    onChanged: (val) {
+                                      setDialogState(() {
+                                        dontShowAgain = val ?? false;
+                                      });
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    l10n.whatsNewDontShowAgain,
+                                    style: const TextStyle(fontSize: 12.5),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: () async {
+                          await setDontShowPopup(dontShowAgain);
+                          await saveCurrentAsBaseline(ds);
+                          changesNotifier.value = null;
+                          if (dialogCtx.mounted) {
+                            Navigator.pop(dialogCtx);
+                          }
+                        },
+                        child: Text(l10n.close),
+                      ),
+                    ],
+                  )
+                else
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      FilledButton(
+                        onPressed: () {
+                          if (dialogCtx.mounted) {
+                            Navigator.pop(dialogCtx);
+                          }
+                        },
+                        child: Text(l10n.close),
+                      ),
+                    ],
+                  ),
               ],
             );
           },
@@ -665,8 +695,10 @@ class InventoryChangesService {
       },
     );
 
-    // Save preference when dialog completes
-    await setDontShowPopup(dontShowAgain);
+    if (updateBaseline) {
+      // Save preference when dialog completes
+      await setDontShowPopup(dontShowAgain);
+    }
     } finally {
       _isDialogShowing = false;
     }

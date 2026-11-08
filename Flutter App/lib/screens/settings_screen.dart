@@ -2,20 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/settings.dart';
+import '../models/component.dart';
 import '../services/data_service.dart';
 import '../services/update_service.dart';
 import '../services/inventory_changes_service.dart';
 import '../l10n/app_localizations.dart';
 import 'inventory_list_screen.dart';
 
+enum SettingsSubmenu {
+  remoteServer,
+  appearance,
+  containers,
+  tagTree,
+  genericTags,
+  properties,
+  data,
+  about,
+}
+
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+  final SettingsSubmenu? initialSubmenu;
+
+  const SettingsScreen({super.key, this.initialSubmenu});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  SettingsSubmenu? _activeSubmenu;
   late List<ContainerConfig> _containers;
   late List<String> _tags;
   late Map<String, dynamic> _tagTree;
@@ -42,11 +57,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
+    _activeSubmenu = widget.initialSubmenu;
     _containers = [];
     _tags = [];
     _tagTree = {};
     _specialTags = [];
     _drawerDividers = {};
+  }
+
+  @override
+  void didUpdateWidget(SettingsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialSubmenu != oldWidget.initialSubmenu &&
+        widget.initialSubmenu != null) {
+      _activeSubmenu = widget.initialSubmenu;
+    }
   }
 
   Map<String, dynamic> _deepCopyTree(Map<String, dynamic> source) {
@@ -70,12 +95,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _save() async {
     final ds = context.read<DataService>();
+    if (_containers.isEmpty && ds.settings.containers.isNotEmpty) {
+      _containers = ds.settings.containers.map((c) => c.clone()).toList();
+    }
+    if (_tags.isEmpty && ds.settings.availableTags.isNotEmpty) {
+      _tags = List.from(ds.settings.availableTags);
+    }
+    if (_specialTags.isEmpty && ds.settings.specialTags.isNotEmpty) {
+      _specialTags = ds.settings.specialTags.map((t) => t.clone()).toList();
+    }
+    if (_drawerDividers.isEmpty && ds.settings.drawerDividers.isNotEmpty) {
+      _drawerDividers = Map.from(ds.settings.drawerDividers);
+    }
     await ds.updateSettings(AppSettings(
       containers: _containers,
       availableTags: _tags,
       tagTree: _tagTree,
       specialTags: _specialTags,
       drawerDividers: _drawerDividers,
+      bufferBags: ds.settings.bufferBags,
     ));
     _lastSettingsRef = ds.settings;
 
@@ -718,822 +756,1125 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final sortedTags = List<String>.from(_tags)..sort();
     final l10n = context.l10n;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.settingsTitle),
-        actions: [TextButton(onPressed: _save, child: Text(l10n.saveSettings))],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _SectionHeader(title: l10n.sectionRemoteServer, icon: Icons.cloud_outlined),
-          Card(
-              child: Padding(
-            padding: const EdgeInsets.all(16),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(l10n.useRemoteServer,
-                        style: const TextStyle(fontWeight: FontWeight.w500)),
-                    Text(
-                      ds.isRemote
-                          ? ds.serverConnected
-                              ? l10n.serverConnectedStatus
-                              : l10n.serverDisconnectedStatus
-                          : l10n.localStorageStatus,
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: cs.onSurfaceVariant),
-                    ),
-                  ]),
-                ),
-                Switch(
-                  value: ds.isRemote,
-                  onChanged: (v) async {
-                    await ds.setStorageMode(
-                        v ? StorageMode.remote : StorageMode.local);
-                    if (mounted && v && !ds.serverConnected) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text(ds.lastError ?? l10n.connectionFailed),
-                          backgroundColor: cs.error));
-                    }
+    final isSubmenu = _activeSubmenu != null;
+    final title = isSubmenu
+        ? _getSubmenuTitle(_activeSubmenu!, l10n)
+        : l10n.settingsTitle;
+
+    return PopScope(
+      canPop: !isSubmenu,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _activeSubmenu != null) {
+          setState(() {
+            _activeSubmenu = null;
+          });
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: isSubmenu
+              ? BackButton(
+                  onPressed: () {
+                    setState(() {
+                      _activeSubmenu = null;
+                    });
                   },
-                ),
-              ]),
-              const Divider(height: 24),
-              if (ds.isRemote &&
-                  ds.serverConnected &&
-                  ds.currentInventory != null)
-                InkWell(
-                  onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const InventoryListScreen())),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Row(children: [
-                      Icon(Icons.inventory_2_outlined,
-                          size: 18, color: cs.primary),
-                      const SizedBox(width: 10),
-                      Expanded(
-                          child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(l10n.activeInventory,
-                              style: theme.textTheme.labelSmall
-                                  ?.copyWith(color: cs.onSurfaceVariant)),
-                          Text(ds.currentInventory!.name,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: cs.primary)),
-                        ],
-                      )),
-                      Icon(Icons.chevron_right, color: cs.primary, size: 18),
-                    ]),
+                )
+              : null,
+          title: Text(title),
+          actions: [
+            if (_activeSubmenu == SettingsSubmenu.containers ||
+                _activeSubmenu == SettingsSubmenu.properties ||
+                _activeSubmenu == SettingsSubmenu.genericTags ||
+                _activeSubmenu == SettingsSubmenu.tagTree)
+              TextButton(
+                onPressed: _save,
+                child: Text(l10n.saveSettings),
+              ),
+          ],
+        ),
+        body: _activeSubmenu == null
+            ? _buildMainMenu(context, ds, l10n, theme, cs)
+            : _buildSubmenuBody(
+                _activeSubmenu!,
+                context,
+                ds,
+                l10n,
+                theme,
+                cs,
+                sortedTags,
+              ),
+      ),
+    );
+  }
+
+  String _getSubmenuTitle(SettingsSubmenu submenu, AppLocalizations l10n) {
+    switch (submenu) {
+      case SettingsSubmenu.remoteServer:
+        return l10n.sectionRemoteServer;
+      case SettingsSubmenu.appearance:
+        return l10n.sectionAppearance;
+      case SettingsSubmenu.containers:
+        return l10n.sectionContainers;
+      case SettingsSubmenu.tagTree:
+        return l10n.sectionTagTree;
+      case SettingsSubmenu.genericTags:
+        return l10n.sectionGenericTags;
+      case SettingsSubmenu.properties:
+        return l10n.sectionProperties;
+      case SettingsSubmenu.data:
+        return l10n.sectionData;
+      case SettingsSubmenu.about:
+        return l10n.sectionAbout;
+    }
+  }
+
+  IconData _getSubmenuIcon(SettingsSubmenu submenu) {
+    switch (submenu) {
+      case SettingsSubmenu.remoteServer:
+        return Icons.cloud_outlined;
+      case SettingsSubmenu.appearance:
+        return Icons.palette_outlined;
+      case SettingsSubmenu.containers:
+        return Icons.grid_view;
+      case SettingsSubmenu.tagTree:
+        return Icons.account_tree_outlined;
+      case SettingsSubmenu.genericTags:
+        return Icons.label_outline;
+      case SettingsSubmenu.properties:
+        return Icons.tune;
+      case SettingsSubmenu.data:
+        return Icons.storage_outlined;
+      case SettingsSubmenu.about:
+        return Icons.info_outline;
+    }
+  }
+
+  String _getSubmenuSubtitle(
+    SettingsSubmenu submenu,
+    DataService ds,
+    AppLocalizations l10n,
+  ) {
+    switch (submenu) {
+      case SettingsSubmenu.remoteServer:
+        return ds.isRemote
+            ? (ds.serverConnected
+                ? l10n.serverConnectedStatus
+                : l10n.serverDisconnectedStatus)
+            : l10n.localStorageStatus;
+      case SettingsSubmenu.appearance:
+        final themeName = ds.themeMode == ThemeMode.system
+            ? l10n.themeSystem
+            : (ds.themeMode == ThemeMode.light
+                ? l10n.themeLight
+                : l10n.themeDark);
+        return '${l10n.themeMode}: $themeName • ${l10n.languageLabel}';
+      case SettingsSubmenu.containers:
+        return '${_containers.length} ${l10n.cabinetContainer.toLowerCase()}';
+      case SettingsSubmenu.tagTree:
+        return l10n.tagTreeDesc;
+      case SettingsSubmenu.genericTags:
+        return '${_tags.length} tag';
+      case SettingsSubmenu.properties:
+        return '${_specialTags.length} ${l10n.sectionProperties.toLowerCase()}';
+      case SettingsSubmenu.data:
+        return '${l10n.exportJson}, ${l10n.importJson}';
+      case SettingsSubmenu.about:
+        return '${l10n.checkUpdates}, ${l10n.whatsNewTitle}';
+    }
+  }
+
+  Widget _buildMainMenu(
+    BuildContext context,
+    DataService ds,
+    AppLocalizations l10n,
+    ThemeData theme,
+    ColorScheme cs,
+  ) {
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      children: SettingsSubmenu.values.map((submenu) {
+        final title = _getSubmenuTitle(submenu, l10n);
+        final icon = _getSubmenuIcon(submenu);
+        final subtitle = _getSubmenuSubtitle(submenu, ds, l10n);
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          elevation: 0,
+          color: cs.surfaceContainerLow,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: cs.outlineVariant.withOpacity(0.35),
+            ),
+          ),
+          child: ListTile(
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: cs.primaryContainer,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: cs.onPrimaryContainer, size: 22),
+            ),
+            title: Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+            ),
+            subtitle: Text(
+              subtitle,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: cs.onSurfaceVariant),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: Icon(
+              Icons.chevron_right,
+              color: cs.onSurfaceVariant,
+              size: 20,
+            ),
+            onTap: () {
+              setState(() {
+                _activeSubmenu = submenu;
+              });
+            },
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildSubmenuBody(
+    SettingsSubmenu submenu,
+    BuildContext context,
+    DataService ds,
+    AppLocalizations l10n,
+    ThemeData theme,
+    ColorScheme cs,
+    List<String> sortedTags,
+  ) {
+    Widget content;
+    switch (submenu) {
+      case SettingsSubmenu.remoteServer:
+        content = _buildRemoteServerSection(context, ds, l10n, theme, cs);
+        break;
+      case SettingsSubmenu.appearance:
+        content = _buildAppearanceSection(context, ds, l10n, theme, cs);
+        break;
+      case SettingsSubmenu.containers:
+        content = _buildContainersSection(context, ds, l10n, theme, cs);
+        break;
+      case SettingsSubmenu.tagTree:
+        content = _buildTagTreeSection(context, ds, l10n, theme, cs);
+        break;
+      case SettingsSubmenu.genericTags:
+        content = _buildGenericTagsSection(
+            context, ds, l10n, theme, cs, sortedTags);
+        break;
+      case SettingsSubmenu.properties:
+        content = _buildPropertiesSection(context, ds, l10n, theme, cs);
+        break;
+      case SettingsSubmenu.data:
+        content = _buildDataSection(context, ds, l10n, theme, cs);
+        break;
+      case SettingsSubmenu.about:
+        content = _buildAboutSection(context, ds, l10n, theme, cs);
+        break;
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        content,
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  Widget _buildRemoteServerSection(
+    BuildContext context,
+    DataService ds,
+    AppLocalizations l10n,
+    ThemeData theme,
+    ColorScheme cs,
+  ) {
+    final isConnected = ds.isRemote && ds.serverConnected;
+
+    return Card(
+        child: Padding(
+      padding: const EdgeInsets.all(16),
+      child:
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: isConnected
+                ? (theme.brightness == Brightness.dark
+                    ? Colors.green.withOpacity(0.18)
+                    : Colors.green.withOpacity(0.10))
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border: isConnected
+                ? Border.all(
+                    color: theme.brightness == Brightness.dark
+                        ? Colors.green.withOpacity(0.4)
+                        : Colors.green.withOpacity(0.3),
+                  )
+                : Border.all(color: Colors.transparent),
+          ),
+          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(l10n.useRemoteServer,
+                    style: const TextStyle(fontWeight: FontWeight.w500)),
+                Text(
+                  ds.isRemote
+                      ? ds.serverConnected
+                          ? l10n.serverConnectedStatus
+                          : l10n.serverDisconnectedStatus
+                      : l10n.localStorageStatus,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: isConnected
+                        ? (theme.brightness == Brightness.dark
+                            ? Colors.green.shade300
+                            : Colors.green.shade800)
+                        : cs.onSurfaceVariant,
+                    fontWeight: isConnected ? FontWeight.w600 : null,
                   ),
                 ),
-              if (ds.isRemote &&
-                  ds.serverConnected &&
-                  ds.currentInventory != null)
-                const Divider(height: 16),
-              Text(l10n.serverUrl,
-                  style: theme.textTheme.labelMedium
-                      ?.copyWith(color: cs.onSurfaceVariant)),
-              const SizedBox(height: 6),
-              Row(children: [
+              ]),
+            ),
+            Switch(
+              value: ds.isRemote,
+              onChanged: (v) async {
+                await ds.setStorageMode(
+                    v ? StorageMode.remote : StorageMode.local);
+                if (mounted && v && !ds.serverConnected) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(ds.lastError ?? l10n.connectionFailed),
+                      backgroundColor: cs.error));
+                }
+              },
+            ),
+          ]),
+        ),
+        const Divider(height: 20),
+        if (ds.isRemote &&
+            ds.serverConnected &&
+            ds.currentInventory != null)
+          InkWell(
+            onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const InventoryListScreen())),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(children: [
+                Icon(Icons.inventory_2_outlined,
+                    size: 18, color: cs.primary),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: TextField(
-                    controller: _serverUrlCtrl,
-                    decoration: InputDecoration(
-                      border: const OutlineInputBorder(),
-                      hintText: 'https://192.168.1.2:8443',
-                      isDense: true,
-                      suffixIcon: _serverOk == null
-                          ? null
-                          : Icon(
-                              _serverOk!
-                                  ? Icons.check_circle
-                                  : Icons.error_outline,
-                              color: _serverOk! ? Colors.green : cs.error),
-                    ),
-                    keyboardType: TextInputType.url,
-                    onSubmitted: (_) => _applyServer(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                _testingServer
-                    ? const SizedBox(
-                        width: 36,
-                        height: 36,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                    : FilledButton.tonal(
-                        onPressed: _testServer, child: Text(l10n.check)),
+                    child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(l10n.activeInventory,
+                        style: theme.textTheme.labelSmall
+                            ?.copyWith(color: cs.onSurfaceVariant)),
+                    Text(ds.currentInventory!.name,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: cs.primary)),
+                  ],
+                )),
+                Icon(Icons.chevron_right, color: cs.primary, size: 18),
               ]),
-              const SizedBox(height: 8),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(l10n.trustSelfSignedCertificates),
-                subtitle: Text(
-                  l10n.trustSelfSignedCertificatesDesc,
-                  style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                ),
-                value: ds.trustSelfSigned,
-                onChanged: (val) async {
-                  await ds.setTrustSelfSigned(val);
+            ),
+          ),
+        if (ds.isRemote &&
+            ds.serverConnected &&
+            ds.currentInventory != null)
+          const Divider(height: 16),
+        Text(l10n.serverUrl,
+            style: theme.textTheme.labelMedium
+                ?.copyWith(color: cs.onSurfaceVariant)),
+        const SizedBox(height: 6),
+        Row(children: [
+          Expanded(
+            child: TextField(
+              controller: _serverUrlCtrl,
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(),
+                hintText: 'https://192.168.1.2:8443',
+                isDense: true,
+                suffixIcon: _serverOk == null
+                    ? null
+                    : Icon(
+                        _serverOk!
+                            ? Icons.check_circle
+                            : Icons.error_outline,
+                        color: _serverOk! ? Colors.green : cs.error),
+              ),
+              keyboardType: TextInputType.url,
+              onSubmitted: (_) => _applyServer(),
+            ),
+          ),
+          const SizedBox(width: 8),
+          _testingServer
+              ? const SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : FilledButton.tonal(
+                  onPressed: _testServer, child: Text(l10n.check)),
+        ]),
+        const SizedBox(height: 8),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(l10n.trustSelfSignedCertificates),
+          subtitle: Text(
+            l10n.trustSelfSignedCertificatesDesc,
+            style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          value: ds.trustSelfSigned,
+          onChanged: (val) async {
+            await ds.setTrustSelfSigned(val);
+          },
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+                onPressed: _applyServer,
+                icon: const Icon(Icons.save_outlined),
+                label: Text(l10n.save))),
+        if (ds.isRemote) ...[
+          const SizedBox(height: 8),
+          SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  await ds.refreshFromServer();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(ds.serverConnected
+                            ? l10n.syncSuccess
+                            : ds.lastError ?? l10n.error),
+                        backgroundColor:
+                            ds.serverConnected ? null : cs.error));
+                  }
+                },
+                icon: const Icon(Icons.sync),
+                label: Text(l10n.syncNow),
+              )),
+        ],
+      ]),
+    ));
+  }
+
+  Widget _buildAppearanceSection(
+    BuildContext context,
+    DataService ds,
+    AppLocalizations l10n,
+    ThemeData theme,
+    ColorScheme cs,
+  ) {
+    return Card(
+        child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(l10n.themeMode, style: theme.textTheme.bodyLarge),
+              ),
+              DropdownButton<ThemeMode>(
+                value: ds.themeMode,
+                underline: const SizedBox.shrink(),
+                items: [
+                  DropdownMenuItem(
+                    value: ThemeMode.system,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.brightness_auto, size: 18),
+                        const SizedBox(width: 8),
+                        Text(l10n.themeSystem),
+                      ],
+                    ),
+                  ),
+                  DropdownMenuItem(
+                    value: ThemeMode.light,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.light_mode, size: 18),
+                        const SizedBox(width: 8),
+                        Text(l10n.themeLight),
+                      ],
+                    ),
+                  ),
+                  DropdownMenuItem(
+                    value: ThemeMode.dark,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.dark_mode, size: 18),
+                        const SizedBox(width: 8),
+                        Text(l10n.themeDark),
+                      ],
+                    ),
+                  ),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    ds.updateThemeMode(val);
+                  }
                 },
               ),
-              const SizedBox(height: 8),
-              SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                      onPressed: _applyServer,
-                      icon: const Icon(Icons.save_outlined),
-                      label: Text(l10n.save))),
-              if (ds.isRemote) ...[
-                const SizedBox(height: 8),
-                SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        await ds.refreshFromServer();
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                              content: Text(ds.serverConnected
-                                  ? l10n.syncSuccess
-                                  : ds.lastError ?? l10n.error),
-                              backgroundColor:
-                                  ds.serverConnected ? null : cs.error));
-                        }
-                      },
-                      icon: const Icon(Icons.sync),
-                      label: Text(l10n.syncNow),
-                    )),
-              ],
-            ]),
-          )),
-          const SizedBox(height: 24),
-          _SectionHeader(title: l10n.sectionAppearance, icon: Icons.palette_outlined),
-          Card(
-              child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(l10n.themeMode, style: theme.textTheme.bodyLarge),
-                    ),
-                    DropdownButton<ThemeMode>(
-                      value: ds.themeMode,
-                      underline: const SizedBox.shrink(),
-                      items: [
-                        DropdownMenuItem(
-                          value: ThemeMode.system,
-                          child: Row(
-                            children: [
-                              const Icon(Icons.brightness_auto, size: 18),
-                              const SizedBox(width: 8),
-                              Text(l10n.themeSystem),
-                            ],
-                          ),
-                        ),
-                        DropdownMenuItem(
-                          value: ThemeMode.light,
-                          child: Row(
-                            children: [
-                              const Icon(Icons.light_mode, size: 18),
-                              const SizedBox(width: 8),
-                              Text(l10n.themeLight),
-                            ],
-                          ),
-                        ),
-                        DropdownMenuItem(
-                          value: ThemeMode.dark,
-                          child: Row(
-                            children: [
-                              const Icon(Icons.dark_mode, size: 18),
-                              const SizedBox(width: 8),
-                              Text(l10n.themeDark),
-                            ],
-                          ),
-                        ),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) {
-                          ds.updateThemeMode(val);
-                        }
-                      },
-                    ),
-                  ],
-                ),
-                const Divider(height: 16),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isNarrow = constraints.maxWidth < 460;
-                    final languageDropdown = DropdownButton<String>(
-                      value: ds.savedLanguageCode ?? 'system',
-                      underline: const SizedBox.shrink(),
-                      isExpanded: isNarrow,
-                      items: [
-                        DropdownMenuItem(
-                          value: 'system',
-                          child: Text(l10n.languageSystem),
-                        ),
-                        DropdownMenuItem(
-                          value: 'en',
-                          child: Text(l10n.langEn),
-                        ),
-                        DropdownMenuItem(
-                          value: 'it',
-                          child: Text(l10n.langIt),
-                        ),
-                        DropdownMenuItem(
-                          value: 'es',
-                          child: Text(l10n.langEs),
-                        ),
-                        DropdownMenuItem(
-                          value: 'fr',
-                          child: Text(l10n.langFr),
-                        ),
-                        DropdownMenuItem(
-                          value: 'de',
-                          child: Text(l10n.langDe),
-                        ),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) {
-                          ds.updateLanguage(val);
-                        }
-                      },
-                    );
-
-                    if (isNarrow) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.language, size: 20),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(l10n.languageLabel,
-                                    style: theme.textTheme.bodyLarge),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          languageDropdown,
-                        ],
-                      );
-                    }
-
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Row(
-                            children: [
-                              const Icon(Icons.language, size: 20),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(l10n.languageLabel,
-                                    style: theme.textTheme.bodyLarge),
-                              ),
-                            ],
-                          ),
-                        ),
-                        languageDropdown,
-                      ],
-                    );
-                  },
-                ),
-              ],
-            ),
-          )),
-          const SizedBox(height: 24),
-          _SectionHeader(
-              title: l10n.sectionContainers,
-              icon: Icons.grid_view),
-          Card(
-              child: Padding(
-            padding: const EdgeInsets.all(16),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(
-                  l10n.containersDesc,
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: cs.onSurfaceVariant)),
-              const SizedBox(height: 12),
-              ..._containers.map((container) {
-                return Card(
-                  color: cs.surfaceContainerLow,
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    leading: CircleAvatar(
-                      backgroundColor: cs.primary,
-                      foregroundColor: cs.onPrimary,
-                      child: Text('${container.id}'),
-                    ),
-                    title: Text(
-                      container.name.isNotEmpty
-                          ? container.name
-                          : '${l10n.cabinetContainer} ${container.id}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Text(
-                      '${container.rows} ${l10n.rows.toLowerCase()} x ${container.columns} ${l10n.columns.toLowerCase()} · ${container.rows * container.columns - container.disabledDrawers.length} (${container.disabledDrawers.length})',
-                      style: theme.textTheme.bodySmall,
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined),
-                          tooltip: l10n.editAction,
-                          onPressed: () => _showEditContainerDialog(container),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          color: cs.error,
-                          tooltip: l10n.deleteContainer,
-                          onPressed: _containers.length > 1
-                              ? () => _confirmDeleteContainer(container)
-                              : null,
-                        ),
-                      ],
-                    ),
+            ],
+          ),
+          const Divider(height: 16),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 460;
+              final languageDropdown = DropdownButton<String>(
+                value: ds.savedLanguageCode ?? 'system',
+                underline: const SizedBox.shrink(),
+                isExpanded: isNarrow,
+                items: [
+                  DropdownMenuItem(
+                    value: 'system',
+                    child: Text(l10n.languageSystem),
                   ),
+                  DropdownMenuItem(
+                    value: 'en',
+                    child: Text(l10n.langEn),
+                  ),
+                  DropdownMenuItem(
+                    value: 'it',
+                    child: Text(l10n.langIt),
+                  ),
+                  DropdownMenuItem(
+                    value: 'es',
+                    child: Text(l10n.langEs),
+                  ),
+                  DropdownMenuItem(
+                    value: 'fr',
+                    child: Text(l10n.langFr),
+                  ),
+                  DropdownMenuItem(
+                    value: 'de',
+                    child: Text(l10n.langDe),
+                  ),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    ds.updateLanguage(val);
+                  }
+                },
+              );
+
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.language, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(l10n.languageLabel,
+                              style: theme.textTheme.bodyLarge),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    languageDropdown,
+                  ],
                 );
-              }),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _showAddContainerDialog,
-                  icon: const Icon(Icons.add),
-                  label: Text(l10n.newContainer),
-                ),
-              ),
-              const Divider(height: 32),
-              if (_containers.isNotEmpty) ...[
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isNarrow = constraints.maxWidth < 460;
-                    final previewDropdown = DropdownButton<int>(
-                      value: _containers
-                              .any((c) => c.id == _selectedCabinetPreview)
-                          ? _selectedCabinetPreview
-                          : _containers.first.id,
-                      underline: const SizedBox.shrink(),
-                      isExpanded: isNarrow,
-                      items: _containers.map((c) {
-                        return DropdownMenuItem(
-                          value: c.id,
-                          child: Text(c.name.isNotEmpty
-                              ? c.name
-                              : '${l10n.cabinetContainer} ${c.id}'),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          setState(() => _selectedCabinetPreview = val);
-                        }
-                      },
-                    );
+              }
 
-                    if (isNarrow) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            l10n.previewAndShape,
-                            style: theme.textTheme.titleSmall
-                                ?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 4),
-                          SizedBox(
-                            width: double.infinity,
-                            child: previewDropdown,
-                          ),
-                        ],
-                      );
-                    }
-
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Row(
                       children: [
+                        const Icon(Icons.language, size: 20),
+                        const SizedBox(width: 8),
                         Expanded(
-                          child: Text(
-                            l10n.previewAndShape,
-                            style: theme.textTheme.titleSmall
-                                ?.copyWith(fontWeight: FontWeight.bold),
-                          ),
+                          child: Text(l10n.languageLabel,
+                              style: theme.textTheme.bodyLarge),
                         ),
-                        const SizedBox(width: 16),
-                        previewDropdown,
                       ],
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
-                _DrawerGrid(
-                  container: _containers.firstWhere(
-                      (c) => c.id == _selectedCabinetPreview,
-                      orElse: () => _containers.first),
-                  drawerDividers: _drawerDividers,
-                  selectedDrawers: _selectedPreviewDrawers,
-                  onDrawerClick: (label) {
-                    _configureDrawer(label);
-                  },
-                  onSelectStart: (label) {
-                    setState(() {
-                      _selectedPreviewDrawers.add(label);
-                    });
-                  },
-                  onSelectUpdate: (label) {
-                    setState(() {
-                      _selectedPreviewDrawers.add(label);
-                    });
-                  },
-                  onSelectEnd: () {
-                    _showBulkActionDialog();
-                  },
-                ),
-                const SizedBox(height: 16),
-                const Divider(),
-                const SizedBox(height: 8),
-                Text(
-                  l10n.manualDrawerConfigTitle,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _manualDrawerCtrl,
-                        decoration: InputDecoration(
-                          labelText: l10n.manualDrawerCode,
-                          hintText: l10n.manualDrawerHint,
-                          border: const OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        textCapitalization: TextCapitalization.characters,
-                        onSubmitted: (_) => _configureManualDrawer(),
-                      ),
                     ),
-                    const SizedBox(width: 8),
-                    FilledButton(
-                      onPressed: _configureManualDrawer,
-                      child: Text(l10n.configureButton),
+                  ),
+                  languageDropdown,
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    ));
+  }
+
+  Widget _buildContainersSection(
+    BuildContext context,
+    DataService ds,
+    AppLocalizations l10n,
+    ThemeData theme,
+    ColorScheme cs,
+  ) {
+    return Card(
+        child: Padding(
+      padding: const EdgeInsets.all(16),
+      child:
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(
+            l10n.containersDesc,
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: cs.onSurfaceVariant)),
+        const SizedBox(height: 12),
+        ..._containers.map((container) {
+          return Card(
+            color: cs.surfaceContainerLow,
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              leading: CircleAvatar(
+                backgroundColor: cs.primary,
+                foregroundColor: cs.onPrimary,
+                child: Text('${container.id}'),
+              ),
+              title: Text(
+                container.name.isNotEmpty
+                    ? container.name
+                    : '${l10n.cabinetContainer} ${container.id}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(
+                '${container.rows} ${l10n.rows.toLowerCase()} x ${container.columns} ${l10n.columns.toLowerCase()} · ${container.rows * container.columns - container.disabledDrawers.length} (${container.disabledDrawers.length})',
+                style: theme.textTheme.bodySmall,
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined),
+                    tooltip: l10n.editAction,
+                    onPressed: () => _showEditContainerDialog(container),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    color: cs.error,
+                    tooltip: l10n.deleteContainer,
+                    onPressed: _containers.length > 1
+                        ? () => _confirmDeleteContainer(container)
+                        : null,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _showAddContainerDialog,
+            icon: const Icon(Icons.add),
+            label: Text(l10n.newContainer),
+          ),
+        ),
+        const Divider(height: 32),
+        if (_containers.isNotEmpty) ...[
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 460;
+              final previewDropdown = DropdownButton<int>(
+                value: _containers
+                        .any((c) => c.id == _selectedCabinetPreview)
+                    ? _selectedCabinetPreview
+                    : _containers.first.id,
+                underline: const SizedBox.shrink(),
+                isExpanded: isNarrow,
+                items: _containers.map((c) {
+                  return DropdownMenuItem(
+                    value: c.id,
+                    child: Text(c.name.isNotEmpty
+                        ? c.name
+                        : '${l10n.cabinetContainer} ${c.id}'),
+                  );
+                }).toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => _selectedCabinetPreview = val);
+                  }
+                },
+              );
+
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.previewAndShape,
+                      style: theme.textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      width: double.infinity,
+                      child: previewDropdown,
                     ),
                   ],
-                ),
-              ],
-            ]),
-          )),
-          const SizedBox(height: 24),
-          _SectionHeader(
-              title: l10n.sectionTagTree, icon: Icons.account_tree_outlined),
-          Card(
-              child: Padding(
-            padding: const EdgeInsets.all(16),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(
-                  l10n.tagTreeDesc,
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: cs.onSurfaceVariant)),
-              const SizedBox(height: 16),
-              Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: cs.outlineVariant),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: _buildTreeLevel(_tagTree, []),
-              ),
-            ]),
-          )),
-          const SizedBox(height: 24),
-          _SectionHeader(
-              title: l10n.sectionGenericTags, icon: Icons.label_outline),
-          Card(
-              child: Padding(
-            padding: const EdgeInsets.all(16),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Expanded(
-                  child: TextField(
-                    controller: _newTagCtrl,
-                    decoration: InputDecoration(
-                        labelText: l10n.newGenericTag,
-                        border: const OutlineInputBorder(),
-                        isDense: true),
-                    onSubmitted: (_) => _addTag(),
+                );
+              }
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.previewAndShape,
+                      style: theme.textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
                   ),
+                  const SizedBox(width: 16),
+                  previewDropdown,
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          _DrawerGrid(
+            container: _containers.firstWhere(
+                (c) => c.id == _selectedCabinetPreview,
+                orElse: () => _containers.first),
+            drawerDividers: _drawerDividers,
+            selectedDrawers: _selectedPreviewDrawers,
+            onDrawerClick: (label) {
+              _configureDrawer(label);
+            },
+            onSelectStart: (label) {
+              setState(() {
+                _selectedPreviewDrawers.add(label);
+              });
+            },
+            onSelectUpdate: (label) {
+              setState(() {
+                _selectedPreviewDrawers.add(label);
+              });
+            },
+            onSelectEnd: () {
+              _showBulkActionDialog();
+            },
+          ),
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 8),
+          Text(
+            l10n.manualDrawerConfigTitle,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _manualDrawerCtrl,
+                  decoration: InputDecoration(
+                    labelText: l10n.manualDrawerCode,
+                    hintText: l10n.manualDrawerHint,
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  textCapitalization: TextCapitalization.characters,
+                  onSubmitted: (_) => _configureManualDrawer(),
                 ),
-                const SizedBox(width: 8),
-                FilledButton.icon(
-                    onPressed: _addTag,
-                    icon: const Icon(Icons.add),
-                    label: Text(l10n.addTag)),
-              ]),
-              const SizedBox(height: 16),
-              if (_tags.isEmpty)
-                Text(l10n.noGenericTags,
-                    style: TextStyle(color: cs.onSurfaceVariant))
-              else
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: sortedTags
-                      .map((tag) => Chip(
-                            label: Text(tag),
-                            onDeleted: () => _confirmDeleteTag(tag),
-                            deleteIcon: const Icon(Icons.close, size: 16),
-                          ))
-                      .toList(),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: _configureManualDrawer,
+                child: Text(l10n.configureButton),
+              ),
+            ],
+          ),
+        ],
+      ]),
+    ));
+  }
+
+  Widget _buildTagTreeSection(
+    BuildContext context,
+    DataService ds,
+    AppLocalizations l10n,
+    ThemeData theme,
+    ColorScheme cs,
+  ) {
+    return Card(
+        child: Padding(
+      padding: const EdgeInsets.all(16),
+      child:
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(
+            l10n.tagTreeDesc,
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: cs.onSurfaceVariant)),
+        const SizedBox(height: 16),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: cs.outlineVariant),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: _buildTreeLevel(_tagTree, []),
+        ),
+      ]),
+    ));
+  }
+
+  Widget _buildGenericTagsSection(
+    BuildContext context,
+    DataService ds,
+    AppLocalizations l10n,
+    ThemeData theme,
+    ColorScheme cs,
+    List<String> sortedTags,
+  ) {
+    return Card(
+        child: Padding(
+      padding: const EdgeInsets.all(16),
+      child:
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(
+            child: TextField(
+              controller: _newTagCtrl,
+              decoration: InputDecoration(
+                  labelText: l10n.newGenericTag,
+                  border: const OutlineInputBorder(),
+                  isDense: true),
+              onSubmitted: (_) => _addTag(),
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.icon(
+              onPressed: _addTag,
+              icon: const Icon(Icons.add),
+              label: Text(l10n.addTag)),
+        ]),
+        const SizedBox(height: 16),
+        if (_tags.isEmpty)
+          Text(l10n.noGenericTags,
+              style: TextStyle(color: cs.onSurfaceVariant))
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: sortedTags
+                .map((tag) => Chip(
+                      label: Text(tag),
+                      onDeleted: () => _confirmDeleteTag(tag),
+                      deleteIcon: const Icon(Icons.close, size: 16),
+                    ))
+                .toList(),
+          ),
+      ]),
+    ));
+  }
+
+  Widget _buildPropertiesSection(
+    BuildContext context,
+    DataService ds,
+    AppLocalizations l10n,
+    ThemeData theme,
+    ColorScheme cs,
+  ) {
+    return Card(
+        child: Padding(
+      padding: const EdgeInsets.all(16),
+      child:
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(
+            l10n.propertiesDesc,
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: cs.onSurfaceVariant)),
+        const SizedBox(height: 16),
+        LayoutBuilder(builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 600;
+
+          Widget buildUnitField({bool expanded = false}) {
+            final field = TextField(
+              controller: _newSpecialUnitCtrl,
+              decoration: InputDecoration(
+                labelText: l10n.propUnit,
+                border: const OutlineInputBorder(),
+                isDense: true,
+              ),
+              onSubmitted: (_) => _addSpecialTag(),
+            );
+            return expanded
+                ? Expanded(flex: 3, child: field)
+                : SizedBox(width: 80, child: field);
+          }
+
+          Widget buildShortIdField({bool expanded = false}) {
+            final field = TextField(
+              controller: _newSpecialShortIdCtrl,
+              decoration: InputDecoration(
+                labelText: l10n.propSigla,
+                hintText: l10n.propSiglaHint,
+                border: const OutlineInputBorder(),
+                isDense: true,
+              ),
+              onSubmitted: (_) => _addSpecialTag(),
+            );
+            return expanded
+                ? Expanded(flex: 2, child: field)
+                : SizedBox(width: 70, child: field);
+          }
+
+          Widget buildTextChip() {
+            return FilterChip(
+              label: Text(l10n.propText),
+              selected: _newSpecialIsString,
+              onSelected: (v) => setState(() => _newSpecialIsString = v),
+              visualDensity: VisualDensity.compact,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            );
+          }
+
+          Widget buildAddButton() {
+            return IconButton.filled(
+              onPressed: _addSpecialTag,
+              icon: const Icon(Icons.add),
+              tooltip: l10n.addProp,
+              visualDensity: VisualDensity.compact,
+            );
+          }
+
+          if (isCompact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: _newSpecialNameCtrl,
+                  decoration: InputDecoration(
+                    labelText: l10n.propName,
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  onSubmitted: (_) => _addSpecialTag(),
                 ),
-            ]),
-          )),
-          const SizedBox(height: 24),
-          _SectionHeader(title: l10n.sectionProperties, icon: Icons.tune),
-          Card(
-              child: Padding(
-            padding: const EdgeInsets.all(16),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(
-                  l10n.propertiesDesc,
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: cs.onSurfaceVariant)),
-              const SizedBox(height: 16),
-              LayoutBuilder(builder: (context, constraints) {
-                final isCompact = constraints.maxWidth < 600;
-
-                Widget buildUnitField({bool expanded = false}) {
-                  final field = TextField(
-                    controller: _newSpecialUnitCtrl,
-                    decoration: InputDecoration(
-                      labelText: l10n.propUnit,
-                      border: const OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    onSubmitted: (_) => _addSpecialTag(),
-                  );
-                  return expanded
-                      ? Expanded(flex: 3, child: field)
-                      : SizedBox(width: 80, child: field);
-                }
-
-                Widget buildShortIdField({bool expanded = false}) {
-                  final field = TextField(
-                    controller: _newSpecialShortIdCtrl,
-                    decoration: InputDecoration(
-                      labelText: l10n.propSigla,
-                      hintText: l10n.propSiglaHint,
-                      border: const OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    onSubmitted: (_) => _addSpecialTag(),
-                  );
-                  return expanded
-                      ? Expanded(flex: 2, child: field)
-                      : SizedBox(width: 70, child: field);
-                }
-
-                Widget buildTextChip() {
-                  return FilterChip(
-                    label: Text(l10n.propText),
-                    selected: _newSpecialIsString,
-                    onSelected: (v) => setState(() => _newSpecialIsString = v),
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  );
-                }
-
-                Widget buildAddButton() {
-                  return IconButton.filled(
-                    onPressed: _addSpecialTag,
-                    icon: const Icon(Icons.add),
-                    tooltip: l10n.addProp,
-                    visualDensity: VisualDensity.compact,
-                  );
-                }
-
-                if (isCompact) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      TextField(
-                        controller: _newSpecialNameCtrl,
-                        decoration: InputDecoration(
-                          labelText: l10n.propName,
-                          border: const OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        onSubmitted: (_) => _addSpecialTag(),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          buildUnitField(expanded: true),
-                          const SizedBox(width: 8),
-                          buildShortIdField(expanded: true),
-                          const SizedBox(width: 8),
-                          buildTextChip(),
-                          const SizedBox(width: 8),
-                          buildAddButton(),
-                        ],
-                      ),
-                    ],
-                  );
-                }
-
-                return Row(
+                const SizedBox(height: 8),
+                Row(
                   children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _newSpecialNameCtrl,
-                        decoration: InputDecoration(
-                          labelText: l10n.propName,
-                          border: const OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        onSubmitted: (_) => _addSpecialTag(),
-                      ),
-                    ),
+                    buildUnitField(expanded: true),
                     const SizedBox(width: 8),
-                    buildUnitField(),
-                    const SizedBox(width: 8),
-                    buildShortIdField(),
+                    buildShortIdField(expanded: true),
                     const SizedBox(width: 8),
                     buildTextChip(),
                     const SizedBox(width: 8),
                     buildAddButton(),
                   ],
-                );
-              }),
-              const SizedBox(height: 16),
-              if (_specialTags.isEmpty)
-                Text(l10n.noPropsConfigured,
-                    style: TextStyle(color: cs.onSurfaceVariant))
-              else
-                ReorderableListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  buildDefaultDragHandles: false,
-                  itemCount: _specialTags.length,
-                  onReorder: (oldIndex, newIndex) {
-                    setState(() {
-                      if (newIndex > oldIndex) newIndex -= 1;
-                      final item = _specialTags.removeAt(oldIndex);
-                      _specialTags.insert(newIndex, item);
-                    });
-                  },
-                  itemBuilder: (ctx, i) {
-                    final st = _specialTags[i];
-                    return ListTile(
-                      key: ValueKey(st.name),
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                          st.isString ? Icons.text_fields : Icons.numbers,
-                          color: cs.primary),
-                      title: Row(
-                        children: [
-                          Flexible(
-                            child: Text(st.name,
-                                style: const TextStyle(fontWeight: FontWeight.w500),
-                                overflow: TextOverflow.ellipsis),
-                          ),
-                          if (st.shortId.isNotEmpty) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 1.5),
-                              decoration: BoxDecoration(
-                                color: cs.primaryContainer,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                st.shortId,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: cs.onPrimaryContainer,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      subtitle: Text((st.unit.isNotEmpty
-                              ? '${l10n.propUnit}: ${st.unit}'
-                              : l10n.notAssigned) +
-                          (st.isString ? ' • ${l10n.propText}' : '') +
-                          (st.shortId.isNotEmpty ? ' • ${l10n.propSigla}: ${st.shortId}' : '')),
-                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                        IconButton(
-                            icon: const Icon(Icons.edit_outlined),
-                            tooltip: l10n.editAction,
-                            onPressed: () => _editSpecialTag(st)),
-                        IconButton(
-                            icon: Icon(Icons.delete_outline, color: cs.error),
-                            tooltip: l10n.deleteButton,
-                            onPressed: () => _confirmDeleteSpecialTag(st.name)),
-                        ReorderableDragStartListener(
-                            index: i,
-                            child: const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 8.0),
-                                child: Icon(Icons.drag_handle))),
-                      ]),
-                    );
-                  },
                 ),
-            ]),
-          )),
-          const SizedBox(height: 24),
-          _SectionHeader(title: l10n.sectionData, icon: Icons.storage_outlined),
-          Card(
-              child: Column(children: [
-            ListTile(
-                leading: Icon(Icons.upload_file, color: cs.primary),
-                title: Text(l10n.exportJson),
-                onTap: () async => await ds.exportData()),
-            const Divider(height: 1),
-            ListTile(
-                leading: Icon(Icons.download_outlined, color: cs.primary),
-                title: Text(l10n.importJson),
-                onTap: () => _importData(ds)),
-            // --- NUOVO BOTTONE PER I BACKUP REMOTI ---
-            if (ds.isRemote && ds.serverConnected) ...[
-              const Divider(height: 1),
-              ListTile(
-                leading: Icon(Icons.restore, color: cs.primary),
-                title: Text(l10n.restoreRemoteBackup),
-                onTap: () => _showRestoreDialog(context, ds),
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _newSpecialNameCtrl,
+                  decoration: InputDecoration(
+                    labelText: l10n.propName,
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  onSubmitted: (_) => _addSpecialTag(),
+                ),
               ),
+              const SizedBox(width: 8),
+              buildUnitField(),
+              const SizedBox(width: 8),
+              buildShortIdField(),
+              const SizedBox(width: 8),
+              buildTextChip(),
+              const SizedBox(width: 8),
+              buildAddButton(),
             ],
-          ])),
-          const SizedBox(height: 24),
-          _SectionHeader(
-              title: l10n.sectionAbout, icon: Icons.info_outline),
-          Card(
-              child: Column(children: [
-            ListTile(
-              leading: Icon(Icons.system_update_alt, color: cs.primary),
-              title: Text(l10n.checkUpdates),
-              subtitle:
-                  Text(l10n.checkUpdatesSubtitle),
-              onTap: () => UpdateService.checkAndPromptUpdate(context,
-                  showNoUpdateFeedback: true),
-            ),
-            const Divider(height: 1),
-            ListTile(
-              leading: Icon(Icons.open_in_browser, color: cs.primary),
-              title: Text(l10n.openGitHub),
-              subtitle: const Text('https://github.com/Kikkiu17/InventoryApp'),
-              onTap: () async {
-                final uri = Uri.parse(UpdateService.releasesHtmlUrl);
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-              },
-            ),
-            const Divider(height: 1),
-            ListTile(
-              leading: Icon(Icons.published_with_changes, color: cs.primary),
-              title: Text(l10n.whatsNewViewRecentChanges),
-              subtitle: Text(l10n.whatsNewSubtitle),
-              onTap: () =>
-                  InventoryChangesService.showRecentChanges(context, ds),
-            ),
-            const Divider(height: 1),
-            SwitchListTile(
-              secondary:
-                  Icon(Icons.notifications_active_outlined, color: cs.primary),
-              title: Text(l10n.whatsNewSettingTitle),
-              subtitle: Text(l10n.whatsNewSettingSubtitle),
-              value: !InventoryChangesService.isPopupDisabled,
-              onChanged: (val) async {
-                await InventoryChangesService.setDontShowPopup(!val);
-                setState(() {});
-              },
-            ),
-          ])),
-          const SizedBox(height: 32),
-        ],
+          );
+        }),
+        const SizedBox(height: 16),
+        if (_specialTags.isEmpty)
+          Text(l10n.noPropsConfigured,
+              style: TextStyle(color: cs.onSurfaceVariant))
+        else
+          ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            itemCount: _specialTags.length,
+            onReorder: (oldIndex, newIndex) {
+              setState(() {
+                if (newIndex > oldIndex) newIndex -= 1;
+                final item = _specialTags.removeAt(oldIndex);
+                _specialTags.insert(newIndex, item);
+              });
+            },
+            itemBuilder: (ctx, i) {
+              final st = _specialTags[i];
+              return ListTile(
+                key: ValueKey(st.name),
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                    st.isString ? Icons.text_fields : Icons.numbers,
+                    color: cs.primary),
+                title: Row(
+                  children: [
+                    Flexible(
+                      child: Text(st.name,
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                          overflow: TextOverflow.ellipsis),
+                    ),
+                    if (st.shortId.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: cs.primaryContainer,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          st.shortId,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: cs.onPrimaryContainer,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                subtitle: Text((st.unit.isNotEmpty
+                        ? '${l10n.propUnit}: ${st.unit}'
+                        : l10n.notAssigned) +
+                    (st.isString ? ' • ${l10n.propText}' : '') +
+                    (st.shortId.isNotEmpty ? ' • ${l10n.propSigla}: ${st.shortId}' : '')),
+                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                  IconButton(
+                      icon: const Icon(Icons.edit_outlined),
+                      tooltip: l10n.editAction,
+                      onPressed: () => _editSpecialTag(st)),
+                  IconButton(
+                      icon: Icon(Icons.delete_outline, color: cs.error),
+                      tooltip: l10n.deleteButton,
+                      onPressed: () => _confirmDeleteSpecialTag(st.name)),
+                  ReorderableDragStartListener(
+                      index: i,
+                      child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8.0),
+                          child: Icon(Icons.drag_handle))),
+                ]),
+              );
+            },
+          ),
+      ]),
+    ));
+  }
+
+  Widget _buildDataSection(
+    BuildContext context,
+    DataService ds,
+    AppLocalizations l10n,
+    ThemeData theme,
+    ColorScheme cs,
+  ) {
+    return Card(
+        child: Column(children: [
+      ListTile(
+          leading: Icon(Icons.upload_file, color: cs.primary),
+          title: Text(l10n.exportJson),
+          onTap: () async => await ds.exportData()),
+      const Divider(height: 1),
+      ListTile(
+          leading: Icon(Icons.download_outlined, color: cs.primary),
+          title: Text(l10n.importJson),
+          onTap: () => _importData(ds)),
+      // --- NUOVO BOTTONE PER I BACKUP REMOTI ---
+      if (ds.isRemote && ds.serverConnected) ...[
+        const Divider(height: 1),
+        ListTile(
+          leading: Icon(Icons.restore, color: cs.primary),
+          title: Text(l10n.restoreRemoteBackup),
+          onTap: () => _showRestoreDialog(context, ds),
+        ),
+      ],
+    ]));
+  }
+
+  Widget _buildAboutSection(
+    BuildContext context,
+    DataService ds,
+    AppLocalizations l10n,
+    ThemeData theme,
+    ColorScheme cs,
+  ) {
+    return Card(
+        child: Column(children: [
+      ListTile(
+        leading: Icon(Icons.system_update_alt, color: cs.primary),
+        title: Text(l10n.checkUpdates),
+        subtitle:
+            Text(l10n.checkUpdatesSubtitle),
+        onTap: () => UpdateService.checkAndPromptUpdate(context,
+            showNoUpdateFeedback: true),
       ),
-    );
+      const Divider(height: 1),
+      ListTile(
+        leading: Icon(Icons.open_in_browser, color: cs.primary),
+        title: Text(l10n.openGitHub),
+        subtitle: const Text('https://github.com/Kikkiu17/InventoryApp'),
+        onTap: () async {
+          final uri = Uri.parse(UpdateService.releasesHtmlUrl);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+        },
+      ),
+      const Divider(height: 1),
+      ListTile(
+        leading: Icon(Icons.published_with_changes, color: cs.primary),
+        title: Text(l10n.whatsNewViewRecentChanges),
+        subtitle: Text(l10n.whatsNewSubtitle),
+        onTap: () =>
+            InventoryChangesService.showRecentChanges(context, ds),
+      ),
+      const Divider(height: 1),
+      SwitchListTile(
+        secondary:
+            Icon(Icons.notifications_active_outlined, color: cs.primary),
+        title: Text(l10n.whatsNewSettingTitle),
+        subtitle: Text(l10n.whatsNewSettingSubtitle),
+        value: !InventoryChangesService.isPopupDisabled,
+        onChanged: (val) async {
+          await InventoryChangesService.setDontShowPopup(!val);
+          setState(() {});
+        },
+      ),
+    ]));
   }
 
   Widget _buildTreeLevel(Map<String, dynamic> node, List<String> path) {
@@ -1921,6 +2262,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         .map((backup) => ListTile(
                               title: Text(_formatBackupName(backup)),
                               leading: const Icon(Icons.history),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.difference_outlined),
+                                tooltip: l10n.viewBackupDiff,
+                                onPressed: () =>
+                                    _showBackupDiff(ctx, ds, backup),
+                              ),
                               onTap: () => Navigator.pop(ctx, backup),
                             ))
                         .toList(),
@@ -1956,6 +2303,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: Text(l10n.restoreSuccess)));
         }
+      }
+    }
+  }
+
+  Future<void> _showBackupDiff(
+      BuildContext context, DataService ds, String backup) async {
+    final l10n = context.l10n;
+    bool loaderShowing = true;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    ).then((_) => loaderShowing = false);
+
+    Map<String, dynamic>? content;
+    try {
+      content = await ds.getBackupContent(backup);
+    } catch (_) {}
+
+    if (loaderShowing && context.mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+    if (!context.mounted) return;
+
+    if (content == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.errorLoadingBackup)),
+      );
+      return;
+    }
+
+    try {
+      final backupComps = (content['components'] as List? ?? [])
+          .map((c) => Component.fromJson(c as Map<String, dynamic>))
+          .toList();
+      final currentComps = ds.components;
+
+      final invName = ds.currentInventory?.name ?? ds.currentInventoryId;
+      final report = InventoryChangesService.computeChanges(
+        currentInventories: {ds.currentInventoryId: backupComps},
+        previousInventories: {ds.currentInventoryId: currentComps},
+        inventoryNames: {ds.currentInventoryId: invName},
+      );
+
+      if (!report.hasChanges) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.noDifferencesWithBackup)),
+        );
+        return;
+      }
+
+      await InventoryChangesService.showChangesDialog(
+        context,
+        report,
+        ds: ds,
+        updateBaseline: false,
+        customTitle: l10n.backupDiffTitle,
+        customSubtitle: _formatBackupName(backup),
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${l10n.errorLoadingBackup}: $e')),
+        );
       }
     }
   }

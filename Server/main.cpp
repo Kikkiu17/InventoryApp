@@ -296,7 +296,21 @@ json load_inv(const std::string& id) {
     if (!fs::exists(p)) {
         json empty = {
             {"components", json::array()},
-            {"settings", {{"drawerRows",4}, {"drawerColumns",6}, {"availableTags",json::array()}, {"tagTree",json::object()}, {"specialTags",json::array()}}}
+            {"settings", {
+                {"drawerRows", 4},
+                {"drawerColumns", 6},
+                {"numCabinets", 1},
+                {"containers", json::array({
+                    {{"id", 1}, {"name", ""}, {"rows", 4}, {"columns", 6},
+                     {"disabledDrawers", json::array()}, {"invertRows", false},
+                     {"invertColumns", false}, {"mergedDrawers", json::array()}}
+                })},
+                {"availableTags", json::array()},
+                {"tagTree", json::object()},
+                {"specialTags", json::array()},
+                {"drawerDividers", json::object()},
+                {"bufferBags", json::array()}
+            }}
         };
         g_cached_inventories[id] = empty;
         return empty;
@@ -540,6 +554,27 @@ int main(int argc, char* argv[]) {
         return json_ok(res);
     });
 
+    CROW_ROUTE(app, "/api/inventories/<string>/backups/<string>").methods("GET"_method)
+    ([](const std::string& inv, const std::string& filename) {
+        if (!valid_id(inv)) return json_err("ID non valido");
+        if (filename.find("..") != std::string::npos || filename.find('/') != std::string::npos || filename.find('\\') != std::string::npos) {
+            return json_err("Percorso non valido", 400);
+        }
+        std::string prefix = inv + "_";
+        if (filename.rfind(prefix, 0) != 0) {
+            return json_err("Backup non appartenente a questo inventario", 403);
+        }
+        fs::path p = fs::path(DATA_DIR) / "backups" / filename;
+        if (!fs::exists(p)) return json_err("Backup non trovato", 404);
+        try {
+            std::ifstream f(p);
+            auto db = json::parse(f);
+            crow::response res(200, db.dump(2));
+            res.add_header("Content-Type", "application/json");
+            return res;
+        } catch (const std::exception& e) { return json_err(e.what()); }
+    });
+
     CROW_ROUTE(app, "/api/inventories/<string>/backups/<string>/restore").methods("POST"_method)
     ([](const std::string& inv, const std::string& filename) {
         if (!valid_id(inv)) return json_err("ID non valido");
@@ -573,7 +608,24 @@ int main(int argc, char* argv[]) {
             meta.push_back(entry);
             save_meta(meta);
 
-            json empty = {{"components", json::array()}, {"settings", {{"drawerRows",4},{"drawerColumns",6}, {"availableTags",json::array()}, {"tagTree",json::object()}, {"specialTags",json::array()}}}};
+            json empty = {
+                {"components", json::array()},
+                {"settings", {
+                    {"drawerRows", 4},
+                    {"drawerColumns", 6},
+                    {"numCabinets", 1},
+                    {"containers", json::array({
+                        {{"id", 1}, {"name", ""}, {"rows", 4}, {"columns", 6},
+                         {"disabledDrawers", json::array()}, {"invertRows", false},
+                         {"invertColumns", false}, {"mergedDrawers", json::array()}}
+                    })},
+                    {"availableTags", json::array()},
+                    {"tagTree", json::object()},
+                    {"specialTags", json::array()},
+                    {"drawerDividers", json::object()},
+                    {"bufferBags", json::array()}
+                }}
+            };
             save_inv(id, empty);
             return json_ok(entry, 201);
         } catch (const std::exception& e) { return json_err(e.what()); }
@@ -870,7 +922,21 @@ int main(int argc, char* argv[]) {
         std::string filename = req.get_header_value("X-Filename");
         if (filename.empty()) filename = "attachment.bin";
         
-        std::string safe_filename = gen_id() + "_" + filename;
+        // Clean up temporary image_picker / scaled cache names
+        if (filename.find("scaled_") != std::string::npos || filename.find("image_picker_") != std::string::npos) {
+            std::string ext = ".jpg";
+            auto dot = filename.rfind('.');
+            if (dot != std::string::npos) ext = filename.substr(dot);
+            filename = "foto" + ext;
+        }
+
+        // Generate a concise 8-hex timestamp to keep filenames short
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+        std::ostringstream ss;
+        ss << std::hex << (ms & 0xFFFFFFFF);
+        std::string safe_filename = ss.str() + "_" + filename;
+
         std::string attach_dir = DATA_DIR + "/attachments/" + inv;
         fs::create_directories(attach_dir);
         

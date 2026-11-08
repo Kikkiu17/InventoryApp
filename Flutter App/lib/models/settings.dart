@@ -109,6 +109,17 @@ class ContainerConfig {
             .toList() ?? [],
       );
 
+  ContainerConfig clone() => ContainerConfig(
+        id: id,
+        name: name,
+        rows: rows,
+        columns: columns,
+        disabledDrawers: List<String>.from(disabledDrawers),
+        invertRows: invertRows,
+        invertColumns: invertColumns,
+        mergedDrawers: mergedDrawers.map((list) => List<String>.from(list)).toList(),
+      );
+
   List<String> get columnLabels => List.generate(columns, (i) {
         String name = '';
         int index = i;
@@ -247,14 +258,16 @@ class AppSettings {
     return map;
   }
 
-  void _flattenTree(Map<String, dynamic> node, Set<String> out) {
+  static void flattenTree(Map<String, dynamic> node, Set<String> out) {
     for (final k in node.keys) {
       out.add(k);
       if (node[k] is Map<String, dynamic>) {
-        _flattenTree(node[k], out);
+        flattenTree(node[k], out);
       }
     }
   }
+
+  void _flattenTree(Map<String, dynamic> node, Set<String> out) => flattenTree(node, out);
 
   List<String> get columnLabels => containers.isNotEmpty ? containers.first.columnLabels : [];
   List<String> get rowLabels => containers.isNotEmpty ? containers.first.rowLabels : [];

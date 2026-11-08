@@ -247,6 +247,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      // Open submenu
+      await tester.tap(find.text('Proprietà con valore'));
+      await tester.pumpAndSettle();
+
       // Find the inputs in "Proprietà con valore"
       final siglaFieldFinder = find.widgetWithText(TextField, 'Sigla');
       expect(siglaFieldFinder, findsOneWidget);
@@ -299,6 +303,10 @@ void main() {
         300,
         scrollable: find.byType(Scrollable).first,
       );
+      await tester.pumpAndSettle();
+
+      // Open submenu
+      await tester.tap(find.text('Proprietà con valore'));
       await tester.pumpAndSettle();
 
       expect(find.text('Lunghezza'), findsOneWidget);

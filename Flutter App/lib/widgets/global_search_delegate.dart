@@ -204,19 +204,68 @@ class GlobalSearchResultTile extends StatelessWidget {
       }
     }
 
-    return ListTile(
-      leading: Icon(
-        isBuffer ? Icons.inbox : Icons.memory,
-        color: isBuffer ? cs.secondary : cs.primary,
+    final hasCabinets = c.cabinet > 1;
+    final isUnassigned = c.drawer.isEmpty;
+    final hasZone = c.drawerZone != null;
+
+    final drawerText = isBuffer
+        ? 'Buffer'
+        : (isUnassigned
+            ? l10n.unassignedDrawerShort
+            : (hasCabinets
+                ? '${c.cabinet}-${c.drawer}${hasZone ? '\nZ${c.drawerZone}' : ''}'
+                : '${c.drawer}${hasZone ? '\nZ${c.drawerZone}' : ''}'));
+
+    final Widget leadingBadge = Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: isBuffer
+            ? cs.secondaryContainer
+            : (isUnassigned ? cs.errorContainer : cs.secondaryContainer),
+        borderRadius: BorderRadius.circular(8),
       ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            isBuffer
+                ? Icons.shopping_bag_outlined
+                : (isUnassigned
+                    ? Icons.location_off_outlined
+                    : (hasCabinets
+                        ? Icons.kitchen_outlined
+                        : Icons.inbox_outlined)),
+            size: 16,
+            color: isBuffer
+                ? cs.onSecondaryContainer
+                : (isUnassigned ? cs.onErrorContainer : cs.onSecondaryContainer),
+          ),
+          const SizedBox(height: 1),
+          Text(
+            drawerText,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: (isBuffer || !isUnassigned) ? 11 : 10,
+              height: 1.05,
+              fontWeight: FontWeight.bold,
+              color: isBuffer
+                  ? cs.onSecondaryContainer
+                  : (isUnassigned ? cs.onErrorContainer : cs.onSecondaryContainer),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return ListTile(
+      leading: leadingBadge,
       title: Text(c.name, style: const TextStyle(fontWeight: FontWeight.bold)),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isBuffer
-                ? (c.description.isNotEmpty ? c.description : l10n.noDescription)
-                : '${c.drawer.isEmpty ? l10n.unassignedDrawerShort : c.drawer}${c.description.isNotEmpty ? " • ${c.description}" : ""}',
+            c.description.isNotEmpty ? c.description : l10n.noDescription,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -306,67 +355,59 @@ class GlobalSearchResultTile extends StatelessWidget {
           ),
         ],
       ),
-      onTap: () async {
-        try {
-          final mainContext = globalMainShellKey.currentContext;
-          if (isBuffer) {
-            if (context.mounted && mainContext != null) {
-              ScaffoldMessenger.of(mainContext).showSnackBar(SnackBar(
-                content: Text(l10n.passedToBuffer),
-                behavior: SnackBarBehavior.floating,
+      onTap: () {
+        showDialog(
+          context: context,
+          builder: (ctx) => ComponentViewDialog(
+            component: c,
+            settings: AppSettings(
+              containers: effectiveDs.settings.containers,
+              availableTags: effectiveDs.settings.availableTags,
+              tagTree: effectiveDs.settings.tagTree,
+              specialTags: availableSpecialTags,
+              drawerDividers: effectiveDs.settings.drawerDividers,
+              bufferBags: effectiveDs.settings.bufferBags,
+            ),
+            onEdit: () {
+              ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                content: Text(l10n.editComponentDirectlyFromList),
               ));
-              onBeforeNavigate?.call();
-              
-              // Passa alla tab Buffer (indice 1)
-              globalMainShellKey.currentState?.switchTab(1);
-              
-              // Mostra il ComponentViewDialog
-              showDialog(
-                context: mainContext,
-                builder: (ctx) => ComponentViewDialog(
-                  component: c,
-                  settings: effectiveDs.settings,
-                  onEdit: () {
-                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                      content: Text(l10n.editComponentDirectlyFromList),
+            },
+            onGoToPosition: () async {
+              try {
+                final mainContext = globalMainShellKey.currentContext;
+                onBeforeNavigate?.call();
+
+                if (isBuffer) {
+                  globalMainShellKey.currentState?.switchTab(1);
+                  if (mainContext != null && mainContext.mounted) {
+                    ScaffoldMessenger.of(mainContext).showSnackBar(SnackBar(
+                      content: Text(l10n.passedToBuffer),
+                      behavior: SnackBarBehavior.floating,
                     ));
-                  },
-                ),
-              );
-            }
-          } else {
-            await effectiveDs.switchInventory(res.inventoryId);
-            effectiveDs.setGlobalSearchQuery(query);
-            if (context.mounted && mainContext != null) {
-              ScaffoldMessenger.of(mainContext).showSnackBar(SnackBar(
-                content: Text(l10n.switchedToInventory(res.inventoryName)),
-                behavior: SnackBarBehavior.floating,
-              ));
-              onBeforeNavigate?.call();
-              
-              // Passa alla tab Home
-              globalMainShellKey.currentState?.switchTab(0);
-              
-              // Mostra il ComponentViewDialog
-              showDialog(
-                context: mainContext,
-                builder: (ctx) => ComponentViewDialog(
-                  component: c,
-                  settings: effectiveDs.settings,
-                  onEdit: () {
-                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                      content: Text(l10n.editComponentDirectlyFromList),
+                  }
+                } else {
+                  await effectiveDs.switchInventory(res.inventoryId);
+                  effectiveDs.setGlobalSearchQuery(c.name);
+                  globalMainShellKey.currentState?.switchTab(0);
+                  if (mainContext != null && mainContext.mounted) {
+                    ScaffoldMessenger.of(mainContext).showSnackBar(SnackBar(
+                      content: Text(l10n.switchedToInventory(res.inventoryName)),
+                      behavior: SnackBarBehavior.floating,
                     ));
-                  },
-                ),
-              );
-            }
-          }
-        } catch (e) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${l10n.error}: $e')));
-          }
-        }
+                  }
+                }
+              } catch (e) {
+                final mainContext = globalMainShellKey.currentContext ?? context;
+                if (mainContext.mounted) {
+                  ScaffoldMessenger.of(mainContext).showSnackBar(
+                    SnackBar(content: Text('${l10n.error}: $e')),
+                  );
+                }
+              }
+            },
+          ),
+        );
       },
     );
   }

@@ -48,9 +48,8 @@ void main() {
         await tester.pumpAndSettle();
       }
 
-      // Scroll a bit more so all fields in the card are in view
-      await tester.dragFrom(
-          Offset(10, size.height * 0.7), const Offset(0, -150));
+      // Tap on "Proprietà con valore" to enter the submenu
+      await tester.tap(find.text('Proprietà con valore'));
       await tester.pumpAndSettle();
 
       final nameField = find.widgetWithText(TextField, 'Nome');
@@ -82,4 +81,40 @@ void main() {
       // expect(error, isNull);
     });
   }
+
+  testWidgets(
+      'Settings screen displays submenus and supports entering and exiting',
+      (tester) async {
+    final ds = DataService();
+    await tester.pumpWidget(
+      ChangeNotifierProvider<DataService>.value(
+        value: ds,
+        child: const MaterialApp(
+          home: SettingsScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Verify main menu items are visible
+    expect(find.text('Server remoto'), findsOneWidget);
+    expect(find.text('Aspetto'), findsOneWidget);
+    expect(find.text('Proprietà con valore'), findsOneWidget);
+
+    // Tap on "Aspetto" submenu
+    await tester.tap(find.text('Aspetto'));
+    await tester.pumpAndSettle();
+
+    // Verify inside "Aspetto" submenu
+    expect(find.byType(BackButton), findsOneWidget);
+
+    // Tap Back button to return to main settings menu
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+
+    // Verify returned to main menu
+    expect(find.text('Server remoto'), findsOneWidget);
+    expect(find.text('Aspetto'), findsOneWidget);
+  });
 }

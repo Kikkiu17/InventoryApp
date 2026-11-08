@@ -12,13 +12,15 @@ import 'image_viewer.dart';
 class ComponentViewDialog extends StatelessWidget {
   final Component component;
   final AppSettings settings;
-  final VoidCallback onEdit;
+  final VoidCallback? onEdit;
+  final VoidCallback? onGoToPosition;
 
   const ComponentViewDialog({
     super.key,
     required this.component,
     required this.settings,
-    required this.onEdit,
+    this.onEdit,
+    this.onGoToPosition,
   });
 
   @override
@@ -42,15 +44,16 @@ class ComponentViewDialog extends StatelessWidget {
               color: cs.secondary,
               onPressed: () => _showMoveDialog(context, ds, currentComp),
             ),
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            tooltip: l10n.editAction,
-            color: cs.primary,
-            onPressed: () {
-              Navigator.pop(context); // close view
-              onEdit();
-            },
-          ),
+          if (onEdit != null)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: l10n.editAction,
+              color: cs.primary,
+              onPressed: () {
+                Navigator.pop(context); // close view
+                onEdit!();
+              },
+            ),
         ],
       ),
       content: SingleChildScrollView(
@@ -207,6 +210,15 @@ class ComponentViewDialog extends StatelessWidget {
         ),
       ),
       actions: [
+        if (onGoToPosition != null)
+          FilledButton.tonalIcon(
+            icon: const Icon(Icons.explore_outlined, size: 18),
+            label: Text(l10n.goToPosition),
+            onPressed: () {
+              Navigator.pop(context);
+              onGoToPosition!();
+            },
+          ),
         TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.close)),
       ],
     );

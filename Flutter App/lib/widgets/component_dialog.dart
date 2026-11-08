@@ -1410,6 +1410,7 @@ class _ComponentDialogState extends State<ComponentDialog> {
         tagTree: currentSettings.tagTree,
         specialTags: currentSettings.specialTags,
         drawerDividers: newDividers,
+        bufferBags: currentSettings.bufferBags,
       );
 
       await ds.updateSettings(updatedSettings);
@@ -1493,11 +1494,28 @@ class _ComponentDialogState extends State<ComponentDialog> {
     }
 
     List<String> finalImages = [];
-    for (var path in _images) {
+    for (int i = 0; i < _images.length; i++) {
+      final path = _images[i];
       if (!path.startsWith('/')) {
         finalImages.add(path);
       } else {
-        final filename = path.split('/').last;
+        final extMatch = RegExp(r'\.[a-zA-Z0-9]+$').firstMatch(path);
+        final ext =
+            extMatch != null ? extMatch.group(0)!.toLowerCase() : '.jpg';
+
+        final cleanComp = _nameCtrl.text
+            .trim()
+            .toLowerCase()
+            .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+            .replaceAll(RegExp(r'_+'), '_')
+            .replaceAll(RegExp(r'^_+|_+$'), '');
+
+        final shortBase = cleanComp.isNotEmpty
+            ? (cleanComp.length > 20
+                ? cleanComp.substring(0, 20).replaceAll(RegExp(r'_+$'), '')
+                : cleanComp)
+            : 'foto';
+        final filename = '${shortBase}_${i + 1}$ext';
         final newName = await ds.uploadAttachment(path, filename);
         if (newName != null) {
           finalImages.add(newName);

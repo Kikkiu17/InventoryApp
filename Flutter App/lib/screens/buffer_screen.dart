@@ -637,11 +637,11 @@ class _BufferScreenState extends State<BufferScreen> {
               ],
             ),
       floatingActionButton: items.isNotEmpty
-          ? FloatingActionButton.extended(
+          ? FloatingActionButton(
               heroTag: 'fab_buffer',
               onPressed: () => _addComponent(context, ds),
-              icon: const Icon(Icons.add),
-              label: Text(l10n.add),
+              tooltip: l10n.add,
+              child: const Icon(Icons.add),
             )
           : null,
     );

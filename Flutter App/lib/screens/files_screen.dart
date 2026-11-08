@@ -213,6 +213,38 @@ class _FilesScreenState extends State<FilesScreen> {
     }
   }
 
+  String _formatImageName(String path, int index, String componentName) {
+    final rawName = path.split('/').last;
+    String name = rawName;
+    final prefixMatch = RegExp(r'^[0-9a-fA-F]{8,16}_(.*)$').firstMatch(name);
+    if (prefixMatch != null) {
+      name = prefixMatch.group(1)!;
+    }
+
+    if (name.contains('scaled_') ||
+        name.contains('image_picker_') ||
+        RegExp(r'^[0-9a-fA-F\-]{25,}').hasMatch(name)) {
+      final extMatch = RegExp(r'\.[a-zA-Z0-9]+$').firstMatch(rawName);
+      final ext = extMatch != null ? extMatch.group(0)!.toLowerCase() : '.jpg';
+
+      final cleanComp = componentName
+          .trim()
+          .toLowerCase()
+          .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+          .replaceAll(RegExp(r'_+'), '_')
+          .replaceAll(RegExp(r'^_+|_+$'), '');
+
+      final shortBase = cleanComp.isNotEmpty
+          ? (cleanComp.length > 20
+              ? cleanComp.substring(0, 20).replaceAll(RegExp(r'_+$'), '')
+              : cleanComp)
+          : 'foto';
+      return '${shortBase}_${index + 1}$ext';
+    }
+
+    return name;
+  }
+
   @override
   Widget build(BuildContext context) {
     final ds = context.watch<DataService>();
@@ -231,10 +263,11 @@ class _FilesScreenState extends State<FilesScreen> {
           isImage: false,
         ));
       }
-      for (final imgPath in c.images) {
+      for (int i = 0; i < c.images.length; i++) {
+        final imgPath = c.images[i];
         allItems.add(FilesScreenItem(
           component: c,
-          name: imgPath.split('/').last,
+          name: _formatImageName(imgPath, i, c.name),
           path: imgPath,
           isLink: false,
           isImage: true,
@@ -247,6 +280,7 @@ class _FilesScreenState extends State<FilesScreen> {
       if (_query.isEmpty) return true;
       final q = _query.toLowerCase();
       return item.name.toLowerCase().contains(q) ||
+          item.path.toLowerCase().contains(q) ||
           item.component.name.toLowerCase().contains(q);
     }).toList();
 
