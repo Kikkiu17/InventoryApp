@@ -552,7 +552,7 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get compDrawerLabel => 'Tiroir';
   @override
-  String get compZoneLabel => 'Zone du tiroir';
+  String get compZoneLabel => 'Zone';
   @override
   String get tagsSectionTitle => 'Étiquettes et Catégories';
   @override

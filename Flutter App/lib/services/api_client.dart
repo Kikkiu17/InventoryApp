@@ -175,8 +175,11 @@ class ApiClient {
     return Component.fromJson(jsonDecode(res.body));
   }
 
-  Future<Component> patchQuantity(String id, int delta) async {
-    final res = await _client.patch(_inv('/components/$id/quantity'),
+  Future<Component> patchQuantity(String id, int delta, [String? invId]) async {
+    final uri = (invId != null && invId.isNotEmpty)
+        ? Uri.parse('$baseUrl/api/inventories/$invId/components/$id/quantity')
+        : _inv('/components/$id/quantity');
+    final res = await _client.patch(uri,
         headers: _headers, body: jsonEncode({'delta': delta})).timeout(_timeout);
     await _check(res);
     return Component.fromJson(jsonDecode(res.body));
@@ -291,13 +294,19 @@ class ApiClient {
     await _check(res);
   }
 
-  Future<Uint8List> downloadAttachment(String filename) async {
-    final res = await _client.get(_inv('/attachments/$filename')).timeout(const Duration(seconds: 30));
+  Future<Uint8List> downloadAttachment(String filename, [String? invId]) async {
+    final uri = (invId != null && invId.isNotEmpty)
+        ? Uri.parse('$baseUrl/api/inventories/$invId/attachments/$filename')
+        : _inv('/attachments/$filename');
+    final res = await _client.get(uri).timeout(const Duration(seconds: 30));
     await _check(res);
     return res.bodyBytes;
   }
 
-  String getAttachmentUrl(String filename) {
+  String getAttachmentUrl(String filename, [String? invId]) {
+    if (invId != null && invId.isNotEmpty) {
+      return '$baseUrl/api/inventories/$invId/attachments/$filename';
+    }
     return _inv('/attachments/$filename').toString();
   }
 }

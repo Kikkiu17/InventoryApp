@@ -594,6 +594,7 @@ class InventoryChangesService {
                                           builder: (ctx) => ComponentViewDialog(
                                             component: change.component,
                                             settings: ds.settings,
+                                            inventoryId: change.inventoryId == '_buffer_' ? null : change.inventoryId,
                                           ),
                                         );
                                       } else {

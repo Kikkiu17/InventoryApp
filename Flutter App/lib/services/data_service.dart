@@ -626,10 +626,13 @@ class DataService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateQuantity(String id, int delta) async {
+  Future<void> updateQuantity(String id, int delta, [String? invId]) async {
+    final effectiveInvId = (invId != null && invId.isNotEmpty && invId != '_buffer_')
+        ? invId
+        : _currentInventoryId;
     if (_mode == StorageMode.remote && _serverConnected) {
       try {
-        final updated = await _api!.patchQuantity(id, delta);
+        final updated = await _api!.patchQuantity(id, delta, effectiveInvId);
         final idx = _components.indexWhere((e) => e.id == updated.id);
         if (idx != -1) _components[idx] = updated;
         final ts = DateTime.tryParse(_api!.lastUpdated ?? '');
@@ -1158,31 +1161,43 @@ class DataService extends ChangeNotifier {
     }
   }
 
-  Future<String> getLocalAttachmentPath(String filename) async {
+  Future<String> getLocalAttachmentPath(String filename, [String? invId]) async {
     final dir = await getApplicationDocumentsDirectory();
-    return '${dir.path}/attachments/$_currentInventoryId/$filename';
+    final id = (invId != null && invId.isNotEmpty && invId != '_buffer_')
+        ? invId
+        : _currentInventoryId;
+    return '${dir.path}/attachments/$id/$filename';
   }
 
-  String getLocalAttachmentPathSync(String filename) {
+  String getLocalAttachmentPathSync(String filename, [String? invId]) {
     if (_localAppDocDir == null) return '';
-    return '$_localAppDocDir/attachments/$_currentInventoryId/$filename';
+    final id = (invId != null && invId.isNotEmpty && invId != '_buffer_')
+        ? invId
+        : _currentInventoryId;
+    return '$_localAppDocDir/attachments/$id/$filename';
   }
 
-  String getAttachmentUrl(String filename) {
+  String getAttachmentUrl(String filename, [String? invId]) {
     if (_api != null) {
-      return _api!.getAttachmentUrl(filename);
+      final id = (invId != null && invId.isNotEmpty && invId != '_buffer_')
+          ? invId
+          : null;
+      return _api!.getAttachmentUrl(filename, id);
     }
     return '';
   }
 
-  Future<String> getOrDownloadAttachment(String filename) async {
-    final localPath = await getLocalAttachmentPath(filename);
+  Future<String> getOrDownloadAttachment(String filename, [String? invId]) async {
+    final localPath = await getLocalAttachmentPath(filename, invId);
     final file = File(localPath);
     if (await file.exists() && await file.length() > 0) {
       return localPath;
     }
     if (_mode == StorageMode.remote && _api != null) {
-      final bytes = await _api!.downloadAttachment(filename);
+      final id = (invId != null && invId.isNotEmpty && invId != '_buffer_')
+          ? invId
+          : null;
+      final bytes = await _api!.downloadAttachment(filename, id);
       await file.parent.create(recursive: true);
       await file.writeAsBytes(bytes);
       return localPath;
@@ -1227,6 +1242,7 @@ class DataService extends ChangeNotifier {
               inventoryName: inv.name,
               component: c,
               specialTags: settings.specialTags,
+              settings: settings,
             ));
           }
         }

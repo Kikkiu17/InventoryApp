@@ -552,7 +552,7 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get compDrawerLabel => 'Schublade';
   @override
-  String get compZoneLabel => 'Schubladenzone';
+  String get compZoneLabel => 'Zone';
   @override
   String get tagsSectionTitle => 'Tags & Kategorien';
   @override

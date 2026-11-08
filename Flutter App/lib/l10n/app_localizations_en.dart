@@ -551,7 +551,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get compDrawerLabel => 'Drawer';
   @override
-  String get compZoneLabel => 'Drawer zone';
+  String get compZoneLabel => 'Zone';
   @override
   String get tagsSectionTitle => 'Tags & Categories';
   @override

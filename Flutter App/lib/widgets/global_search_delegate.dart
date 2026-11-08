@@ -360,14 +360,16 @@ class GlobalSearchResultTile extends StatelessWidget {
           context: context,
           builder: (ctx) => ComponentViewDialog(
             component: c,
-            settings: AppSettings(
-              containers: effectiveDs.settings.containers,
-              availableTags: effectiveDs.settings.availableTags,
-              tagTree: effectiveDs.settings.tagTree,
-              specialTags: availableSpecialTags,
-              drawerDividers: effectiveDs.settings.drawerDividers,
-              bufferBags: effectiveDs.settings.bufferBags,
-            ),
+            inventoryId: isBuffer ? null : res.inventoryId,
+            settings: res.settings ??
+                AppSettings(
+                  containers: effectiveDs.settings.containers,
+                  availableTags: effectiveDs.settings.availableTags,
+                  tagTree: effectiveDs.settings.tagTree,
+                  specialTags: availableSpecialTags,
+                  drawerDividers: effectiveDs.settings.drawerDividers,
+                  bufferBags: effectiveDs.settings.bufferBags,
+                ),
             onEdit: () {
               ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
                 content: Text(l10n.editComponentDirectlyFromList),

@@ -552,7 +552,7 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get compDrawerLabel => 'Cajón';
   @override
-  String get compZoneLabel => 'Zona del cajón';
+  String get compZoneLabel => 'Zona';
   @override
   String get tagsSectionTitle => 'Etiquetas y Categorías';
   @override

@@ -6,12 +6,14 @@ class GlobalSearchResult {
   final String inventoryName;
   final Component component;
   final List<SpecialTag>? specialTags;
+  final AppSettings? settings;
 
   GlobalSearchResult({
     required this.inventoryId,
     required this.inventoryName,
     required this.component,
     this.specialTags,
+    this.settings,
   });
 
   factory GlobalSearchResult.fromJson(Map<String, dynamic> json) {
@@ -22,6 +24,9 @@ class GlobalSearchResult {
       specialTags: (json['specialTags'] as List?)
           ?.map((t) => SpecialTag.fromJson(t as Map<String, dynamic>))
           .toList(),
+      settings: json['settings'] != null
+          ? AppSettings.fromJson(json['settings'] as Map<String, dynamic>)
+          : null,
     );
   }
 
@@ -32,6 +37,8 @@ class GlobalSearchResult {
       'component': component.toJson(),
       if (specialTags != null)
         'specialTags': specialTags!.map((t) => t.toJson()).toList(),
+      if (settings != null)
+        'settings': settings!.toJson(),
     };
   }
 }

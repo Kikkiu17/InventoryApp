@@ -12,6 +12,7 @@ import 'image_viewer.dart';
 class ComponentViewDialog extends StatelessWidget {
   final Component component;
   final AppSettings settings;
+  final String? inventoryId;
   final VoidCallback? onEdit;
   final VoidCallback? onGoToPosition;
 
@@ -19,6 +20,7 @@ class ComponentViewDialog extends StatelessWidget {
     super.key,
     required this.component,
     required this.settings,
+    this.inventoryId,
     this.onEdit,
     this.onGoToPosition,
   });
@@ -30,7 +32,10 @@ class ComponentViewDialog extends StatelessWidget {
     final ds = Provider.of<DataService>(context);
 
     // Get the latest component from the state in case it was updated (e.g. quantity changed)
-    final currentComp = ds.components.firstWhere((c) => c.id == component.id, orElse: () => component);
+    final isCurrentInventory = inventoryId == null || inventoryId == ds.currentInventoryId;
+    final currentComp = isCurrentInventory
+        ? ds.components.firstWhere((c) => c.id == component.id, orElse: () => component)
+        : component;
 
     return AlertDialog(
       title: Row(
@@ -108,12 +113,12 @@ class ComponentViewDialog extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(l10n.quantityLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
                 const Spacer(),
-                IconButton(icon: const Icon(Icons.remove), onPressed: () => ds.updateQuantity(currentComp.id, -1)),
+                IconButton(icon: const Icon(Icons.remove), onPressed: () => ds.updateQuantity(currentComp.id, -1, inventoryId)),
                 SizedBox(
                   width: 40,
                   child: Text('${currentComp.quantity}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
-                IconButton(icon: const Icon(Icons.add), onPressed: () => ds.updateQuantity(currentComp.id, 1)),
+                IconButton(icon: const Icon(Icons.add), onPressed: () => ds.updateQuantity(currentComp.id, 1, inventoryId)),
               ],
             ),
             const SizedBox(height: 16),
@@ -173,6 +178,7 @@ class ComponentViewDialog extends StatelessWidget {
                                 builder: (context) => FullscreenImageViewer(
                                   images: currentComp.images,
                                   initialIndex: index,
+                                  inventoryId: inventoryId,
                                 ),
                               ),
                             );
@@ -243,7 +249,7 @@ class ComponentViewDialog extends StatelessWidget {
       } catch (_) {}
     } else {
       try {
-        final localPath = await ds.getOrDownloadAttachment(a.path);
+        final localPath = await ds.getOrDownloadAttachment(a.path, inventoryId);
         await OpenFilex.open(localPath);
       } catch (_) {}
     }
@@ -266,12 +272,12 @@ class ComponentViewDialog extends StatelessWidget {
     } else {
       if (ds.mode == StorageMode.remote && ds.serverConnected) {
         return Image.network(
-          ds.getAttachmentUrl(imagePath),
+          ds.getAttachmentUrl(imagePath, inventoryId),
           fit: BoxFit.cover,
           errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image),
         );
       } else {
-        final localPath = ds.getLocalAttachmentPathSync(imagePath);
+        final localPath = ds.getLocalAttachmentPathSync(imagePath, inventoryId);
         return Image.file(
           File(localPath),
           fit: BoxFit.cover,

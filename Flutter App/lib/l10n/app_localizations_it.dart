@@ -554,7 +554,7 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get compDrawerLabel => 'Cassetto';
   @override
-  String get compZoneLabel => 'Zona cassetto';
+  String get compZoneLabel => 'Zona';
   @override
   String get tagsSectionTitle => 'Tag e Categorie';
   @override

@@ -755,6 +755,9 @@ int main(int argc, char* argv[]) {
                     if (settings.contains("specialTags")) {
                         res_item["specialTags"] = settings["specialTags"];
                     }
+                    if (!settings.is_null() && settings.is_object()) {
+                        res_item["settings"] = settings;
+                    }
                     results.push_back(res_item);
                 }
             }
