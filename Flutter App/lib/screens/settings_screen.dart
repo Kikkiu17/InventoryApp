@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart'
+    show CupertinoPageTransition, CupertinoRouteTransitionMixin;
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/settings.dart';
@@ -6,6 +9,7 @@ import '../models/component.dart';
 import '../services/data_service.dart';
 import '../services/update_service.dart';
 import '../services/inventory_changes_service.dart';
+import '../services/new_features_service.dart';
 import '../l10n/app_localizations.dart';
 import 'inventory_list_screen.dart';
 
@@ -20,6 +24,104 @@ enum SettingsSubmenu {
   about,
 }
 
+class SettingsSubmenuRoute<T> extends PageRoute<T>
+    with CupertinoRouteTransitionMixin<T> {
+  final WidgetBuilder builder;
+  @override
+  final String? title;
+
+  SettingsSubmenuRoute({
+    required this.builder,
+    this.title,
+    super.settings,
+  });
+
+  @override
+  DelegatedTransitionBuilder? get delegatedTransition =>
+      CupertinoPageTransition.delegatedTransition;
+
+  @override
+  Widget buildContent(BuildContext context) {
+    return _PredictiveBackObserverWidget(
+      route: this,
+      child: builder(context),
+    );
+  }
+
+  @override
+  bool get maintainState => true;
+
+  @override
+  String get debugLabel => '${super.debugLabel}(${settings.name})';
+}
+
+class _PredictiveBackObserverWidget extends StatefulWidget {
+  final PageRoute<dynamic> route;
+  final Widget child;
+
+  const _PredictiveBackObserverWidget({
+    required this.route,
+    required this.child,
+  });
+
+  @override
+  State<_PredictiveBackObserverWidget> createState() =>
+      _PredictiveBackObserverWidgetState();
+}
+
+class _PredictiveBackObserverWidgetState
+    extends State<_PredictiveBackObserverWidget> with WidgetsBindingObserver {
+  bool _handlingGesture = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  bool handleStartBackGesture(PredictiveBackEvent backEvent) {
+    if (!widget.route.isCurrent || !widget.route.popGestureEnabled) {
+      return false;
+    }
+    _handlingGesture = true;
+    widget.route.handleStartBackGesture(progress: 1.0 - backEvent.progress);
+    return true;
+  }
+
+  @override
+  void handleUpdateBackGestureProgress(PredictiveBackEvent backEvent) {
+    if (!_handlingGesture || !widget.route.isCurrent) return;
+    widget.route
+        .handleUpdateBackGestureProgress(progress: 1.0 - backEvent.progress);
+  }
+
+  @override
+  void handleCommitBackGesture() {
+    if (!_handlingGesture) return;
+    _handlingGesture = false;
+    widget.route.handleCommitBackGesture();
+  }
+
+  @override
+  void handleCancelBackGesture() {
+    if (!_handlingGesture) return;
+    _handlingGesture = false;
+    widget.route.handleCancelBackGesture();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.child;
+  }
+}
+
 class SettingsScreen extends StatefulWidget {
   final SettingsSubmenu? initialSubmenu;
 
@@ -29,7 +131,12 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsStateNotifier extends ChangeNotifier {
+  void notify() => notifyListeners();
+}
+
+class _SettingsScreenState extends State<SettingsScreen>
+    with WidgetsBindingObserver {
   SettingsSubmenu? _activeSubmenu;
   late List<ContainerConfig> _containers;
   late List<String> _tags;
@@ -53,25 +160,85 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   final Set<String> _expandedPaths = {};
   AppSettings? _lastSettingsRef;
+  late DataService _dataService;
+  final _stateNotifier = _SettingsStateNotifier();
+  bool _initialSubmenuHandled = false;
 
   @override
   void initState() {
     super.initState();
-    _activeSubmenu = widget.initialSubmenu;
+    WidgetsBinding.instance.addObserver(this);
     _containers = [];
     _tags = [];
     _tagTree = {};
     _specialTags = [];
     _drawerDividers = {};
+    NewFeaturesService.initPreferences().then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _dataService = context.read<DataService>();
+    if (_lastSettingsRef == null) {
+      _loadFromSettings(_dataService.settings);
+      if (widget.initialSubmenu != null && !_initialSubmenuHandled) {
+        _initialSubmenuHandled = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _openSubmenu(widget.initialSubmenu!);
+          }
+        });
+      }
+    }
   }
 
   @override
   void didUpdateWidget(SettingsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.initialSubmenu != oldWidget.initialSubmenu &&
-        widget.initialSubmenu != null) {
-      _activeSubmenu = widget.initialSubmenu;
+        widget.initialSubmenu != null &&
+        _activeSubmenu != widget.initialSubmenu) {
+      _openSubmenu(widget.initialSubmenu!);
     }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      _save();
+    }
+  }
+
+  void _loadFromSettings(AppSettings s) {
+    _lastSettingsRef = s;
+    _containers = s.containers
+        .map((c) => ContainerConfig(
+              id: c.id,
+              name: c.name,
+              rows: c.rows,
+              columns: c.columns,
+              disabledDrawers: List<String>.from(c.disabledDrawers),
+              invertRows: c.invertRows,
+              invertColumns: c.invertColumns,
+              mergedDrawers: c.mergedDrawers
+                  .map((list) => List<String>.from(list))
+                  .toList(),
+            ))
+        .toList();
+
+    _tags = List.from(s.availableTags);
+    _tagTree = _deepCopyTree(s.tagTree);
+    _specialTags = s.specialTags.map((t) => t.clone()).toList();
+    _drawerDividers = Map.from(s.drawerDividers);
+
+    _serverUrlCtrl.text = _dataService.serverUrl;
+    _expandedPaths.clear();
   }
 
   Map<String, dynamic> _deepCopyTree(Map<String, dynamic> source) {
@@ -84,6 +251,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _save();
+    _stateNotifier.dispose();
     _newTagCtrl.dispose();
     _newSpecialNameCtrl.dispose();
     _newSpecialUnitCtrl.dispose();
@@ -93,8 +263,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.dispose();
   }
 
+  void _notifyRoute() {
+    _stateNotifier.notify();
+  }
+
+  void _onDataChanged() {
+    _stateNotifier.notify();
+    _save();
+  }
+
   Future<void> _save() async {
-    final ds = context.read<DataService>();
+    final ds = _dataService;
     if (_containers.isEmpty && ds.settings.containers.isNotEmpty) {
       _containers = ds.settings.containers.map((c) => c.clone()).toList();
     }
@@ -117,9 +296,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ));
     _lastSettingsRef = ds.settings;
 
-    if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(context.l10n.settingsSaved)));
+    final url = _serverUrlCtrl.text.trim();
+    if (url.isNotEmpty && url != ds.serverUrl) {
+      await ds.setServerUrl(url);
     }
   }
 
@@ -263,6 +442,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ));
         _selectedCabinetPreview = nextId;
       });
+      _onDataChanged();
     }
   }
 
@@ -393,6 +573,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }
         container.disabledDrawers = updatedDisabled;
       });
+      _onDataChanged();
     }
   }
 
@@ -427,6 +608,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _containers.isNotEmpty ? _containers.first.id : 1;
         }
       });
+      _onDataChanged();
     }
   }
 
@@ -479,6 +661,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {
         _selectedPreviewDrawers.clear();
       });
+      _notifyRoute();
       return;
     }
 
@@ -489,6 +672,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }
         _selectedPreviewDrawers.clear();
       });
+      _onDataChanged();
     } else if (action == 'disable') {
       setState(() {
         for (final label in _selectedPreviewDrawers) {
@@ -498,6 +682,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }
         _selectedPreviewDrawers.clear();
       });
+      _onDataChanged();
     } else if (action == 'merge') {
       setState(() {
         final selectedList = _selectedPreviewDrawers.toList();
@@ -508,6 +693,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         container.mergedDrawers.add(selectedList);
         _selectedPreviewDrawers.clear();
       });
+      _onDataChanged();
     } else if (action == 'unmerge') {
       setState(() {
         final selectedList = _selectedPreviewDrawers.toList();
@@ -517,6 +703,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         container.mergedDrawers.removeWhere((m) => m.length < 2);
         _selectedPreviewDrawers.clear();
       });
+      _onDataChanged();
     } else if (action == 'zones') {
       int selectedZones = 2;
       if (!mounted) return;
@@ -578,10 +765,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           }
           _selectedPreviewDrawers.clear();
         });
+        _onDataChanged();
       } else {
         setState(() {
           _selectedPreviewDrawers.clear();
         });
+        _notifyRoute();
       }
     }
   }
@@ -693,6 +882,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           }
         }
       });
+      _onDataChanged();
     }
   }
 
@@ -719,92 +909,74 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _configureDrawer(input);
   }
 
+  void _openSubmenu(SettingsSubmenu submenu) {
+    _activeSubmenu = submenu;
+    final route = SettingsSubmenuRoute<void>(
+      builder: (routeContext) => _buildSubmenuScaffold(submenu, routeContext),
+      settings: RouteSettings(name: '/settings/${submenu.name}'),
+    );
+    Navigator.of(context).push(route).then((_) {
+      if (mounted) {
+        setState(() {
+          _activeSubmenu = null;
+        });
+      }
+      _save();
+    });
+  }
+
+  Widget _buildSubmenuScaffold(
+    SettingsSubmenu submenu,
+    BuildContext routeContext,
+  ) {
+    return ListenableBuilder(
+      listenable: _stateNotifier,
+      builder: (context, _) {
+        final l10n = context.l10n;
+        final theme = Theme.of(context);
+        final cs = theme.colorScheme;
+        final ds = context.watch<DataService>();
+        final sortedTags = List<String>.from(_tags)..sort();
+        final title = _getSubmenuTitle(submenu, l10n);
+
+        return Scaffold(
+          appBar: AppBar(
+            leading: BackButton(
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            title: Text(title),
+          ),
+          body: _buildSubmenuBody(
+            submenu,
+            context,
+            ds,
+            l10n,
+            theme,
+            cs,
+            sortedTags,
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final ds = context.watch<DataService>();
+    final s = ds.settings;
+    if (_lastSettingsRef != s && _lastSettingsRef != null) {
+      _loadFromSettings(s);
+    }
+
+    final l10n = context.l10n;
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    if (_lastSettingsRef != ds.settings) {
-      _lastSettingsRef = ds.settings;
-      final s = ds.settings;
-
-      _containers = s.containers
-          .map((c) => ContainerConfig(
-                id: c.id,
-                name: c.name,
-                rows: c.rows,
-                columns: c.columns,
-                disabledDrawers: List<String>.from(c.disabledDrawers),
-                invertRows: c.invertRows,
-                invertColumns: c.invertColumns,
-                mergedDrawers: c.mergedDrawers
-                    .map((list) => List<String>.from(list))
-                    .toList(),
-              ))
-          .toList();
-
-      _tags = List.from(s.availableTags);
-      _tagTree = _deepCopyTree(s.tagTree);
-      _specialTags = s.specialTags.map((t) => t.clone()).toList();
-      _drawerDividers = Map.from(s.drawerDividers);
-
-      _serverUrlCtrl.text = ds.serverUrl;
-      _expandedPaths.clear();
-    }
-
-    final sortedTags = List<String>.from(_tags)..sort();
-    final l10n = context.l10n;
-
-    final isSubmenu = _activeSubmenu != null;
-    final title = isSubmenu
-        ? _getSubmenuTitle(_activeSubmenu!, l10n)
-        : l10n.settingsTitle;
-
-    return PopScope(
-      canPop: !isSubmenu,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && _activeSubmenu != null) {
-          setState(() {
-            _activeSubmenu = null;
-          });
-        }
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          leading: isSubmenu
-              ? BackButton(
-                  onPressed: () {
-                    setState(() {
-                      _activeSubmenu = null;
-                    });
-                  },
-                )
-              : null,
-          title: Text(title),
-          actions: [
-            if (_activeSubmenu == SettingsSubmenu.containers ||
-                _activeSubmenu == SettingsSubmenu.properties ||
-                _activeSubmenu == SettingsSubmenu.genericTags ||
-                _activeSubmenu == SettingsSubmenu.tagTree)
-              TextButton(
-                onPressed: _save,
-                child: Text(l10n.saveSettings),
-              ),
-          ],
-        ),
-        body: _activeSubmenu == null
-            ? _buildMainMenu(context, ds, l10n, theme, cs)
-            : _buildSubmenuBody(
-                _activeSubmenu!,
-                context,
-                ds,
-                l10n,
-                theme,
-                cs,
-                sortedTags,
-              ),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(l10n.settingsTitle),
       ),
+      body: _buildMainMenu(context, ds, l10n, theme, cs),
     );
   }
 
@@ -936,9 +1108,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               size: 20,
             ),
             onTap: () {
-              setState(() {
-                _activeSubmenu = submenu;
-              });
+              _openSubmenu(submenu);
             },
           ),
         );
@@ -1144,13 +1314,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             await ds.setTrustSelfSigned(val);
           },
         ),
-        const SizedBox(height: 8),
-        SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-                onPressed: _applyServer,
-                icon: const Icon(Icons.save_outlined),
-                label: Text(l10n.save))),
+
         if (ds.isRemote) ...[
           const SizedBox(height: 8),
           SizedBox(
@@ -1414,6 +1578,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (val) {
                   if (val != null) {
                     setState(() => _selectedCabinetPreview = val);
+                    _notifyRoute();
                   }
                 },
               );
@@ -1466,11 +1631,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               setState(() {
                 _selectedPreviewDrawers.add(label);
               });
+              _notifyRoute();
             },
             onSelectUpdate: (label) {
               setState(() {
                 _selectedPreviewDrawers.add(label);
               });
+              _notifyRoute();
             },
             onSelectEnd: () {
               _showBulkActionDialog();
@@ -1731,6 +1898,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 final item = _specialTags.removeAt(oldIndex);
                 _specialTags.insert(newIndex, item);
               });
+              _onDataChanged();
             },
             itemBuilder: (ctx, i) {
               final st = _specialTags[i];
@@ -1872,6 +2040,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onChanged: (val) async {
           await InventoryChangesService.setDontShowPopup(!val);
           setState(() {});
+          _notifyRoute();
+        },
+      ),
+      const Divider(height: 1),
+      ListTile(
+        key: const Key('settings_new_features_tile'),
+        leading: Icon(Icons.auto_awesome, color: cs.primary),
+        title: Text(l10n.newFeaturesSettingsTitle),
+        subtitle: Text(l10n.newFeaturesSettingsSubtitle),
+        onTap: () => NewFeaturesService.show(context),
+      ),
+      const Divider(height: 1),
+      SwitchListTile(
+        key: const Key('settings_new_features_auto_show_switch'),
+        secondary:
+            Icon(Icons.tips_and_updates_outlined, color: cs.primary),
+        title: Text(l10n.newFeaturesAutoShowTitle),
+        subtitle: Text(l10n.newFeaturesAutoShowSubtitle),
+        value: !NewFeaturesService.isAutoShowDisabled,
+        onChanged: (val) async {
+          await NewFeaturesService.setDontShowOnUpdate(!val);
+          setState(() {});
+          _notifyRoute();
         },
       ),
     ]));
@@ -1901,6 +2092,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   else
                     _expandedPaths.remove(currentPathKey);
                 });
+                _notifyRoute();
               },
               title:
                   Text(k, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -1957,6 +2149,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   final newPathKey = [...path, v].join('|');
                   _expandedPaths.add(newPathKey);
                 });
+                _onDataChanged();
               }
             },
           ),
@@ -1995,40 +2188,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
           current.remove(path.last);
         }
       });
+      _onDataChanged();
     }
   }
 
   Future<void> _testServer() async {
     final l10n = context.l10n;
-    final ds = context.read<DataService>();
+    final ds = _dataService;
     setState(() {
       _testingServer = true;
       _serverOk = null;
     });
+    _notifyRoute();
     final client = ApiClient(
       _serverUrlCtrl.text.trim(),
       allowSelfSigned: ds.trustSelfSigned,
     );
     final ok = await client.ping();
     client.close();
-    setState(() {
-      _testingServer = false;
-      _serverOk = ok;
-    });
-    if (mounted)
+    if (mounted) {
+      setState(() {
+        _testingServer = false;
+        _serverOk = ok;
+      });
+      _notifyRoute();
+      if (ok) {
+        await _applyServer();
+      }
       ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(ok ? '${l10n.connectionSuccess} ✅' : '${l10n.connectionFailed} ❌')));
+    }
   }
 
   Future<void> _applyServer() async {
     final url = _serverUrlCtrl.text.trim();
     if (url.isEmpty) return;
-    final ds = context.read<DataService>();
+    final ds = _dataService;
     final ok = await ds.setServerUrl(url);
-    setState(() {
-      _serverOk = ok;
-      _serverUrlCtrl.text = ds.serverUrl;
-    });
+    if (mounted) {
+      setState(() {
+        _serverOk = ok;
+        _serverUrlCtrl.text = ds.serverUrl;
+      });
+      _notifyRoute();
+    }
   }
 
   void _addTag() {
@@ -2036,6 +2239,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (tag.isEmpty || _tags.contains(tag)) return;
     setState(() => _tags.add(tag));
     _newTagCtrl.clear();
+    _onDataChanged();
   }
 
   void _addSpecialTag() {
@@ -2052,6 +2256,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _newSpecialNameCtrl.clear();
     _newSpecialUnitCtrl.clear();
     _newSpecialShortIdCtrl.clear();
+    _onDataChanged();
   }
 
   Future<void> _editSpecialTag(SpecialTag st) async {
@@ -2150,6 +2355,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         st.shortId = shortIdCtrl.text.trim();
         st.isString = isString;
       });
+      _onDataChanged();
     }
   }
 
@@ -2170,7 +2376,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
-    if (confirm == true) setState(() => _tags.remove(tag));
+    if (confirm == true) {
+      setState(() => _tags.remove(tag));
+      _onDataChanged();
+    }
   }
 
   Future<void> _confirmDeleteSpecialTag(String name) async {
@@ -2190,8 +2399,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
-    if (confirm == true)
+    if (confirm == true) {
       setState(() => _specialTags.removeWhere((t) => t.name == name));
+      _onDataChanged();
+    }
   }
 
   Future<void> _importData(DataService ds) async {
@@ -2236,6 +2447,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ds.settings.specialTags.map((t) => t.clone()).toList();
         _drawerDividers = Map.from(ds.settings.drawerDividers);
       });
+      _notifyRoute();
     }
   }
 

@@ -774,7 +774,9 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get deleteFileTitle => 'Elimina file';
   @override
-  String get componentPrefix => 'Componente';
+  String get componentPrefix => 'Elemento';
+  @override
+  String get itemPrefix => 'Elemento';
 
   @override
   String get zoneNearLabel => 'Vicina (davanti)';
@@ -856,7 +858,11 @@ class AppLocalizationsIt extends AppLocalizations {
   String deleteAttachmentPermanentConfirm(String name) =>
       'Vuoi eliminare definitivamente "$name"?';
   @override
-  String get searchFileOrComponentPlaceholder => 'Cerca file o componente...';
+  String get searchFileOrComponentPlaceholder => 'Cerca file o elemento...';
+  @override
+  String get seeItem => 'Vedi elemento';
+  @override
+  String get selectItemToView => 'Seleziona elemento';
 
   @override
   String get deleteComponentConfirmMsg =>
@@ -1068,4 +1074,70 @@ class AppLocalizationsIt extends AppLocalizations {
   String get noDifferencesWithBackup => 'Nessuna differenza rispetto allo stato attuale';
   @override
   String get errorLoadingBackup => 'Errore durante il caricamento del backup';
+
+  // New Features Walkthrough
+  @override
+  String get newFeaturesTitle => 'Novità dell\'app';
+  @override
+  String get newFeaturesSubtitle => 'Scopri le novità introdotte nell\'app';
+  @override
+  String get newFeaturesSkip => 'Salta';
+  @override
+  String get newFeaturesNext => 'Avanti';
+  @override
+  String get newFeaturesBack => 'Indietro';
+  @override
+  String get newFeaturesDone => 'Ho capito';
+  @override
+  String get newFeaturesDontShowForNewVersions => 'Non mostrare per le nuove versioni';
+  @override
+  String get newFeaturesSettingsTitle => 'Guida alle funzionalità';
+  @override
+  String get newFeaturesSettingsSubtitle => 'Scopri le nuove funzionalità e come usarle';
+  @override
+  String get newFeaturesAutoShowTitle => 'Mostra novità agli aggiornamenti';
+  @override
+  String get newFeaturesAutoShowSubtitle => 'Mostra automaticamente la guida quando l\'app viene aggiornata';
+
+  @override
+  String get newFeatureMapCategory => 'Mappa & Posizione';
+  @override
+  String get newFeatureMapTitle => 'Trova sulla mappa in un tocco';
+  @override
+  String get newFeatureMapSubtitle => 'Tocca il riquadro della posizione per evidenziare subito cassetto e zona.';
+  @override
+  String get newFeatureMapStep1 => 'Tocca il riquadro con la posizione sulla tessera (es. A1 · 2)';
+  @override
+  String get newFeatureMapStep2 => 'Il cassetto e la zona esatta si evidenziano in arancione sulla mappa';
+
+  @override
+  String get newFeatureFilesCategory => 'Gestione File';
+  @override
+  String get newFeatureFilesTitle => 'Vedi elemento direttamente dai file';
+  @override
+  String get newFeatureFilesSubtitle => 'Apri la scheda dell\'elemento collegato con un clic destro o pressione prolungata.';
+  @override
+  String get newFeatureFilesStep1 => 'Fai clic destro o tieni premuto su un file nella pagina File';
+  @override
+  String get newFeatureFilesStep2 => 'Scegli \'Vedi elemento\' per consultare dettagli e posizione';
+
+  @override
+  String get newFeatureSettingsCategory => 'Impostazioni';
+  @override
+  String get newFeatureSettingsTitle => 'Salvataggio immediato senza tasti';
+  @override
+  String get newFeatureSettingsSubtitle => 'Ogni preferenza o modifica si salva all\'istante senza dover confermare.';
+  @override
+  String get newFeatureSettingsStep1 => 'Modifica liberamente qualsiasi opzione nelle impostazioni';
+  @override
+  String get newFeatureSettingsStep2 => 'Torna indietro in qualsiasi momento: tutto è già salvato';
+
+  @override
+  String get newFeatureMockResistor => 'Resistore 10kΩ';
+  @override
+  String get newFeatureMockFile => 'datasheet.pdf';
+  @override
+  String get newFeatureMockViewItem => 'Vedi elemento';
+  @override
+  String get newFeatureMockAutoSaved => 'Salvataggio automatico';
 }

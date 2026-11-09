@@ -12,6 +12,12 @@ class CabinetMapView extends StatefulWidget {
   final Function(Component) onEditComponent;
   final Future<void> Function(int cabinetId, String drawerLabel, int zoneIndex)
       onAddComponentAt;
+  final int? highlightedCabinetId;
+  final String? highlightedDrawer;
+  final int? highlightedZone;
+  final String? highlightedComponentId;
+  final String? highlightedComponentName;
+  final VoidCallback? onClearHighlight;
 
   const CabinetMapView({
     super.key,
@@ -20,6 +26,12 @@ class CabinetMapView extends StatefulWidget {
     required this.onViewComponent,
     required this.onEditComponent,
     required this.onAddComponentAt,
+    this.highlightedCabinetId,
+    this.highlightedDrawer,
+    this.highlightedZone,
+    this.highlightedComponentId,
+    this.highlightedComponentName,
+    this.onClearHighlight,
   });
 
   @override
@@ -51,8 +63,27 @@ class _CabinetMapViewState extends State<CabinetMapView> {
   void initState() {
     super.initState();
     _transformationController = TransformationController();
-    if (widget.settings.containers.isNotEmpty) {
+    if (widget.highlightedCabinetId != null &&
+        widget.settings.containers
+            .any((c) => c.id == widget.highlightedCabinetId)) {
+      _selectedCabinetId = widget.highlightedCabinetId;
+    } else if (widget.settings.containers.isNotEmpty) {
       _selectedCabinetId = widget.settings.containers.first.id;
+    }
+  }
+
+  @override
+  void didUpdateWidget(CabinetMapView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.highlightedCabinetId != null &&
+        (widget.highlightedCabinetId != oldWidget.highlightedCabinetId ||
+            widget.highlightedDrawer != oldWidget.highlightedDrawer)) {
+      if (widget.settings.containers
+          .any((c) => c.id == widget.highlightedCabinetId)) {
+        setState(() {
+          _selectedCabinetId = widget.highlightedCabinetId;
+        });
+      }
     }
   }
 
@@ -80,7 +111,12 @@ class _CabinetMapViewState extends State<CabinetMapView> {
     // Adjust selected cabinet if the list changes or it becomes invalid
     if (_selectedCabinetId == null ||
         !containers.any((c) => c.id == _selectedCabinetId)) {
-      _selectedCabinetId = containers.first.id;
+      if (widget.highlightedCabinetId != null &&
+          containers.any((c) => c.id == widget.highlightedCabinetId)) {
+        _selectedCabinetId = widget.highlightedCabinetId;
+      } else {
+        _selectedCabinetId = containers.first.id;
+      }
     }
 
     final selectedContainer =
@@ -151,6 +187,68 @@ class _CabinetMapViewState extends State<CabinetMapView> {
             ),
           ),
         ],
+
+        // Highlight indicator banner
+        if (widget.highlightedDrawer != null)
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF3E2723)
+                  : const Color(0xFFFFF3E0),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: (Theme.of(context).brightness == Brightness.dark
+                        ? const Color(0xFFFF9800)
+                        : const Color(0xFFE65100))
+                    .withValues(alpha: 0.5),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.location_on,
+                  size: 20,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFFFFB74D)
+                      : const Color(0xFFE65100),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    widget.highlightedComponentName != null &&
+                            widget.highlightedComponentName!.isNotEmpty
+                        ? '${widget.highlightedComponentName} · ${widget.highlightedCabinetId != null ? "${l10n.cabinetContainer} ${widget.highlightedCabinetId}, " : ""}${l10n.drawerNumber(widget.highlightedDrawer!)}${widget.highlightedZone != null ? " (Z${widget.highlightedZone})" : ""}'
+                        : '${widget.highlightedCabinetId != null ? "${l10n.cabinetContainer} ${widget.highlightedCabinetId}, " : ""}${l10n.drawerNumber(widget.highlightedDrawer!)}${widget.highlightedZone != null ? " (Z${widget.highlightedZone})" : ""}',
+                    style: TextStyle(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFFFFE0B2)
+                          : const Color(0xFFBF360C),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (widget.onClearHighlight != null)
+                  InkWell(
+                    onTap: widget.onClearHighlight,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(
+                        Icons.close,
+                        size: 18,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? const Color(0xFFFFB74D)
+                            : const Color(0xFFE65100),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
 
         // Scrolling Instructions & Statistics
         Padding(
@@ -404,6 +502,12 @@ class _CabinetMapViewState extends State<CabinetMapView> {
     final key = '${container.id}_$label';
     final totalZones = settings.drawerDividers[key] ?? 1;
 
+    final isDrawerHighlighted = widget.highlightedDrawer != null &&
+        (widget.highlightedCabinetId == null ||
+            widget.highlightedCabinetId == container.id) &&
+        (label == widget.highlightedDrawer ||
+            (group != null && group.contains(widget.highlightedDrawer)));
+
     final List<Component> drawerComps = [];
     if (group != null) {
       for (final lbl in group) {
@@ -419,15 +523,25 @@ class _CabinetMapViewState extends State<CabinetMapView> {
       }
     }
 
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final highlightOrange = isDark ? const Color(0xFFFF9800) : const Color(0xFFE65100);
+
+    final double outerRadius = isDrawerHighlighted ? 10.0 : 8.0;
+    final double borderWidth = isDrawerHighlighted ? 4.0 : (drawerComps.isNotEmpty ? 1.5 : 1.0);
+    final double innerRadius = (outerRadius - borderWidth).clamp(3.0, 7.0);
+
     return Container(
       margin: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(outerRadius),
         border: Border.all(
-          color: drawerComps.isNotEmpty
-              ? cs.primary.withValues(alpha: 0.6)
-              : cs.outlineVariant.withValues(alpha: 0.7),
-          width: drawerComps.isNotEmpty ? 1.5 : 1.0,
+          color: isDrawerHighlighted
+              ? highlightOrange
+              : (drawerComps.isNotEmpty
+                  ? cs.primary.withValues(alpha: 0.6)
+                  : cs.outlineVariant.withValues(alpha: 0.7)),
+          width: borderWidth,
         ),
         boxShadow: drawerComps.isNotEmpty
             ? [
@@ -440,7 +554,7 @@ class _CabinetMapViewState extends State<CabinetMapView> {
             : null,
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(7),
+        borderRadius: BorderRadius.circular(innerRadius),
         child: Stack(
           children: [
             // Zones rendering
@@ -454,6 +568,8 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                       1,
                       drawerComps,
                       cs,
+                      isDrawerHighlighted: isDrawerHighlighted,
+                      isTargetZone: isDrawerHighlighted,
                     )
                   : Column(
                       children: List.generate(totalZones, (i) {
@@ -461,14 +577,19 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                         final zoneComps = drawerComps
                             .where((c) => (c.drawerZone ?? 1) == zoneIdx)
                             .toList();
+                        final isTarget = isDrawerHighlighted &&
+                            (widget.highlightedZone == null ||
+                                widget.highlightedZone == zoneIdx);
                         return Expanded(
                           child: Container(
                             decoration: BoxDecoration(
                               border: i < totalZones - 1
                                   ? Border(
                                       bottom: BorderSide(
-                                          color: cs.outlineVariant
-                                              .withValues(alpha: 0.4),
+                                          color: isDrawerHighlighted
+                                              ? highlightOrange.withValues(alpha: 0.35)
+                                              : cs.outlineVariant
+                                                  .withValues(alpha: 0.4),
                                           width: 0.8))
                                   : null,
                             ),
@@ -480,6 +601,8 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                               totalZones,
                               zoneComps,
                               cs,
+                              isDrawerHighlighted: isDrawerHighlighted,
+                              isTargetZone: isTarget,
                             ),
                           ),
                         );
@@ -493,19 +616,25 @@ class _CabinetMapViewState extends State<CabinetMapView> {
               child: IgnorePointer(
                 child: Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      const EdgeInsets.symmetric(horizontal: 3.5, vertical: 1.5),
                   decoration: BoxDecoration(
-                    color: cs.surface.withValues(alpha: 0.9),
+                    color: isDrawerHighlighted
+                        ? highlightOrange
+                        : cs.surface.withValues(alpha: 0.9),
                     borderRadius: BorderRadius.circular(4),
                     border: Border.all(
-                        color: cs.outlineVariant.withValues(alpha: 0.5)),
+                        color: isDrawerHighlighted
+                            ? highlightOrange
+                            : cs.outlineVariant.withValues(alpha: 0.5)),
                   ),
                   child: Text(
                     displayLabel,
                     style: TextStyle(
-                      fontSize: group != null ? 8.5 : 9.5,
+                      fontSize: group != null ? 8.0 : 8.5,
                       fontWeight: FontWeight.bold,
-                      color: cs.onSurface,
+                      color: isDrawerHighlighted
+                          ? Colors.white
+                          : cs.onSurface,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -526,13 +655,68 @@ class _CabinetMapViewState extends State<CabinetMapView> {
     int zoneIndex,
     int totalZones,
     List<Component> comps,
-    ColorScheme cs,
-  ) {
+    ColorScheme cs, {
+    bool isDrawerHighlighted = false,
+    bool isTargetZone = false,
+  }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final highlightOrange = isDark ? const Color(0xFFFF9800) : const Color(0xFFE65100);
     final isOccupied = comps.isNotEmpty;
-    return Material(
-      color: isOccupied
+
+    // Background color: if drawer is highlighted, use orange tones only
+    final Color bgColor;
+    if (isDrawerHighlighted) {
+      if (isTargetZone) {
+        bgColor = highlightOrange.withValues(alpha: isDark ? 0.35 : 0.28);
+      } else {
+        // Non-target zones (both top and bottom) use the dark background color of the empty zone
+        bgColor = isDark
+            ? const Color(0xFF1E1208)
+            : const Color(0xFFFFF8E1);
+      }
+    } else {
+      bgColor = isOccupied
           ? cs.primaryContainer.withValues(alpha: totalZones > 1 ? 0.75 : 0.9)
-          : cs.surface,
+          : cs.surface;
+    }
+
+    // Zone letter color
+    final Color letterColor;
+    if (isDrawerHighlighted) {
+      if (isTargetZone) {
+        letterColor = isDark ? const Color(0xFFFFE082) : const Color(0xFFBF360C);
+      } else {
+        letterColor = isDark
+            ? const Color(0xFFFFB74D).withValues(alpha: 0.65)
+            : const Color(0xFFD84315).withValues(alpha: 0.65);
+      }
+    } else {
+      letterColor = isOccupied
+          ? cs.onPrimaryContainer.withValues(alpha: 0.65)
+          : cs.onSurfaceVariant.withValues(alpha: 0.5);
+    }
+
+    // Count badge styling (harmonized orange palette in target drawer, no blue)
+    final Color countBadgeBg;
+    final Color countBadgeTextColor;
+    if (isDrawerHighlighted) {
+      if (isTargetZone) {
+        countBadgeBg = highlightOrange;
+        countBadgeTextColor = Colors.white;
+      } else {
+        countBadgeBg = isDark
+            ? const Color(0xFF7A3805)
+            : const Color(0xFFBF360C).withValues(alpha: 0.60);
+        countBadgeTextColor = Colors.white.withValues(alpha: 0.9);
+      }
+    } else {
+      countBadgeBg = cs.primary;
+      countBadgeTextColor = cs.onPrimary;
+    }
+
+    return Material(
+      color: bgColor,
       child: InkWell(
         onTap: () => _showDrawerDetails(context, cabinetId, drawerLabel),
         child: Padding(
@@ -553,31 +737,37 @@ class _CabinetMapViewState extends State<CabinetMapView> {
                     style: TextStyle(
                       fontSize: 7.5,
                       fontWeight: FontWeight.bold,
-                      color: isOccupied
-                          ? cs.onPrimaryContainer.withValues(alpha: 0.65)
-                          : cs.onSurfaceVariant.withValues(alpha: 0.5),
+                      color: letterColor,
                     ),
                   ),
                 ),
-              // Quantity components count badge
+              // Quantity components count badge (clean, without overlapping icons or labels)
               if (isOccupied)
                 Align(
                   alignment: totalZones > 1
                       ? Alignment.centerRight
                       : Alignment.bottomRight,
                   child: Container(
+                    margin: EdgeInsets.only(
+                      right: isDrawerHighlighted ? 4.5 : 1.5,
+                      bottom: totalZones <= 1 ? (isDrawerHighlighted ? 2.5 : 0.0) : 0.0,
+                    ),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 4, vertical: 1.5),
+                        horizontal: 3, vertical: 1),
+                    constraints:
+                        const BoxConstraints(minWidth: 12, minHeight: 12),
                     decoration: BoxDecoration(
-                      color: cs.primary,
-                      borderRadius: BorderRadius.circular(8),
+                      color: countBadgeBg,
+                      borderRadius: BorderRadius.circular(isDrawerHighlighted ? 5.0 : 8.0),
                     ),
                     child: Text(
                       '${comps.length}',
+                      textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 8,
+                        fontSize: 7.5,
+                        height: 1.0,
                         fontWeight: FontWeight.bold,
-                        color: cs.onPrimary,
+                        color: countBadgeTextColor,
                       ),
                     ),
                   ),
@@ -800,12 +990,28 @@ class _CabinetMapViewState extends State<CabinetMapView> {
     DataService ds,
     ColorScheme cs,
   ) {
+    final isCompHighlighted = (widget.highlightedComponentId != null &&
+            comp.id == widget.highlightedComponentId) ||
+        (widget.highlightedComponentName != null &&
+            comp.name == widget.highlightedComponentName);
+
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final highlightOrange = isDark ? const Color(0xFFFF9800) : const Color(0xFFE65100);
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
       decoration: BoxDecoration(
-        color: cs.surface,
+        color: isCompHighlighted
+            ? highlightOrange.withValues(alpha: isDark ? 0.20 : 0.12)
+            : cs.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+        border: Border.all(
+          color: isCompHighlighted
+              ? highlightOrange
+              : cs.outlineVariant.withValues(alpha: 0.3),
+          width: isCompHighlighted ? 1.5 : 1.0,
+        ),
       ),
       child: Material(
         type: MaterialType.transparency,

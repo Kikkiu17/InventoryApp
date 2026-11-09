@@ -49,4 +49,5 @@ app.*.map.json
 *.appimage
 *.apk
 *.exe
+devtools_options.yaml
 

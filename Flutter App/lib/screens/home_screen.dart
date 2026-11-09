@@ -1,10 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:open_filex/open_filex.dart';
 
 import '../models/component.dart';
 import '../models/settings.dart';
@@ -15,9 +10,9 @@ import '../widgets/component_tile.dart';
 import '../widgets/component_dialog.dart';
 import '../widgets/component_view_dialog.dart';
 import '../widgets/cabinet_map_view.dart';
-import 'package:flutter/services.dart';
 import '../l10n/app_localizations.dart';
 import '../services/inventory_changes_service.dart';
+import '../services/new_features_service.dart';
 import '../models/inventory_change.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -39,6 +34,11 @@ class _HomeScreenState extends State<HomeScreen> {
   int? _cabinetFilter;
   bool _unassignedPosition = false;
   String _viewMode = 'list';
+  int? _highlightedCabinetId;
+  String? _highlightedDrawer;
+  int? _highlightedZone;
+  String? _highlightedComponentId;
+  String? _highlightedComponentName;
 
   String _lastInventoryId = '';
 
@@ -46,6 +46,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await NewFeaturesService.checkAndPrompt(context);
+      if (!mounted) return;
       UpdateService.checkAndPromptUpdate(context);
       final ds = context.read<DataService>();
       // Retry loading from server in case the initial load() in main() failed
@@ -122,6 +124,24 @@ class _HomeScreenState extends State<HomeScreen> {
       _unassignedPosition = false;
       _sortMode = SortMode.name;
       _sortSpecialTag = null;
+      _highlightedCabinetId = null;
+      _highlightedDrawer = null;
+      _highlightedZone = null;
+      _highlightedComponentId = null;
+      _highlightedComponentName = null;
+    }
+
+    if (ds.mapHighlightTarget != null) {
+      final target = ds.mapHighlightTarget!;
+      _viewMode = 'map';
+      _highlightedCabinetId = target.cabinet;
+      _highlightedDrawer = target.drawer;
+      _highlightedZone = target.drawerZone;
+      _highlightedComponentId = target.componentId;
+      _highlightedComponentName = target.componentName;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ds.clearMapHighlightTarget();
+      });
     }
 
     if (ds.globalSearchQuery != null) {
@@ -399,6 +419,12 @@ class _HomeScreenState extends State<HomeScreen> {
             child: CabinetMapView(
               settings: ds.settings,
               dataService: ds,
+              highlightedCabinetId: _highlightedCabinetId,
+              highlightedDrawer: _highlightedDrawer,
+              highlightedZone: _highlightedZone,
+              highlightedComponentId: _highlightedComponentId,
+              highlightedComponentName: _highlightedComponentName,
+              onClearHighlight: _clearHighlight,
               onViewComponent: (comp) => _viewComponent(context, comp),
               onEditComponent: (comp) => _editComponent(context, comp),
               onAddComponentAt: (cabinetId, drawerLabel, zoneIndex) async {
@@ -633,6 +659,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         component: comp,
                         settings: ds.settings,
                         onTapTile: () => _viewComponent(ctx, comp),
+                        onTapPosition: () => _showComponentOnMap(comp),
                         onEdit: () => _editComponent(ctx, comp),
                         onDuplicate: () => _duplicateComponent(ctx, comp),
                         onIncrement: () => ds.updateQuantity(comp.id, 1),
@@ -745,6 +772,36 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _showComponentOnMap(Component comp) {
+    if (comp.drawer.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.unassignedPosition),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _viewMode = 'map';
+      _highlightedCabinetId = comp.cabinet;
+      _highlightedDrawer = comp.drawer;
+      _highlightedZone = comp.drawerZone;
+      _highlightedComponentId = comp.id;
+      _highlightedComponentName = comp.name;
+    });
+  }
+
+  void _clearHighlight() {
+    setState(() {
+      _highlightedCabinetId = null;
+      _highlightedDrawer = null;
+      _highlightedZone = null;
+      _highlightedComponentId = null;
+      _highlightedComponentName = null;
+    });
+  }
+
   Future<void> _viewComponent(BuildContext context, Component comp) async {
     final ds = context.read<DataService>();
     await showDialog(
@@ -755,6 +812,7 @@ class _HomeScreenState extends State<HomeScreen> {
         onEdit: () {
           _editComponent(context, comp);
         },
+        onGoToPosition: () => _showComponentOnMap(comp),
       ),
     );
   }

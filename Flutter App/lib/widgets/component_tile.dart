@@ -13,6 +13,7 @@ class ComponentTile extends StatelessWidget {
   final Component component;
   final AppSettings settings;
   final VoidCallback onTapTile;
+  final VoidCallback? onTapPosition;
   final VoidCallback onEdit;
   final VoidCallback onDuplicate;
   final VoidCallback onIncrement;
@@ -23,6 +24,7 @@ class ComponentTile extends StatelessWidget {
     required this.component,
     required this.settings,
     required this.onTapTile,
+    this.onTapPosition,
     required this.onEdit,
     required this.onDuplicate,
     required this.onIncrement,
@@ -76,39 +78,47 @@ class ComponentTile extends StatelessWidget {
                                 ? container.name
                                 : context.l10n.containerNumber(container.id);
                           }(),
-                    child: Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: isUnassigned
-                            ? cs.errorContainer
-                            : cs.secondaryContainer,
+                    child: Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                      child: InkWell(
+                        onTap: onTapPosition,
                         borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                              isUnassigned
-                                  ? Icons.location_off_outlined
-                                  : (hasCabinets
-                                      ? Icons.kitchen_outlined
-                                      : Icons.inbox_outlined),
-                              size: 16,
-                              color: isUnassigned
-                                  ? cs.onErrorContainer
-                                  : cs.onSecondaryContainer),
-                          const SizedBox(height: 1),
-                          Text(drawerText,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                  fontSize: isUnassigned ? 11 : 12,
-                                  height: 1.05,
-                                  fontWeight: FontWeight.bold,
+                        child: Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: isUnassigned
+                                ? cs.errorContainer
+                                : cs.secondaryContainer,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                  isUnassigned
+                                      ? Icons.location_off_outlined
+                                      : (hasCabinets
+                                          ? Icons.kitchen_outlined
+                                          : Icons.inbox_outlined),
+                                  size: 16,
                                   color: isUnassigned
                                       ? cs.onErrorContainer
-                                      : cs.onSecondaryContainer)),
-                        ],
+                                      : cs.onSecondaryContainer),
+                              const SizedBox(height: 1),
+                              Text(drawerText,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                      fontSize: isUnassigned ? 11 : 12,
+                                      height: 1.05,
+                                      fontWeight: FontWeight.bold,
+                                      color: isUnassigned
+                                          ? cs.onErrorContainer
+                                          : cs.onSecondaryContainer)),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),

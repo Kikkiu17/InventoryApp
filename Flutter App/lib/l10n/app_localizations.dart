@@ -467,6 +467,9 @@ abstract class AppLocalizations {
   String get renameFileTitle;
   String deleteAttachmentPermanentConfirm(String name);
   String get searchFileOrComponentPlaceholder;
+  String get seeItem;
+  String get selectItemToView;
+  String get itemPrefix;
 
   // Component Dialogs additions
   String get deleteComponentConfirmMsg;
@@ -575,6 +578,42 @@ abstract class AppLocalizations {
   String get backupDiffTitle;
   String get noDifferencesWithBackup;
   String get errorLoadingBackup;
+
+  // New Features Walkthrough
+  String get newFeaturesTitle;
+  String get newFeaturesSubtitle;
+  String get newFeaturesSkip;
+  String get newFeaturesNext;
+  String get newFeaturesBack;
+  String get newFeaturesDone;
+  String get newFeaturesDontShowForNewVersions;
+  String get newFeaturesSettingsTitle;
+  String get newFeaturesSettingsSubtitle;
+  String get newFeaturesAutoShowTitle;
+  String get newFeaturesAutoShowSubtitle;
+
+  String get newFeatureMapCategory;
+  String get newFeatureMapTitle;
+  String get newFeatureMapSubtitle;
+  String get newFeatureMapStep1;
+  String get newFeatureMapStep2;
+
+  String get newFeatureFilesCategory;
+  String get newFeatureFilesTitle;
+  String get newFeatureFilesSubtitle;
+  String get newFeatureFilesStep1;
+  String get newFeatureFilesStep2;
+
+  String get newFeatureSettingsCategory;
+  String get newFeatureSettingsTitle;
+  String get newFeatureSettingsSubtitle;
+  String get newFeatureSettingsStep1;
+  String get newFeatureSettingsStep2;
+
+  String get newFeatureMockResistor;
+  String get newFeatureMockFile;
+  String get newFeatureMockViewItem;
+  String get newFeatureMockAutoSaved;
 }
 
 

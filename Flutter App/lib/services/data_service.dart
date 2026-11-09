@@ -43,6 +43,22 @@ class SpecialFilter {
   bool get isEmpty => exact.isEmpty && min.isEmpty && max.isEmpty;
 }
 
+class MapHighlightTarget {
+  final int cabinet;
+  final String drawer;
+  final int? drawerZone;
+  final String? componentId;
+  final String? componentName;
+
+  const MapHighlightTarget({
+    required this.cabinet,
+    required this.drawer,
+    this.drawerZone,
+    this.componentId,
+    this.componentName,
+  });
+}
+
 class SyncConflict {
   final List<Component> localComponents;
   final AppSettings localSettings;
@@ -128,6 +144,7 @@ class DataService extends ChangeNotifier {
   bool _trustSelfSigned = true;
   String _currentInventoryId = 'default';
   String? _globalSearchQuery;
+  MapHighlightTarget? _mapHighlightTarget;
   ApiClient? _api;
 
   DataService() {
@@ -170,6 +187,7 @@ class DataService extends ChangeNotifier {
   bool get isRemote => _mode == StorageMode.remote;
   SyncConflict? get pendingConflict => _pendingConflict;
   String? get globalSearchQuery => _globalSearchQuery;
+  MapHighlightTarget? get mapHighlightTarget => _mapHighlightTarget;
   ThemeMode get themeMode => _themeMode;
   String get languageCode => _languageCode;
   String? get savedLanguageCode => _savedLanguageCode;
@@ -177,6 +195,22 @@ class DataService extends ChangeNotifier {
 
   void setGlobalSearchQuery(String? query) {
     _globalSearchQuery = query;
+    notifyListeners();
+  }
+
+  void highlightComponentOnMap(Component comp) {
+    _mapHighlightTarget = MapHighlightTarget(
+      cabinet: comp.cabinet,
+      drawer: comp.drawer,
+      drawerZone: comp.drawerZone,
+      componentId: comp.id,
+      componentName: comp.name,
+    );
+    notifyListeners();
+  }
+
+  void clearMapHighlightTarget() {
+    _mapHighlightTarget = null;
     notifyListeners();
   }
 

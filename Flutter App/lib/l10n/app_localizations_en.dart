@@ -768,7 +768,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get deleteFileTitle => 'Delete file';
   @override
-  String get componentPrefix => 'Component';
+  String get componentPrefix => 'Item';
+  @override
+  String get itemPrefix => 'Item';
 
   @override
   String get zoneNearLabel => 'Near (front)';
@@ -850,7 +852,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String deleteAttachmentPermanentConfirm(String name) =>
       'Do you want to permanently delete "$name"?';
   @override
-  String get searchFileOrComponentPlaceholder => 'Search file or component...';
+  String get searchFileOrComponentPlaceholder => 'Search file or item...';
+  @override
+  String get seeItem => 'View item';
+  @override
+  String get selectItemToView => 'Select item';
 
   @override
   String get deleteComponentConfirmMsg =>
@@ -1062,4 +1068,70 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noDifferencesWithBackup => 'No differences compared to current state';
   @override
   String get errorLoadingBackup => 'Error loading backup';
+
+  // New Features Walkthrough
+  @override
+  String get newFeaturesTitle => 'What\'s New';
+  @override
+  String get newFeaturesSubtitle => 'Discover the latest features added to the app';
+  @override
+  String get newFeaturesSkip => 'Skip';
+  @override
+  String get newFeaturesNext => 'Next';
+  @override
+  String get newFeaturesBack => 'Back';
+  @override
+  String get newFeaturesDone => 'Got it';
+  @override
+  String get newFeaturesDontShowForNewVersions => 'Don\'t show for new versions';
+  @override
+  String get newFeaturesSettingsTitle => 'App Features Guide';
+  @override
+  String get newFeaturesSettingsSubtitle => 'Discover recent features and how to use them';
+  @override
+  String get newFeaturesAutoShowTitle => 'Show new features on updates';
+  @override
+  String get newFeaturesAutoShowSubtitle => 'Automatically show the feature guide when the app is updated';
+
+  @override
+  String get newFeatureMapCategory => 'Map & Position';
+  @override
+  String get newFeatureMapTitle => 'Find on Map in One Tap';
+  @override
+  String get newFeatureMapSubtitle => 'Tap the position badge to instantly reveal the drawer and zone on the map.';
+  @override
+  String get newFeatureMapStep1 => 'Tap the position badge on any item tile (e.g. A1 · 2)';
+  @override
+  String get newFeatureMapStep2 => 'The drawer and exact zone light up in bright orange on the map';
+
+  @override
+  String get newFeatureFilesCategory => 'Files & Attachments';
+  @override
+  String get newFeatureFilesTitle => 'View Item Directly from Files';
+  @override
+  String get newFeatureFilesSubtitle => 'Open linked item details with a right-click or long-press on any file.';
+  @override
+  String get newFeatureFilesStep1 => 'Right-click or long-press any file in the Files page';
+  @override
+  String get newFeatureFilesStep2 => 'Choose \'View item\' to inspect its details and position';
+
+  @override
+  String get newFeatureSettingsCategory => 'Settings & Navigation';
+  @override
+  String get newFeatureSettingsTitle => 'Instant Auto-Save Everywhere';
+  @override
+  String get newFeatureSettingsSubtitle => 'Preferences are saved immediately without needing a save button.';
+  @override
+  String get newFeatureSettingsStep1 => 'Change any setting or option freely';
+  @override
+  String get newFeatureSettingsStep2 => 'Navigate back anytime: changes are already preserved';
+
+  @override
+  String get newFeatureMockResistor => '10kΩ Resistor';
+  @override
+  String get newFeatureMockFile => 'datasheet.pdf';
+  @override
+  String get newFeatureMockViewItem => 'View item';
+  @override
+  String get newFeatureMockAutoSaved => 'Auto-saved';
 }

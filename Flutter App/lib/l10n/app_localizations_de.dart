@@ -775,7 +775,9 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get deleteFileTitle => 'Datei löschen';
   @override
-  String get componentPrefix => 'Komponente';
+  String get componentPrefix => 'Element';
+  @override
+  String get itemPrefix => 'Element';
 
   @override
   String get zoneNearLabel => 'Nah (vorne)';
@@ -860,7 +862,11 @@ class AppLocalizationsDe extends AppLocalizations {
       'Möchten Sie "$name" dauerhaft löschen?';
   @override
   String get searchFileOrComponentPlaceholder =>
-      'Datei oder Komponente suchen...';
+      'Datei oder Element suchen...';
+  @override
+  String get seeItem => 'Element anzeigen';
+  @override
+  String get selectItemToView => 'Element auswählen';
 
   @override
   String get deleteComponentConfirmMsg =>
@@ -1075,4 +1081,70 @@ class AppLocalizationsDe extends AppLocalizations {
   String get noDifferencesWithBackup => 'Keine Unterschiede zum aktuellen Zustand';
   @override
   String get errorLoadingBackup => 'Fehler beim Laden des Backups';
+
+  // New Features Walkthrough
+  @override
+  String get newFeaturesTitle => 'Neuigkeiten der App';
+  @override
+  String get newFeaturesSubtitle => 'Entdecken Sie die neuesten Funktionen Ihrer App';
+  @override
+  String get newFeaturesSkip => 'Überspringen';
+  @override
+  String get newFeaturesNext => 'Weiter';
+  @override
+  String get newFeaturesBack => 'Zurück';
+  @override
+  String get newFeaturesDone => 'Verstanden';
+  @override
+  String get newFeaturesDontShowForNewVersions => 'Bei neuen Versionen nicht mehr anzeigen';
+  @override
+  String get newFeaturesSettingsTitle => 'Funktionsübersicht';
+  @override
+  String get newFeaturesSettingsSubtitle => 'Entdecken Sie neue Funktionen und deren Bedienung';
+  @override
+  String get newFeaturesAutoShowTitle => 'Neuheiten nach Updates anzeigen';
+  @override
+  String get newFeaturesAutoShowSubtitle => 'Zeigt die Übersicht nach einem App-Update automatisch an';
+
+  @override
+  String get newFeatureMapCategory => 'Karte & Position';
+  @override
+  String get newFeatureMapTitle => 'Mit einem Tippen auf der Karte finden';
+  @override
+  String get newFeatureMapSubtitle => 'Tippen Sie auf das Positionsfeld, um Schublade und Zone hervorzuheben.';
+  @override
+  String get newFeatureMapStep1 => 'Tippen Sie auf die Positionsmarke eines Elements (z. B. A1 · 2)';
+  @override
+  String get newFeatureMapStep2 => 'Schublade und genaue Zone leuchten auf der Karte orange auf';
+
+  @override
+  String get newFeatureFilesCategory => 'Dateien & Anhänge';
+  @override
+  String get newFeatureFilesTitle => 'Element direkt aus Dateien ansehen';
+  @override
+  String get newFeatureFilesSubtitle => 'Öffnen Sie Details verknüpfter Elemente per Rechtsklick oder langem Drücken.';
+  @override
+  String get newFeatureFilesStep1 => 'Klicken Sie mit der rechten Maustaste oder halten Sie eine Datei gedrückt';
+  @override
+  String get newFeatureFilesStep2 => 'Wählen Sie \'Element ansehen\' für Details und Position';
+
+  @override
+  String get newFeatureSettingsCategory => 'Einstellungen';
+  @override
+  String get newFeatureSettingsTitle => 'Sofortige automatische Speicherung';
+  @override
+  String get newFeatureSettingsSubtitle => 'Jede Änderung wird ohne Bestätigungsbutton sofort gesichert.';
+  @override
+  String get newFeatureSettingsStep1 => 'Passen Sie Einstellungen nach Belieben an';
+  @override
+  String get newFeatureSettingsStep2 => 'Gehen Sie einfach zurück: alles ist bereits gespeichert';
+
+  @override
+  String get newFeatureMockResistor => 'Widerstand 10kΩ';
+  @override
+  String get newFeatureMockFile => 'datasheet.pdf';
+  @override
+  String get newFeatureMockViewItem => 'Element ansehen';
+  @override
+  String get newFeatureMockAutoSaved => 'Automatisch gespeichert';
 }

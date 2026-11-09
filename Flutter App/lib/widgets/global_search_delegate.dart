@@ -216,45 +216,97 @@ class GlobalSearchResultTile extends StatelessWidget {
                 ? '${c.cabinet}-${c.drawer}${hasZone ? '\nZ${c.drawerZone}' : ''}'
                 : '${c.drawer}${hasZone ? '\nZ${c.drawerZone}' : ''}'));
 
-    final Widget leadingBadge = Container(
-      width: 48,
-      height: 48,
-      decoration: BoxDecoration(
-        color: isBuffer
-            ? cs.secondaryContainer
-            : (isUnassigned ? cs.errorContainer : cs.secondaryContainer),
+    final Widget leadingBadge = Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
         borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            isBuffer
-                ? Icons.shopping_bag_outlined
-                : (isUnassigned
-                    ? Icons.location_off_outlined
-                    : (hasCabinets
-                        ? Icons.kitchen_outlined
-                        : Icons.inbox_outlined)),
-            size: 16,
+        onTap: () async {
+          if (isBuffer) {
+            onBeforeNavigate?.call();
+            globalMainShellKey.currentState?.switchTab(1);
+            final mainContext = globalMainShellKey.currentContext;
+            if (mainContext != null && mainContext.mounted) {
+              ScaffoldMessenger.of(mainContext).showSnackBar(SnackBar(
+                content: Text(l10n.passedToBuffer),
+                behavior: SnackBarBehavior.floating,
+              ));
+            }
+            return;
+          }
+          if (isUnassigned) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(l10n.unassignedPosition),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            return;
+          }
+          try {
+            final mainContext = globalMainShellKey.currentContext;
+            onBeforeNavigate?.call();
+            if (res.inventoryId != effectiveDs.currentInventoryId) {
+              await effectiveDs.switchInventory(res.inventoryId);
+              if (mainContext != null && mainContext.mounted) {
+                ScaffoldMessenger.of(mainContext).showSnackBar(SnackBar(
+                  content: Text(l10n.switchedToInventory(res.inventoryName)),
+                  behavior: SnackBarBehavior.floating,
+                ));
+              }
+            }
+            effectiveDs.highlightComponentOnMap(c);
+            globalMainShellKey.currentState?.switchTab(0);
+          } catch (e) {
+            final mainContext = globalMainShellKey.currentContext ?? context;
+            if (mainContext.mounted) {
+              ScaffoldMessenger.of(mainContext).showSnackBar(
+                SnackBar(content: Text('${l10n.error}: $e')),
+              );
+            }
+          }
+        },
+        child: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
             color: isBuffer
-                ? cs.onSecondaryContainer
-                : (isUnassigned ? cs.onErrorContainer : cs.onSecondaryContainer),
+                ? cs.secondaryContainer
+                : (isUnassigned ? cs.errorContainer : cs.secondaryContainer),
+            borderRadius: BorderRadius.circular(8),
           ),
-          const SizedBox(height: 1),
-          Text(
-            drawerText,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: (isBuffer || !isUnassigned) ? 11 : 10,
-              height: 1.05,
-              fontWeight: FontWeight.bold,
-              color: isBuffer
-                  ? cs.onSecondaryContainer
-                  : (isUnassigned ? cs.onErrorContainer : cs.onSecondaryContainer),
-            ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                isBuffer
+                    ? Icons.shopping_bag_outlined
+                    : (isUnassigned
+                        ? Icons.location_off_outlined
+                        : (hasCabinets
+                            ? Icons.kitchen_outlined
+                            : Icons.inbox_outlined)),
+                size: 16,
+                color: isBuffer
+                    ? cs.onSecondaryContainer
+                    : (isUnassigned ? cs.onErrorContainer : cs.onSecondaryContainer),
+              ),
+              const SizedBox(height: 1),
+              Text(
+                drawerText,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: (isBuffer || !isUnassigned) ? 11 : 10,
+                  height: 1.05,
+                  fontWeight: FontWeight.bold,
+                  color: isBuffer
+                      ? cs.onSecondaryContainer
+                      : (isUnassigned ? cs.onErrorContainer : cs.onSecondaryContainer),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
 
@@ -391,6 +443,9 @@ class GlobalSearchResultTile extends StatelessWidget {
                 } else {
                   await effectiveDs.switchInventory(res.inventoryId);
                   effectiveDs.setGlobalSearchQuery(c.name);
+                  if (c.drawer.isNotEmpty) {
+                    effectiveDs.highlightComponentOnMap(c);
+                  }
                   globalMainShellKey.currentState?.switchTab(0);
                   if (mainContext != null && mainContext.mounted) {
                     ScaffoldMessenger.of(mainContext).showSnackBar(SnackBar(
