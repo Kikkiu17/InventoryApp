@@ -412,7 +412,7 @@ class GlobalSearchResultTile extends StatelessWidget {
           context: context,
           builder: (ctx) => ComponentViewDialog(
             component: c,
-            inventoryId: isBuffer ? null : res.inventoryId,
+            inventoryId: isBuffer ? '_buffer_' : res.inventoryId,
             settings: res.settings ??
                 AppSettings(
                   containers: effectiveDs.settings.containers,

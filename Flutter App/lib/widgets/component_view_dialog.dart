@@ -42,7 +42,7 @@ class ComponentViewDialog extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(child: Text(currentComp.name)),
-          if (ds.isRemote && ds.inventories.length > 1)
+          if (ds.isRemote && ds.inventories.length > 1 && inventoryId != '_buffer_')
             IconButton(
               icon: const Icon(Icons.drive_file_move_outlined),
               tooltip: l10n.moveToAnotherInventory,
@@ -289,7 +289,8 @@ class ComponentViewDialog extends StatelessWidget {
 
   Future<void> _showMoveDialog(BuildContext context, DataService ds, Component component) async {
     final l10n = context.l10n;
-    final otherInventories = ds.inventories.where((inv) => inv.id != ds.currentInventoryId).toList();
+    final sourceInvId = (inventoryId != null && inventoryId!.isNotEmpty) ? inventoryId! : ds.currentInventoryId;
+    final otherInventories = ds.inventories.where((inv) => inv.id != sourceInvId).toList();
     if (otherInventories.isEmpty) return;
 
     InventoryMeta? selectedInventory = otherInventories.first;
@@ -347,7 +348,7 @@ class ComponentViewDialog extends StatelessWidget {
         Navigator.pop(context);
       }
 
-      await ds.moveComponent(component.id, targetInv.id);
+      await ds.moveComponent(component.id, targetInv.id, sourceInvId);
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(

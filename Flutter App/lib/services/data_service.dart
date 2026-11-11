@@ -637,16 +637,26 @@ class DataService extends ChangeNotifier {
   }
 
   Future<void> moveComponent(
-      String componentId, String targetInventoryId) async {
+      String componentId, String targetInventoryId, [String? sourceInventoryId]) async {
+    final effectiveSourceId = (sourceInventoryId != null &&
+            sourceInventoryId.isNotEmpty &&
+            sourceInventoryId != '_buffer_')
+        ? sourceInventoryId
+        : _currentInventoryId;
+
     if (_mode == StorageMode.remote && _serverConnected) {
       try {
-        await _api!.moveComponent(componentId, targetInventoryId);
-        _components.removeWhere((e) => e.id == componentId);
-        final ts = DateTime.tryParse(_api!.lastUpdated ?? '');
-        await _mirrorToLocal(_components, _settings, timestamp: ts);
+        await _api!.moveComponent(componentId, targetInventoryId, effectiveSourceId);
+        if (effectiveSourceId == _currentInventoryId) {
+          _components.removeWhere((e) => e.id == componentId);
+          final ts = DateTime.tryParse(_api!.lastUpdated ?? '');
+          await _mirrorToLocal(_components, _settings, timestamp: ts);
+        }
 
-        // Invalidate target inventory local mirror
+        // Invalidate both source and target inventory local mirror cache
         final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('components_$effectiveSourceId');
+        await prefs.remove('localTimestamp_$effectiveSourceId');
         await prefs.remove('components_$targetInventoryId');
         await prefs.remove('localTimestamp_$targetInventoryId');
       } catch (e) {

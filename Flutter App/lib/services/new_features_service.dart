@@ -69,9 +69,9 @@ class NewFeaturesService {
     if (versionOverride != null) return versionOverride!;
     try {
       final info = await PackageInfo.fromPlatform();
-      return info.version.isNotEmpty ? info.version : '1.19.0';
+      return info.version.isNotEmpty ? info.version : '1.19.1';
     } catch (_) {
-      return '1.19.0';
+      return '1.19.1';
     }
   }
 

@@ -280,9 +280,12 @@ class ApiClient {
     return jsonResponse['filename'] as String;
   }
 
-  Future<void> moveComponent(String componentId, String targetInventoryId) async {
+  Future<void> moveComponent(String componentId, String targetInventoryId, [String? sourceInventoryId]) async {
+    final uri = (sourceInventoryId != null && sourceInventoryId.isNotEmpty)
+        ? Uri.parse('$baseUrl/api/inventories/$sourceInventoryId/components/$componentId/move')
+        : _inv('/components/$componentId/move');
     final res = await _client.post(
-      _inv('/components/$componentId/move'),
+      uri,
       headers: _headers,
       body: jsonEncode({'targetInventoryId': targetInventoryId}),
     ).timeout(_timeout);
