@@ -16,7 +16,7 @@ class _NewFeaturesScreenState extends State<NewFeaturesScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   bool _dontShowForNewVersions = false;
-  String _appVersion = '1.19.2';
+  String _appVersion = '1.19.3';
 
   @override
   void initState() {
