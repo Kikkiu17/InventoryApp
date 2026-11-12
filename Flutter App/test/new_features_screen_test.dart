@@ -18,7 +18,7 @@ void main() {
     PackageInfo.setMockInitialValues(
       appName: 'inventario',
       packageName: 'com.example.inventario',
-      version: '1.19.1',
+      version: '1.19.2',
       buildNumber: '1',
       buildSignature: '',
     );

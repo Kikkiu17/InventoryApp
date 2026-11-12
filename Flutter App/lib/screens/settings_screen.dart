@@ -53,6 +53,17 @@ class SettingsSubmenuRoute<T> extends PageRoute<T>
 
   @override
   String get debugLabel => '${super.debugLabel}(${settings.name})';
+
+  @override
+  void handleCommitBackGesture() {
+    if (!isCurrent) {
+      return;
+    }
+    navigator?.pop();
+    if (controller?.isAnimating ?? false) {
+      controller?.reverse();
+    }
+  }
 }
 
 class _PredictiveBackObserverWidget extends StatefulWidget {

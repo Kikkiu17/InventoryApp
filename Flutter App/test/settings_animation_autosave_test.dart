@@ -116,11 +116,89 @@ void main() {
 
       // Commit back gesture
       observerState.handleCommitBackGesture();
+
+      // Verify animation does NOT jump back to upperBound (1.0), but continues smoothly towards 0.0
+      expect(modalRoute.animation?.value, closeTo(0.25, 0.05));
+      expect(modalRoute.animation?.value, isNot(greaterThan(0.3)));
+
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(modalRoute.animation?.value, lessThan(0.25));
+      expect(modalRoute.animation?.value, greaterThanOrEqualTo(0.0));
+
       await tester.pumpAndSettle();
 
       // Returned to main menu
       expect(find.text('Server remoto'), findsOneWidget);
       expect(find.text('Aspetto'), findsOneWidget);
+    });
+
+    testWidgets(
+        'Predictive back gesture commit smoothly reverses from current progress without jumping to 1.0',
+        (tester) async {
+      final ds = DataService();
+      await tester.pumpWidget(
+        ChangeNotifierProvider<DataService>.value(
+          value: ds,
+          child: const MaterialApp(
+            home: SettingsScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Enter "Aspetto" submenu
+      await tester.tap(find.text('Aspetto'));
+      await tester.pumpAndSettle();
+
+      final modalRoute = ModalRoute.of(
+              tester.element(find.text("Tema dell'app"))) as PageRoute;
+      expect(modalRoute.isCurrent, isTrue);
+      expect(modalRoute.animation?.value, equals(1.0));
+
+      final observerFinder = find.byWidgetPredicate(
+        (w) => w.runtimeType.toString() == '_PredictiveBackObserverWidget',
+      );
+      expect(observerFinder, findsOneWidget);
+      final observerState =
+          tester.state(observerFinder) as WidgetsBindingObserver;
+
+      final handled = observerState.handleStartBackGesture(PredictiveBackEvent.fromMap({
+        'touchOffset': [10.0, 300.0],
+        'progress': 0.0,
+        'swipeEdge': 0,
+        'isButtonEvent': false,
+      }));
+      expect(handled, isTrue);
+
+      // Drag 60%
+      observerState.handleUpdateBackGestureProgress(PredictiveBackEvent.fromMap({
+        'touchOffset': [200.0, 300.0],
+        'progress': 0.60,
+        'swipeEdge': 0,
+        'isButtonEvent': false,
+      }));
+      await tester.pump();
+
+      final progressBeforeCommit = modalRoute.animation!.value;
+      expect(progressBeforeCommit, closeTo(0.40, 0.05));
+
+      // Commit gesture
+      observerState.handleCommitBackGesture();
+
+      // Immediately upon commit, the route animation must not jump to upperBound (1.0)
+      expect(modalRoute.animation!.value, equals(progressBeforeCommit));
+      expect(modalRoute.animation!.value, isNot(closeTo(1.0, 0.1)));
+
+      // Step forward by 40ms to verify reverse animation smoothly progresses towards 0.0
+      await tester.pump(const Duration(milliseconds: 40));
+      expect(modalRoute.animation!.value, lessThan(progressBeforeCommit));
+      expect(modalRoute.animation!.value, greaterThanOrEqualTo(0.0));
+
+      // Settle remaining animation
+      await tester.pumpAndSettle();
+
+      // Main menu should now be active
+      expect(find.text('Server remoto'), findsOneWidget);
     });
 
     testWidgets(
