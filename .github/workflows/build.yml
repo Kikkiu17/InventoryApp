@@ -34,7 +34,7 @@ jobs:
         working-directory: './Flutter App'
 
       - name: Build APK
-        run: flutter build apk --release
+        run: flutter build apk --release --android-skip-build-dependency-validation
         working-directory: './Flutter App'
 
       - name: Upload Android APK
